@@ -30,6 +30,15 @@ type Ctx = { Bindings: Env }
 
 const app = new Hono<Ctx>()
 
+// 基础安全响应头（面板自带登录，这几项成本几乎为零）
+app.use('*', async (c, next) => {
+  await next()
+  c.header('X-Content-Type-Options', 'nosniff')
+  c.header('X-Frame-Options', 'DENY')
+  c.header('Referrer-Policy', 'no-referrer')
+  c.header('Permissions-Policy', 'geolocation=(), microphone=(), camera=()')
+})
+
 // ---------- 基础设施 ----------
 
 /** JWT 秘钥：优先 env，否则在 D1 meta 里生成一次并复用。 */
@@ -43,12 +52,18 @@ async function secretOf(env: Env): Promise<string> {
   return secret
 }
 
-async function currentUser(c: any) {
+interface Session {
+  username: string
+  mustChange: boolean
+  uid: number
+}
+
+async function currentUser(c: any): Promise<Session | null> {
   const token = getCookie(c, COOKIE)
   if (!token) return null
   const payload = await verifyJWT(token, await secretOf(c.env))
-  if (!payload) return null
-  return typeof payload.u === 'string' ? payload.u : null
+  if (!payload || typeof payload.u !== 'string') return null
+  return { username: payload.u, uid: Number(payload.uid ?? 0), mustChange: payload.mc === true }
 }
 
 /** 选中的节点：X-Remote-Server 头优先，缺省落到第一个启用节点。 */
@@ -88,7 +103,8 @@ app.post('/api/login', async (c) => {
   const user = await doLogin(c.env.DB, String(body.user ?? ''), String(body.pass ?? ''))
   await run(c.env.DB, 'INSERT INTO login_attempts (ip, ts, ok) VALUES (?, ?, ?)', ip, ts, user ? 1 : 0)
   if (!user) return json(c, null, new Error('Invalid login'))
-  const token = await signJWT({ u: user.username, uid: user.id }, await secretOf(c.env))
+  const mustChange = user.must_change === 1
+  const token = await signJWT({ u: user.username, uid: user.id, mc: mustChange }, await secretOf(c.env))
   let isHttps = true
   try {
     isHttps = new URL(c.req.url).protocol === 'https:'
@@ -99,7 +115,7 @@ app.post('/api/login', async (c) => {
   // 前端路由守卫读的是 document.cookie 里的 `s-ui`（沿用它原来的名字）。
   // 这个只是"已登录"标记，读得到也无所谓；真正的凭据是上面那个 HttpOnly cookie。
   setCookie(c, MARKER_COOKIE, '1', { httpOnly: false, sameSite: 'Lax', path: '/', maxAge: 86400, secure: isHttps })
-  return okMsg(c)
+  return json(c, { must_change: mustChange })
 })
 
 app.get('/api/logout', async (c) => {
@@ -113,9 +129,13 @@ app.get('/api/logout', async (c) => {
 app.use('/api/*', async (c, next) => {
   const p = c.req.path
   if (p.endsWith('/login') || p.endsWith('/logout')) return await next()
-  const user = await currentUser(c)
-  if (!user) return json(c, null, new Error('Invalid login'))
-  c.set('user' as never, user as never)
+  const session = await currentUser(c)
+  if (!session) return json(c, null, new Error('Invalid login'))
+  const action = c.req.path.split('/').pop() ?? ''
+  if (session.mustChange && !['changePass', 'logout', 'login', 'users', 'changes', 'tokens', 'servers'].includes(action)) {
+    return json(c, null, new Error('当前是默认密码，请先到「管理 → 修改密码」改成自己的密码'))
+  }
+  c.set('user' as never, session.username as never)
   return await next()
 })
 
@@ -255,7 +275,54 @@ app.get('/api/changes', async (c) => {
 })
 
 app.get('/api/updateInfo', async (c) => json(c, { current: 'cf-0.1.0', latest: 'cf-0.1.0' }))
-app.get('/api/tokens', async (c) => json(c, []))
+
+// 管理员列表（Admins 页依赖；lastLogin 必须是字符串，前端会 split）
+app.get('/api/users', async (c) => {
+  const rows = await all<{ id: number; username: string }>(
+    c.env.DB,
+    'SELECT id, username FROM users ORDER BY id ASC',
+  )
+  return json(c, rows.map((r) => ({ id: r.id, username: r.username, lastLogin: '' })))
+})
+
+// 第三方调用用的 API Token（面板自用，给脚本/监控取订阅或改配置）
+app.get('/api/tokens', async (c) => {
+  const session = await currentUser(c)
+  if (!session) return json(c, [])
+  const rows = await all<{ id: number; desc: string; token: string; expiry: number }>(
+    c.env.DB,
+    'SELECT id, desc, token, expiry FROM tokens WHERE user_id = ? ORDER BY id DESC',
+    session.uid,
+  )
+  return json(c, rows)
+})
+
+app.post('/api/addToken', async (c) => {
+  const session = await currentUser(c)
+  if (!session) return json(c, null, new Error('Invalid login'))
+  const body = await c.req.parseBody()
+  const desc = String(body.desc ?? '')
+  const expiry = parseInt(String(body.expiry ?? '0'), 10) || 0
+  const token = randHex(24)
+  await run(
+    c.env.DB,
+    'INSERT INTO tokens (user_id, desc, token, expiry, created_at) VALUES (?, ?, ?, ?, ?)',
+    session.uid,
+    desc,
+    token,
+    expiry,
+    now(),
+  )
+  return json(c, token)
+})
+
+app.post('/api/deleteToken', async (c) => {
+  const body = await c.req.parseBody()
+  const id = parseInt(String(body.id ?? '0'), 10)
+  if (!id) return json(c, null, new Error('invalid id'))
+  await run(c.env.DB, 'DELETE FROM tokens WHERE id = ?', id)
+  return okMsg(c)
+})
 
 // 前端的"服务器列表"= 这里的受管节点。可达性用 agent 最近一次上报的时间判断，
 // 不需要（也不应该）由面板反连节点。
@@ -404,7 +471,22 @@ app.post('/api/changePass', async (c) => {
   const user = await doLogin(c.env.DB, username, oldPass)
   if (!user) return json(c, null, new Error('Invalid login'))
   const { hashPassword } = await import('./auth')
-  await run(c.env.DB, 'UPDATE users SET username = ?, password_hash = ? WHERE id = ?', newName, await hashPassword(newPass), user.id)
+  await run(
+    c.env.DB,
+    'UPDATE users SET username = ?, password_hash = ?, must_change = 0 WHERE id = ?',
+    newName,
+    await hashPassword(newPass),
+    user.id,
+  )
+  // 重签 cookie，让 mc 立刻变 false，不用重新登录
+  let https = true
+  try {
+    https = new URL(c.req.url).protocol === 'https:'
+  } catch {
+    https = true
+  }
+  const fresh = await signJWT({ u: newName, uid: user.id, mc: false }, await secretOf(c.env))
+  setCookie(c, COOKIE, fresh, { httpOnly: true, sameSite: 'Lax', path: '/', maxAge: 86400, secure: https })
   return okMsg(c, 'save')
 })
 

@@ -84,11 +84,14 @@ export async function getUser(db: D1Database, username: string): Promise<UserRow
 export async function ensureAdmin(db: D1Database, user = 'admin', pass = 'admin'): Promise<boolean> {
   const exists = await first<UserRow>(db, 'SELECT id FROM users LIMIT 1')
   if (exists) return false
+  // 没配 ADMIN_PASS（或还是 admin）时强制首次登录改密，避免面板裸奔
+  const weak = !pass || pass === 'admin'
   await run(
     db,
-    'INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)',
+    'INSERT INTO users (username, password_hash, must_change, created_at) VALUES (?, ?, ?, ?)',
     user,
-    await hashPassword(pass),
+    await hashPassword(pass || 'admin'),
+    weak ? 1 : 0,
     now(),
   )
   return true

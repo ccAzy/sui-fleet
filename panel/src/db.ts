@@ -48,6 +48,7 @@ export interface UserRow {
   id: number
   username: string
   password_hash: string
+  must_change: number
   created_at: number
 }
 

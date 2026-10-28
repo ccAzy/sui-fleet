@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS users (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   username      TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,          -- pbkdf2$<iter>$<salt_b64>$<hash_b64>
+  must_change   INTEGER NOT NULL DEFAULT 0, -- 首次用默认密码建号时为 1，强制改密
   created_at    INTEGER NOT NULL
 );
 

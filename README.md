@@ -82,6 +82,47 @@ go build -tags "with_quic,with_grpc,with_utls,with_acme,with_gvisor,with_naive_o
 
 token 在面板「服务器」页新增节点时生成，只显示一次。
 
+## 部署时要配的「变量 / 密钥」
+
+Cloudflare 里的两类配置：**Secret**（加密，`wrangler secret put`）和 **Var**（明文，写在 `wrangler.toml` 的 `[vars]`）。
+本项目需要的不多：
+
+| 名称 | 类型 | 必填 | 作用 | 不配会怎样 |
+| --- | --- | --- | --- | --- |
+| `ADMIN_PASS` | Secret | **建议必填** | 首次建号时的密码 | 默认 `admin`，登录后被强制跳去改密 |
+| `ADMIN_USER` | Secret | 否 | 首次建号的用户名 | 默认 `admin` |
+| `JWT_SECRET` | Secret | 否 | 会话签名密钥 | 首次启动自动生成 32 字节存进 D1 `meta` 表 |
+| `PANEL_BASE` | Var | 否 | 订阅链接里用的面板地址 | 用请求的 Host 兜底 |
+| `DB` | D1 binding | 是 | 数据 | 面板起不来 |
+
+```bash
+cd panel
+npx wrangler secret put ADMIN_PASS     # 交互式输入，不会写进仓库
+npx wrangler secret put ADMIN_USER     # 可选
+npx wrangler secret put JWT_SECRET     # 可选，建议配：换库/迁移后旧会话不会全失效
+```
+
+> 注意：`[vars]` 是明文（Cloudflare 控制台可见），**密码类一律用 secret**。
+> `npx wrangler deploy` 不会覆盖已设的 secret。
+
+## 绑定自己的域名后怎么登录
+
+- 登录方式是 **用户名 + 密码**，不是 UUID/Token。密码用 PBKDF2-SHA256（12 万次迭代）存 D1，cookie 是 HttpOnly JWT。
+- 地址：`https://你的域名/login`（绑域名后可在 Cloudflare 里把 Worker 路由指过去，或直接用 Workers 自定义域）。
+- 首次访问会按 `ADMIN_USER` / `ADMIN_PASS` 自动建号；**如果没配 `ADMIN_PASS`（或配的仍是 `admin`），登录后会被强制带到「管理 → 修改密码」**，改完才能用其它页面。
+- 改完密码会立刻重签 cookie，不用退出重登。
+- 登录失败限流：同一 IP 5 分钟内失败 8 次即拒绝。
+
+### 再叠一层 Cloudflare Access（可选，推荐）
+
+免费版 50 个用户，等于给面板加一道 SSO/邮箱验证码，连密码都不用暴露在公网：
+
+1. Zero Trust → Access → Applications → Add self-hosted，域名填 `panel.你的域名`
+2. Policy 选 `Emails`，只填你自己的邮箱
+3. 保存后访问面板先过 Access，再进 S-UI 登录页
+
+**但要把 `/agent/*` 和 `/sub/*` 排除在 Access 之外**，否则节点拉配置、客户端拉订阅都会被拦。
+在 Application 的 `Bypass` 策略里加 `panel.你的域名/agent` 与 `panel.你的域名/sub` 两条。
 ## 数据流
 
 | 方向 | 端点 | 内容 | 周期 |
