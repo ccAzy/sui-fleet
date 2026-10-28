@@ -140,4 +140,13 @@ token 在面板「服务器」页新增节点时生成，只显示一次。
 
 预览图：`docs/preview/`（home / inbounds / clients / dialog / settings）。
 
-仍可继续的布局级改造（需要动模板，风险和工时都更大）：侧栏加分组标题与文字标签、内容区限宽居中、图标体系换成线性单色。
+### 布局层
+
+- **侧栏**：14 项平铺拆成 概览 / 节点 / 出站 / 系统 四组，带分组标题；图标换成 MDI 线性（outline）变体；
+  收起时只留图标，悬停展开才出文字（`--rail` 类在悬停时仍然存在，隐藏规则要用 `:not(--is-hovering)` 排除）。
+- **内容区**：`View.vue` 里加 `.page-shell`，限宽 1240px 居中，宽屏上不再贴着左边缘散开。
+- **清掉一条历史包袱**：`Default.vue` 里曾有全局 `.v-card-subtitle { text-align:center; border-bottom:1px solid gray }`，
+  它让每张卡片的副标题都变成一条"灰线标题"——这才是廉价感最直接的来源之一。
+
+踩坑：抽屉内容区默认是 `display:block`，直接给列表加 `flex/overflow` 不生效，必须先让
+`.v-navigation-drawer__content` 变成 flex 列，列表才能真正滚动；否则 14 项会被裁掉一半。
