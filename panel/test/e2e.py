@@ -214,6 +214,24 @@ check(
 pull3 = j(post("/agent/pull", js={"revision": PULLED_REV}, token=tok))
 check("command delivered once", pull3.get("unchanged") is True, pull3)
 
+# ---- Clash 订阅 ----
+clash_txt = get(sub_url.replace(BASE, "") + "&type=clash")
+check("clash 订阅", "proxies:" in clash_txt and "type: vless" in clash_txt and "MATCH,PROXY" in clash_txt, clash_txt[:120])
+
+# ---- 备份 / 恢复 ----
+bundle = j(get("/api/getdb?exclude=stats"))
+check(
+    "备份导出",
+    bundle.get("kind") == "sui-cf-backup" and len(bundle.get("tables", {}).get("nodes", [])) >= 1,
+    str(list(bundle.get("tables", {}).keys())),
+)
+imp = j(post("/api/importdb", js=bundle))
+check("备份导入", imp.get("success") is True and imp["obj"]["imported"]["nodes"] >= 1, imp)
+
+# ---- 批量指令 ----
+bulk = j(post("/api/nodes/all/command", form={"kind": "restart_core"}))
+check("批量重启下发", bulk.get("success") is True and bulk["obj"]["queued"] >= 1, bulk)
+
 try:
     bad = get("/sub/" + nid)
     check("sub without key is rejected", bad.strip() in ("", "forbidden"), bad[:60])

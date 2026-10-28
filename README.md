@@ -133,6 +133,36 @@ npx wrangler secret put JWT_SECRET     # 可选，建议配：换库/迁移后�
 | 面板 | `GET /api/load?lu=` | 变更检测后返回全量对象 | 前端轮询 |
 | 订阅 | `GET /sub/<nodeId>` | base64 分享链接 | 客户端拉取 |
 
+## 备份 / 订阅格式 / 批量操作
+
+### 全量备份（JSON，不是 .db 文件）
+
+D1 是 Cloudflare 托管的，没有可下载的库文件。所以备份是一个 JSON 快照：
+
+```text
+GET  /api/getdb?exclude=stats,changes   -> sui-backup-<时间>.json
+POST /api/importdb                       <- 同一个文件（整库覆盖）
+```
+
+快照包含 nodes / objects / settings / changes / usage / commands / users / tokens；
+**不含 `jwt_secret`**（避免把会话密钥一起搬走），所以恢复后重新登录即可。
+前端「Backup & Restore」按钮已经指向这两个接口，文件选择框接受 `.json`。
+
+### 订阅格式
+
+| 请求 | 输出 | 给谁用 |
+| --- | --- | --- |
+| `/sub/<nodeId>?k=<sub_key>` | base64 链接列表 | v2rayN / Shadowrocket 等 |
+| `/sub/<nodeId>?k=<sub_key>&type=clash` | Clash / mihomo YAML | Clash Verge / mihomo 系 |
+
+Clash 输出是把已生成的分享链接反解析成 proxy 条目（vless/vmess/trojan/ss/hysteria2/tuic/anytls），
+再套 `PROXY`(select) + `AUTO`(url-test) 两个策略组和 `GEOIP,CN,DIRECT / MATCH,PROXY` 规则。
+解析失败的条目会被跳过，不会污染整份订阅。
+
+### 批量操作
+
+「Servers」页顶部两个按钮：**Restart all**、**Update all**，一次对全部启用节点下发指令。
+对应接口 `/api/nodes/all/command`、`/api/nodes/all/update-agent`，返回实际入队数量。
 ## 与上游 s-ui 的关系
 
 - 面板协议（`/api/{action}` + `object/action/data` 表单）保持原样，前端零改动即可复用。

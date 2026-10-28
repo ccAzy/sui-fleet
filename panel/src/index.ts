@@ -25,6 +25,8 @@ import {
 import { authAgent, enqueueCommand, handleReport, pendingCommands, pullPayload, type ReportBody } from './agent'
 import { cronTick } from './cron'
 import { getKernelInfo, isOutdated, metaGet, metaSet } from './kernel'
+import { exportBundle, importBundle, type Bundle } from './backup'
+import { buildClashConfig } from './clash'
 
 type Ctx = { Bindings: Env }
 
@@ -490,6 +492,53 @@ app.post('/api/changePass', async (c) => {
   return okMsg(c, 'save')
 })
 
+/* ---------- 备份 / 恢复（JSON 快照，D1 没有可下载的库文件） ---------- */
+
+app.get('/api/getdb', async (c) => {
+  const exclude = (c.req.query('exclude') ?? '').split(',').filter(Boolean)
+  const bundle = await exportBundle(c.env.DB, exclude)
+  const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
+  return c.body(JSON.stringify(bundle, null, 2), 200, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Content-Disposition': `attachment; filename="sui-backup-${stamp}.json"`,
+  })
+})
+
+app.post('/api/importdb', async (c) => {
+  const ct = c.req.header('content-type') ?? ''
+  let data: Bundle
+  try {
+    if (ct.includes('multipart/form-data')) {
+      const form = await c.req.formData()
+      const file = form.get('db')
+      if (!file || typeof file === 'string') return json(c, null, new Error('没有收到文件'))
+      data = JSON.parse(await (file as File).text()) as Bundle
+    } else {
+      data = (await c.req.json()) as Bundle
+    }
+  } catch (e) {
+    return json(c, null, new Error('备份文件解析失败: ' + String(e)))
+  }
+  try {
+    return json(c, await importBundle(c.env.DB, data))
+  } catch (e) {
+    return json(c, null, e)
+  }
+})
+
+/** 只导出当前的 sing-box 基础配置（log/dns/route/experimental）。
+ *  完整配置在节点上渲染，节点侧用 `sui-agent --dump-config` 取。 */
+app.get('/api/singbox-config', async (c) => {
+  const node = await resolveNode(c.env.DB, c.req.header('X-Remote-Server'))
+  if (!node) return json(c, null, new Error('no node selected'))
+  const cfg = await getConfig(c.env.DB, node.id)
+  const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
+  return c.body(JSON.stringify(cfg, null, 2), 200, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Content-Disposition': `attachment; filename="config-${stamp}.json"`,
+  })
+})
+
 // 第三方链接转换：这些需要节点侧内核能力，先明确回错而不是静默成功
 app.post('/api/linkConvert', async (c) => json(c, null, new Error('linkConvert 需要节点侧能力，暂未开放')))
 app.post('/api/subConvert', async (c) => json(c, null, new Error('subConvert 需要节点侧能力，暂未开放')))
@@ -549,6 +598,35 @@ app.post('/api/release', async (c) => {
   await metaSet(c.env.DB, 'agent_release_sha256', String(body.sha256 ?? '').trim())
   await metaSet(c.env.DB, 'agent_release_version', String(body.version ?? '').trim())
   return json(c, await getRelease(c.env.DB))
+})
+
+/* 批量：一次对全部启用节点下发（7 台机器逐台点太累） */
+app.post('/api/nodes/all/command', async (c) => {
+  const body = await c.req.parseBody()
+  const kind = String(body.kind ?? 'restart_core')
+  const nodes = await listNodes(c.env.DB)
+  const actor = (c.get('user' as never) as string) ?? ''
+  let queued = 0
+  for (const n of nodes) {
+    if (!n.enabled) continue
+    await enqueueCommand(c.env.DB, n.id, kind, {}, actor)
+    queued++
+  }
+  return json(c, { queued })
+})
+
+app.post('/api/nodes/all/update-agent', async (c) => {
+  const rel = await getRelease(c.env.DB)
+  if (!rel.url) return json(c, null, new Error('尚未配置更新源：先填写 agent 分发包 URL 与 sha256'))
+  const nodes = await listNodes(c.env.DB)
+  const actor = (c.get('user' as never) as string) ?? ''
+  let queued = 0
+  for (const n of nodes) {
+    if (!n.enabled) continue
+    await enqueueCommand(c.env.DB, n.id, 'update_agent', rel, actor)
+    queued++
+  }
+  return json(c, { queued })
 })
 
 app.post('/api/nodes/:id/update-agent', async (c) => {
@@ -641,7 +719,13 @@ app.get('/sub/:nodeId', async (c) => {
       console.warn("skip malformed client row", e)
     }
   }
-  const text = links.join('\n')
+  // ?type=clash 输出 mihomo/Clash 可直接导入的 YAML；默认仍是 base64 链接列表
+  const subType = (c.req.query('type') ?? '').toLowerCase()
+  if (subType === 'clash' || subType === 'mihomo') {
+    return c.text(buildClashConfig(links, node.name), 200, { 'Content-Type': 'text/yaml; charset=utf-8' })
+  }
+
+  const text = links.join(String.fromCharCode(10))
   const payload = btoa(String.fromCharCode(...new TextEncoder().encode(text)))
   return c.text(payload, 200, { 'Content-Type': 'text/plain; charset=utf-8' })
 })
