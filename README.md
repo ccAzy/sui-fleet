@@ -119,14 +119,25 @@ token 在面板「服务器」页新增节点时生成，只显示一次。
 | 节点内核起不来 | `transport:{type:"tcp"}` 是 UI 概念，sing-box 不认 | 存盘前归一化成 `{}` |
 | 内核报 `default outbound not found: direct` | 新建节点没有默认出站 | 建节点时种 `direct`，agent 侧再加一道兜底 |
 
-## 外观：Liquid Glass 皮肤
+## 外观：按 Apple HIG 重做的 Liquid Glass
 
-面板自带 7 套皮肤（右下角调色板切换），默认是 **Liquid Glass**：
+默认皮肤是 `liquid`。这一版不是"多加模糊"，而是把噪音减掉：
 
-- 折射底：深墨底上一层缓慢漂移的靛/青瓷/琥珀光斑（`styles/liquid-glass.css`）
-- 材质四层：半透明染色 + `backdrop-filter` 模糊增饱和 + 渐变发丝边框 + 内顶高光 + 远近双层阴影
-- 按钮改胶囊、输入框做内凹、弹窗用更实的玻璃保证可读性
-- 只降级动效，不按系统"减少透明度"关材质（Windows 关掉透明效果时 Chrome 会上报 reduce，一刀切会变成实心板）
+| 维度 | 做法 |
+| --- | --- |
+| 颜色 | 近黑中性底（#0B0B0D）+ **单一**强调色（系统蓝 #0A84FF）；不再整屏铺四色渐变大底 |
+| 材质 | 玻璃只出现在浮层（顶栏 / 卡片 / 弹窗 / 菜单）；卡片 = 半透明表面 + 1px 描边 + 顶沿镜面高光 + 极弱阴影 |
+| 字体 | 苹果字体栈（SF / Segoe UI Variable / PingFang SC）+ 明确三级层级；表格数字等宽 |
+| 排版 | 卡片字段改成 Apple 设置页式键值行（标签左、值右、26px 行高）；弹窗里的"卡片套卡片"拍平为分组标题 |
+| 控件 | 主操作实心蓝、次操作纯文字、破坏性操作弱红；标签页改成分段控件；输入框聚焦出 2px 蓝色外环 |
+| 动效 | 200ms `cubic-bezier(0.2,0,0,1)`，不做弹跳 |
 
-想换回旧皮肤：调色板里选其它任意一套；想把默认改回去，改 `src/plugins/skins.ts` 的 `DEFAULT_SKIN`。
-预览图见 `docs/preview/`。
+踩过的两个坑：
+
+1. Vuetify 的 `flat` 变体会把背景压成 `surface` 色，主按钮会变黑 —— 主操作改用 `elevated`。
+2. `prefers-reduced-transparency` 不能用来关材质：Windows 关闭"透明效果"时 Chrome 会上报 reduce，
+   一刀切会让整套玻璃变实心板。
+
+预览图：`docs/preview/`（home / inbounds / clients / dialog / settings）。
+
+仍可继续的布局级改造（需要动模板，风险和工时都更大）：侧栏加分组标题与文字标签、内容区限宽居中、图标体系换成线性单色。
