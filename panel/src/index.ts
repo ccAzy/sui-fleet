@@ -1,3 +1,5 @@
+// @peculiar/x509 依赖 tsyringe，必须先加载反射 polyfill，且必须在其它 import 之前
+import 'reflect-metadata'
 // 面板入口：/api/* 兼容 s-ui 前端协议，/agent/* 给节点，/sub/* 订阅出口。
 import { Hono } from 'hono'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
@@ -23,6 +25,7 @@ import {
   seedNode,
 } from './objects'
 import { authAgent, enqueueCommand, handleReport, pendingCommands, pullPayload, type ReportBody } from './agent'
+import { generateKeypair } from './keypairs'
 import { cronTick } from './cron'
 import { getKernelInfo, isOutdated, metaGet, metaSet } from './kernel'
 import { exportBundle, importBundle, type Bundle } from './backup'
@@ -160,6 +163,13 @@ app.get('/api/load', async (c) => {
     return json(c, { onlines: onlinesOf(node) })
   }
   return json(c, await loadFull(c.env.DB, node.id, subURI))
+})
+
+// 一键添加（QuickTemplate）依赖：生成 Reality 密钥对 / 自签证书
+app.get('/api/keypairs', async (c) => {
+  const kind = c.req.query('k') ?? ''
+  const options = c.req.query('o') ?? ''
+  return json(c, await generateKeypair(kind, options))
 })
 
 app.get('/api/servers', async (c) => {

@@ -46,8 +46,13 @@ const USER_TYPES = new Set([
 function protocolKeyOf(inbound: J): string {
   const type = s(inbound.type)
   if (type === 'shadowsocks') {
+    // 必须与节点侧 util.ShadowsocksClientConfigKey 完全一致：
+    // s-ui 把 SS-2022 的用户配置存在 shadowsocks16 / shadowsocks32 下，
+    // 不是存在完整 method 名里。写成 method 名会导致用户挂不上、节点 SQL 取到 NULL。
     const m = s(inbound.method)
-    return m.startsWith('2022') ? m : 'shadowsocks'
+    if (m === '2022-blake3-aes-128-gcm') return 'shadowsocks16'
+    if (m === '2022-blake3-aes-256-gcm' || m === '2022-blake3-chacha20-poly1305') return 'shadowsocks32'
+    return 'shadowsocks'
   }
   return type
 }
