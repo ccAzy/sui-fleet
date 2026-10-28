@@ -148,5 +148,13 @@ token 在面板「服务器」页新增节点时生成，只显示一次。
 - **清掉一条历史包袱**：`Default.vue` 里曾有全局 `.v-card-subtitle { text-align:center; border-bottom:1px solid gray }`，
   它让每张卡片的副标题都变成一条"灰线标题"——这才是廉价感最直接的来源之一。
 
+### 全站一致性（第二轮）
+
+- **一键主次**：所有页面的工具栏统一为「一个实心主操作 + 若干纯文字次操作 + 破坏性操作弱红」；
+  原来 Outbounds / Relay / Settings 都是一排同色按钮，看不出该点哪个。
+- **确认弹窗**：12 个文件里的 `error/success + outlined`（红绿描边）改成「实心红确认 + 文字取消」。
+- **保存按钮**：Basics / DNS / Rules 原来用警告色描边当保存，语义是错的，改为主色实心。
+- **首页**：四个快捷入口图标改前置、统一为轻量按钮，logo 从 200px 收到 132px。
+
 踩坑：抽屉内容区默认是 `display:block`，直接给列表加 `flex/overflow` 不生效，必须先让
 `.v-navigation-drawer__content` 变成 flex 列，列表才能真正滚动；否则 14 项会被裁掉一半。
