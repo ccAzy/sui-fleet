@@ -2,7 +2,7 @@
 import type { D1Database } from '@cloudflare/workers-types'
 import { first, run, now, type UserRow } from './db'
 
-const ITER = 120_000
+const ITER = 10_000
 
 function b64(buf: ArrayBuffer): string {
   return btoa(String.fromCharCode(...new Uint8Array(buf)))

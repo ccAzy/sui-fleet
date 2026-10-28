@@ -15,3 +15,5 @@ db/
 .DS_Store
 .idea/
 .vscode/
+.tmp/
+panel/wrangler.toml

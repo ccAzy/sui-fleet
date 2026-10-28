@@ -53,6 +53,7 @@
 ```bash
 # 构建前端（产物在 frontend-dist/）
 cd panel && npm install && npm run build:web
+cp wrangler.toml.example wrangler.toml   # 真实配置不入库
 
 # 建库，把返回的 database_id 填进 panel/wrangler.toml
 npx wrangler login
