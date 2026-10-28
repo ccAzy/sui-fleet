@@ -163,6 +163,7 @@ Clash 输出是把已生成的分享链接反解析成 proxy 条目（vless/vmes
 
 「Servers」页顶部两个按钮：**Restart all**、**Update all**，一次对全部启用节点下发指令。
 对应接口 `/api/nodes/all/command`、`/api/nodes/all/update-agent`，返回实际入队数量。
+
 ## 与上游 s-ui 的关系
 
 - 面板协议（`/api/{action}` + `object/action/data` 表单）保持原样，前端零改动即可复用。
@@ -176,7 +177,7 @@ Clash 输出是把已生成的分享链接反解析成 proxy 条目（vless/vmes
 - Cloudflare 免费版：Worker 10 万请求/天、D1 每天 10 万行写入。7 台 × 30 秒一轮 ≈ 2 万请求/天，余量充足。
 - `*.workers.dev` 在国内不可用，控制台必须绑自定义域名。
 - 节点侧 agent 与已有 s-ui 面板不能同时跑（抢内核端口），换机器时先停旧服务。
-- 订阅输出目前是 base64 链接列表；clash/json 格式待接。
+- 订阅已支持 base64 链接列表与 Clash/mihomo YAML；sing-box JSON 订阅尚未提供。
 - 只产出了 linux/amd64 二进制；arm64 需要 `aarch64-linux-gnu-gcc` 交叉工具链。
 - `linkConvert` / `subConvert`（粘贴第三方链接转换）依赖节点侧内核能力，当前明确返回不支持。
 - 节点日志走 s-ui 的 syslog 后端，排查用 `journalctl -u sui-agent`（或 `--dump-config`）。
