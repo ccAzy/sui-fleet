@@ -256,7 +256,14 @@ Clash 输出是把已生成的分享链接反解析成 proxy 条目（vless/vmes
 - agent 启动时用 `debug.ReadBuildInfo()` 读出 `github.com/sagernet/sing-box` 的版本，随每次上报带上来；
 - 面板存进 `nodes.kernel_ver`，首页「Sing-Box Info」卡片显示 `Kernel v1.13.18`；
 - Worker 每 6 小时查一次上游最新 release（缓存进 `meta`，避免打爆 GitHub 匿名限额），
-  落后时在版本旁显示一个可点的 `⬇ v1.13.20` 标记。
+  这只作为"参考信息"显示，**不据此判断可更新**。
+
+**「可更新」的判定依据是包版本，不是上游 tag**：sing-box 编译进 agent，上游发新 tag ≠ 你手上有新包。
+所以面板比的是 `nodes.agent_ver`（节点上报）与 `meta.agent_release_version`（你在 `/api/release` 里配的分发包版本），
+两者不一致才出现可点的更新标记。不配更新源就不显示、点了也会明确报错。
+
+**更新是纯手动的**：定时任务只查版本、从不下发更新指令；三处触发点（首页卡片、Servers 卡片图标、
+Servers 顶部 Update all）都要人点。没有任何自动更新路径。
 
 **点更新会发生什么**：面板下发 `update_agent` 指令，payload 带 `{url, sha256, version}`。节点侧：
 

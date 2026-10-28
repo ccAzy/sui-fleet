@@ -249,7 +249,13 @@ app.get('/api/status', async (c) => {
       outdated: isOutdated(node.kernel_ver, kernel.latest),
       checked_at: kernel.checkedAt,
     },
-    agent: { version: node.agent_ver },
+    // 节点上的包版本 vs 面板配置的分发包版本：不一致才是"可更新"。
+    // 不能拿上游 sing-box tag 当更新依据——内核编译进 agent，换 tag ≠ 手上有新包。
+    agent: {
+      version: node.agent_ver,
+      latest: await metaGet(c.env.DB, 'agent_release_version'),
+      outdated: Boolean(node.agent_ver) && node.agent_ver !== (await metaGet(c.env.DB, 'agent_release_version')),
+    },
   })
 })
 
