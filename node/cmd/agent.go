@@ -255,6 +255,12 @@ func (a *agent) pullOnce() (bool, []map[string]interface{}, error) {
 
 // apply 全量替换本地配置并落盘。s-ui 的 model 自带拆列逻辑，
 // 因此这里反序列化后直接入库即可，渲染仍由 s-ui 原生代码完成。
+//
+// 注意：必须保留面板下发的 id，不能置零交给 GORM 自增。
+// inbound.tls_id / client.inbounds 等关联字段引用的是面板侧的 obj_id，
+// 每次 revision 都 DELETE + INSERT，自增序列会持续增长，
+// 一旦 id 与关联字段脱节，就会出现「hysteria2 拿到 reality 私钥」
+// 「vless 丢失 TLS」这类错位，内核直接起不来。
 func (a *agent) apply(pr *agentPullResp) error {
 	db := database.GetDB()
 	tx := db.Begin()
@@ -277,7 +283,6 @@ func (a *agent) apply(pr *agentPullResp) error {
 		if err := json.Unmarshal(raw, &m); err != nil {
 			return fail(fmt.Errorf("tls: %w", err))
 		}
-		m.Id = 0
 		if err := tx.Create(&m).Error; err != nil {
 			return fail(fmt.Errorf("tls create: %w", err))
 		}
@@ -287,7 +292,6 @@ func (a *agent) apply(pr *agentPullResp) error {
 		if err := json.Unmarshal(raw, &m); err != nil {
 			return fail(fmt.Errorf("inbound: %w", err))
 		}
-		m.Id = 0
 		if err := tx.Create(&m).Error; err != nil {
 			return fail(fmt.Errorf("inbound create: %w", err))
 		}
@@ -297,7 +301,6 @@ func (a *agent) apply(pr *agentPullResp) error {
 		if err := json.Unmarshal(raw, &m); err != nil {
 			return fail(fmt.Errorf("outbound: %w", err))
 		}
-		m.Id = 0
 		if err := tx.Create(&m).Error; err != nil {
 			return fail(fmt.Errorf("outbound create: %w", err))
 		}
@@ -307,7 +310,6 @@ func (a *agent) apply(pr *agentPullResp) error {
 		if err := json.Unmarshal(raw, &m); err != nil {
 			return fail(fmt.Errorf("endpoint: %w", err))
 		}
-		m.Id = 0
 		if err := tx.Create(&m).Error; err != nil {
 			return fail(fmt.Errorf("endpoint create: %w", err))
 		}
@@ -317,7 +319,6 @@ func (a *agent) apply(pr *agentPullResp) error {
 		if err := json.Unmarshal(raw, &m); err != nil {
 			return fail(fmt.Errorf("service: %w", err))
 		}
-		m.Id = 0
 		if err := tx.Create(&m).Error; err != nil {
 			return fail(fmt.Errorf("service create: %w", err))
 		}
@@ -327,7 +328,6 @@ func (a *agent) apply(pr *agentPullResp) error {
 		if err := json.Unmarshal(raw, &m); err != nil {
 			return fail(fmt.Errorf("client: %w", err))
 		}
-		m.Id = 0
 		if err := tx.Create(&m).Error; err != nil {
 			return fail(fmt.Errorf("client create: %w", err))
 		}
