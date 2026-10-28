@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS nodes (
   last_seen    INTEGER NOT NULL DEFAULT 0,
   last_ip      TEXT NOT NULL DEFAULT '',
   agent_ver    TEXT NOT NULL DEFAULT '',
+  kernel_ver   TEXT NOT NULL DEFAULT '', -- 节点上 sing-box 的编译版本
   core_state   TEXT NOT NULL DEFAULT 'unknown', -- running / stopped / error
   status_json  TEXT NOT NULL DEFAULT '{}',
   applied_rev  INTEGER NOT NULL DEFAULT 0        -- 节点已生效的 revision

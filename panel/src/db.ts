@@ -23,6 +23,7 @@ export interface NodeRow {
   last_seen: number
   last_ip: string
   agent_ver: string
+  kernel_ver: string
   core_state: string
   status_json: string
   applied_rev: number

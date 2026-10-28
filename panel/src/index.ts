@@ -24,6 +24,7 @@ import {
 } from './objects'
 import { authAgent, enqueueCommand, handleReport, pendingCommands, pullPayload, type ReportBody } from './agent'
 import { cronTick } from './cron'
+import { getKernelInfo, isOutdated, metaGet, metaSet } from './kernel'
 
 type Ctx = { Bindings: Env }
 
@@ -150,6 +151,8 @@ app.get('/api/servers', async (c) => {
       enabled: n.enabled,
       last_seen: n.last_seen,
       core_state: n.core_state,
+      kernel_ver: n.kernel_ver,
+      agent_ver: n.agent_ver,
       revision: n.revision,
       applied_rev: n.applied_rev,
     })),
@@ -180,25 +183,28 @@ for (const kind of ['inbounds', 'outbounds', 'endpoints', 'services', 'tls', 'cl
 app.get('/api/status', async (c) => {
   const node = await resolveNode(c.env.DB, c.req.header('X-Remote-Server'))
   if (!node) return json(c, {})
+  const kernel = await getKernelInfo(c.env.DB)
   let status: Record<string, unknown> = {}
   try {
     status = JSON.parse(node.status_json) as Record<string, unknown>
   } catch {
     status = {}
   }
+  // 原样透传节点上报的状态对象（cpu / mem / dsk / net / sys / sbd …），
+  // 前端的 Gauge / History 组件按 s-ui 的结构读，压平成数字会全部显示 "-/-"。
+  const sbd = (status.sbd as Record<string, unknown>) ?? {}
   return json(c, {
+    ...status,
     running: node.core_state === 'running',
-    uptime: status.uptime ?? 0,
-    cpu: status.cpu ?? 0,
-    mem: status.mem ?? 0,
-    mem_total: status.mem_total ?? 0,
-    swap: status.swap ?? 0,
-    disk: status.disk ?? 0,
-    disk_total: status.disk_total ?? 0,
-    net_in: status.net_in ?? 0,
-    net_out: status.net_out ?? 0,
-    tcp_count: status.tcp_count ?? 0,
-    udp_count: status.udp_count ?? 0,
+    // 内核运行态以面板记录的 core_state 为准（节点刚上报时 sbd 可能还没带全）
+    sbd: { ...sbd, running: node.core_state === 'running', stats: sbd.stats ?? {} },
+    kernel: {
+      version: node.kernel_ver,
+      latest: kernel.latest,
+      outdated: isOutdated(node.kernel_ver, kernel.latest),
+      checked_at: kernel.checkedAt,
+    },
+    agent: { version: node.agent_ver },
   })
 })
 
@@ -332,6 +338,8 @@ async function saveServers(c: any, action: string, data: unknown): Promise<unkno
       enabled: n.enabled,
       last_seen: n.last_seen,
       core_state: n.core_state,
+      kernel_ver: n.kernel_ver,
+      agent_ver: n.agent_ver,
       revision: n.revision,
       applied_rev: n.applied_rev,
     })),
@@ -434,6 +442,54 @@ app.post('/api/nodes/:id/delete', async (c) => {
   const id = c.req.param('id')
   await purgeNodeData(c.env.DB, id)
   await run(c.env.DB, 'DELETE FROM nodes WHERE id = ?', id)
+  return okMsg(c)
+})
+
+/* ---------- 节点二进制（含内核）更新 ----------
+   面板只存"更新源"（URL + sha256 + 版本），点更新时把这三项随指令下发；
+   节点自己下载、校验、原子替换、重启。面板不托管二进制（Workers 单文件 25MB 限制，装不下 73MB）。 */
+
+async function getRelease(db: Env['DB']) {
+  return {
+    url: await metaGet(db, 'agent_release_url'),
+    sha256: await metaGet(db, 'agent_release_sha256'),
+    version: await metaGet(db, 'agent_release_version'),
+  }
+}
+
+app.get('/api/release', async (c) => json(c, await getRelease(c.env.DB)))
+
+app.post('/api/release', async (c) => {
+  const body = await c.req.parseBody()
+  const url = String(body.url ?? '').trim()
+  if (url && !/^https?:\/\//.test(url)) return json(c, null, new Error('url 必须是 http(s) 地址'))
+  await metaSet(c.env.DB, 'agent_release_url', url)
+  await metaSet(c.env.DB, 'agent_release_sha256', String(body.sha256 ?? '').trim())
+  await metaSet(c.env.DB, 'agent_release_version', String(body.version ?? '').trim())
+  return json(c, await getRelease(c.env.DB))
+})
+
+app.post('/api/nodes/:id/update-agent', async (c) => {
+  const id = c.req.param('id')
+  const node = await getNode(c.env.DB, id)
+  if (!node) return json(c, null, new Error('node not found'))
+  const rel = await getRelease(c.env.DB)
+  if (!rel.url) {
+    return json(c, null, new Error('尚未配置更新源：先在面板设置里填写 agent 分发包 URL 与 sha256'))
+  }
+  await enqueueCommand(c.env.DB, id, 'update_agent', rel, (c.get('user' as never) as string) ?? '')
+  return okMsg(c)
+})
+
+// 与 /api/status 一致：不传 id 时作用于当前选中节点（前端 currentServer 为空也能用）
+app.post('/api/updateAgent', async (c) => {
+  const node = await resolveNode(c.env.DB, c.req.header('X-Remote-Server'))
+  if (!node) return json(c, null, new Error('no node selected'))
+  const rel = await getRelease(c.env.DB)
+  if (!rel.url) {
+    return json(c, null, new Error('尚未配置更新源：先填写 agent 分发包 URL 与 sha256'))
+  }
+  await enqueueCommand(c.env.DB, node.id, 'update_agent', rel, (c.get('user' as never) as string) ?? '')
   return okMsg(c)
 })
 

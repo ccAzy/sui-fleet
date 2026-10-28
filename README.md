@@ -158,3 +158,32 @@ token 在面板「服务器」页新增节点时生成，只显示一次。
 
 踩坑：抽屉内容区默认是 `display:block`，直接给列表加 `flex/overflow` 不生效，必须先让
 `.v-navigation-drawer__content` 变成 flex 列，列表才能真正滚动；否则 14 项会被裁掉一半。
+
+## 监控默认开启 / 内核版本 / 节点更新
+
+**监控默认开启**：首页的 CPU、内存、网络、内核状态四块卡片默认就渲染（存在 localStorage 的 `reloadItems`，
+首次访问给默认值 `g-cpu,g-mem,h-net,i-sbd`），不用每次进来手动勾选。
+
+**面板用的是什么内核**：内核（sing-box）**不是运行时下载的**，它在编译时静态链接进 `sui-agent` 二进制。
+所以「内核版本」是每台节点自己的属性：
+- agent 启动时用 `debug.ReadBuildInfo()` 读出 `github.com/sagernet/sing-box` 的版本，随每次上报带上来；
+- 面板存进 `nodes.kernel_ver`，首页「Sing-Box Info」卡片显示 `Kernel v1.13.18`；
+- Worker 每 6 小时查一次上游最新 release（缓存进 `meta`，避免打爆 GitHub 匿名限额），
+  落后时在版本旁显示一个可点的 `⬇ v1.13.20` 标记。
+
+**点更新会发生什么**：面板下发 `update_agent` 指令，payload 带 `{url, sha256, version}`。节点侧：
+1. 下载到 `<自身>.new`
+2. 校验 sha256（不匹配直接删除并报错，不动原文件）
+3. `chmod 0755` + 原子 `rename` 覆盖自身
+4. 上报回执后 `syscall.Exec` 用新二进制重启
+
+任何一步失败都保留原二进制继续运行，不会把节点搞失联。指令只投递一次（`pending → sent`），
+避免"更新→重启→再更新"的循环（这个循环实测踩过）。
+
+**配置更新源**（面板不托管二进制：Workers 静态资源单 25MB 限制装不下 73MB）：
+
+```bash
+curl -X POST https://<面板>/api/release   -b 'sui_session=<cookie>'   -d 'url=https://your-cdn.example/sui-agent-linux-amd64'   -d 'sha256=<sha256sum>'   -d 'version=1.4.3-<你的构建号>'
+```
+
+之后在「Servers」页每张节点卡片上点下载图标即可推送更新。

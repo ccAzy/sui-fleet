@@ -28,7 +28,9 @@ type Cmd = { id: number; kind: string; payload: string }
 export async function pullPayload(db: D1Database, node: NodeRow, clientRev: number): Promise<J | null> {
   const cmds = await all<Cmd>(
     db,
-    "SELECT id, kind, payload FROM commands WHERE node_id = ? AND status IN ('pending','sent') ORDER BY id ASC LIMIT 20",
+    // 只取 pending：一旦下发就标 sent，否则节点重启后会反复拿到同一条指令
+    // （实测 update_agent 会因此陷入"更新→重启→再更新"的循环）
+    "SELECT id, kind, payload FROM commands WHERE node_id = ? AND status = 'pending' ORDER BY id ASC LIMIT 20",
     node.id,
   )
   if (clientRev === node.revision && cmds.length === 0) return null
@@ -83,6 +85,7 @@ function safeParse(s: string): CmdPayload {
 export type ReportBody = {
   revision_applied?: number
   agent_version?: string
+  kernel_version?: string
   core_state?: string
   uptime?: number
   status?: Record<string, unknown>
@@ -100,12 +103,13 @@ export async function handleReport(db: D1Database, node: NodeRow, body: ReportBo
   const stmts = [
     db
       .prepare(
-        'UPDATE nodes SET last_seen = ?, last_ip = ?, agent_ver = ?, core_state = ?, status_json = ?, applied_rev = ? WHERE id = ?',
+        'UPDATE nodes SET last_seen = ?, last_ip = ?, agent_ver = ?, kernel_ver = ?, core_state = ?, status_json = ?, applied_rev = ? WHERE id = ?',
       )
       .bind(
         ts,
         ip,
         body.agent_version ?? node.agent_ver,
+        body.kernel_version ?? node.kernel_ver,
         body.core_state ?? node.core_state,
         JSON.stringify({ ...status, uptime: body.uptime ?? status.uptime ?? 0 }),
         body.revision_applied ?? node.applied_rev,

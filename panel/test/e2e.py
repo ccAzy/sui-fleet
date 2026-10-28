@@ -120,11 +120,13 @@ r = j(
         js={
             "revision_applied": r["revision"],
             "agent_version": "0.1.0",
+            "kernel_version": "v1.13.18",
             "core_state": "running",
             "uptime": 3600,
             "status": {
                 "cpu": 12.5,
-                "mem": 230000000,
+                "mem": {"total": 8000000000, "used": 2300000000, "usedPercent": 28.7},
+                "net": {"recv": 1024, "sent": 2048},
                 "tcp_count": 42,
                 "onlines": {"inbound": ["vless-443"], "outbound": [], "user": ["alice"]},
             },
@@ -145,6 +147,8 @@ check("traffic accumulated", r["obj"]["clients"][0]["down"] == 2048, r["obj"]["c
 
 r = j(get("/api/status"))
 check("status running", r["obj"]["running"] is True and r["obj"]["uptime"] == 3600, r)
+kernel = r["obj"].get("kernel") or {}
+check("kernel version reported", kernel.get("version") == "v1.13.18", str(kernel))
 
 load_obj = j(get("/api/load"))["obj"]
 sub_url = load_obj["subURI"]
@@ -152,6 +156,25 @@ check("sub uri has key", "?k=" in sub_url, sub_url)
 sub = get(sub_url.replace(BASE, ""))
 decoded = base64.b64decode(sub).decode()
 check("subscription", decoded.startswith("vless://"), decoded[:80])
+
+# ---- 节点更新指令链路 ----
+post("/api/release", form={"url": "https://example.com/sui-agent", "sha256": "deadbeef", "version": "9.9.9"})
+rel = j(get("/api/release"))["obj"]
+check("release saved", rel["url"].endswith("/sui-agent"), rel)
+
+r = j(post("/api/updateAgent", form={}))
+check("enqueue update", r["success"] is True, r)
+
+pull2 = j(post("/agent/pull", js={"revision": PULLED_REV}, token=tok))
+cmds = pull2.get("commands") or []
+check(
+    "agent receives update command",
+    len(cmds) == 1 and cmds[0]["kind"] == "update_agent" and cmds[0]["payload"]["version"] == "9.9.9",
+    str(cmds),
+)
+
+pull3 = j(post("/agent/pull", js={"revision": PULLED_REV}, token=tok))
+check("command delivered once", pull3.get("unchanged") is True, pull3)
 
 try:
     bad = get("/sub/" + nid)

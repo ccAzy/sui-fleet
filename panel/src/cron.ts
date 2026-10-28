@@ -2,11 +2,15 @@
 import type { D1Database } from '@cloudflare/workers-types'
 import { all, batch, now, run } from './db'
 import { listObjects } from './objects'
+import { refreshKernelInfo } from './kernel'
 
 const STALE_SECONDS = 180
 
 export async function cronTick(db: D1Database): Promise<void> {
   const ts = now()
+
+  // 上游内核版本（内部有 6 小时节流，避免打爆 GitHub 匿名限额）
+  await refreshKernelInfo(db)
 
   // 1) 超过 3 个上报周期没消息的节点标成 offline（不删，保留配置）
   await run(
