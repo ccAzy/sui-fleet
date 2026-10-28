@@ -19,11 +19,10 @@ import store from './store'
 // Plugins
 import { registerPlugins } from '@/plugins'
 
-// Gradient skins
-import '@/styles/skins.css'
-import '@/styles/liquid-glass.css'
+// Paper world: 纸白极简（双主题）
+import '@/styles/paper.css'
 import '@/styles/components.css'
-import { savedSkin, applySkinAttr } from '@/plugins/skins'
+import { applyThemeMode, savedThemeMode } from '@/plugins/vuetify'
 
 // Locale
 import { i18n } from '@/locales'
@@ -47,8 +46,8 @@ const notivue = createNotivue({
 
 const loading = ref(false)
 
-// Paint the saved gradient skin onto <html> before the app mounts.
-applySkinAttr(savedSkin().id)
+// 在挂载前把明暗刷到 <html>，避免首帧闪烁
+applyThemeMode(savedThemeMode())
 
 const app = createApp(App)
 app.provide('loading', loading)

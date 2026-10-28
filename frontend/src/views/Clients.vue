@@ -141,7 +141,7 @@
         :mobile="smAndDown"
         mobile-breakpoint="sm"
         width="100%"
-        class="elevation-3 rounded"
+        class="clients-table"
         >
         <template v-slot:item.inbounds="{ item }">
           <span>

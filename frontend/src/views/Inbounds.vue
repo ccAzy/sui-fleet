@@ -66,92 +66,59 @@
       </v-btn>
     </v-col>
   </v-row>
-  <v-row>
-    <v-col cols="12" sm="6" md="4" lg="3" v-for="(item, index) in <any[]>inbounds" :key="item.tag">
-      <v-card rounded="lg" class="entity-card">
-        <div class="entity-head">
-          <span class="entity-title">{{ item.tag }}</span>
-          <span class="entity-kind">{{ item.type }}</span>
-        </div>
-        <!-- 被中转规则接管的节点:它的所有用户都从这个落地出去,不是本机 IP -->
-        <v-chip v-if="exitOf[item.tag]" size="x-small" color="warning" variant="tonal" label class="entity-note">
-          {{ $t('relay.exitVia', { out: exitOf[item.tag] }) }}
-        </v-chip>
-        <div class="kv-list">
-          <div class="kv">
-            <span class="kv-k">{{ $t('in.addr') }}</span>
-            <span class="kv-v">{{ item.listen }}</span>
-          </div>
-          <div class="kv">
-            <span class="kv-k">{{ $t('in.port') }}</span>
-            <span class="kv-v">{{ item.listen_port }}</span>
-          </div>
-          <div class="kv">
-            <span class="kv-k">{{ $t('objects.tls') }}</span>
-            <span class="kv-v">{{ item.tls_id > 0 ? $t('enable') : $t('disable') }}</span>
-          </div>
-          <div class="kv">
-            <span class="kv-k">{{ $t('pages.clients') }}</span>
-            <span class="kv-v">
-              <template v-if="item.users">
-                <v-tooltip activator="parent" dir="ltr" location="bottom" v-if="item.users.length > 0">
-                  <span v-for="u in item.users">{{ u }}<br /></span>
-                </v-tooltip>
-                {{ item.users.length }}
-              </template>
-              <template v-else>-</template>
-            </span>
-          </div>
-          <div class="kv">
-            <span class="kv-k">{{ $t('online') }}</span>
-            <span class="kv-v">
-              <template v-if="onlines.includes(item.tag)">
-                <v-chip density="comfortable" size="small" color="success" variant="flat">{{ $t('online') }}</v-chip>
-              </template>
-              <template v-else>-</template>
-            </span>
-          </div>
-        </div>
-        <v-divider></v-divider>
-        <v-card-actions style="padding: 4px 8px 10px;">
-          <v-btn icon="mdi-file-edit" @click="showModal(item.id)">
-            <v-icon />
-            <v-tooltip activator="parent" location="top" :text="$t('actions.edit')"></v-tooltip>
-          </v-btn>
-          <v-btn icon="mdi-file-remove" style="margin-inline-start:0;" color="warning" @click="delOverlay[index] = true">
-            <v-icon />
-            <v-tooltip activator="parent" location="top" :text="$t('actions.del')"></v-tooltip>
-          </v-btn>
-          <v-overlay
-            v-model="delOverlay[index]"
-            contained
-            class="align-center justify-center"
-          >
-            <v-card :title="$t('actions.del')" rounded="lg">
-              <v-divider></v-divider>
-              <v-card-text>{{ $t('confirm') }}</v-card-text>
-              <v-card-actions>
-                <v-btn color="error" variant="flat" @click="delInbound(item.id)">{{ $t('yes') }}</v-btn>
-                <v-btn variant="text" class="confirm-cancel" @click="delOverlay[index] = false">{{ $t('no') }}</v-btn>
-              </v-card-actions>
-            </v-card>
-          </v-overlay>
-          <v-btn icon="mdi-content-duplicate" :loading="cloneLoading" @click="clone(item.id)">
-            <v-icon />
-            <v-tooltip activator="parent" location="top" :text="$t('actions.clone')"></v-tooltip>
-          </v-btn>
-          <v-btn icon="mdi-qrcode" v-if="item.users && item.users.length > 0" @click="showInboundQr(item)">
-            <v-icon />
-            <v-tooltip activator="parent" location="top" :text="$t('client.links')"></v-tooltip>
-          </v-btn>
-          <v-btn icon="mdi-chart-line" @click="showStats(item.tag)" v-if="Data().enableTraffic">
-            <v-icon />
-            <v-tooltip activator="parent" location="top" :text="$t('stats.graphTitle')"></v-tooltip>
-          </v-btn>
-        </v-card-actions>
-      </v-card>      
-    </v-col>
-  </v-row>
+  <div class="ledger">
+    <div
+      v-for="(item, index) in <any[]>inbounds"
+      :key="item.tag"
+      class="ledger-row"
+    >
+      <span class="ledger-mark" :data-state="onlines.includes(item.tag) ? 'up' : 'down'"></span>
+
+      <span class="ledger-name">{{ item.tag }}</span>
+
+      <span class="ledger-meta">
+        <span class="mono">{{ fmtAddr(item) }}</span> · {{ item.type }} · {{ item.tls_id > 0 ? 'TLS' : 'plain' }} ·
+        <span class="mono" :title="(item.users || []).join(', ')">{{ (item.users || []).length }}</span> 用户<template
+          v-if="exitOf[item.tag]"
+        > · {{ $t('relay.exitVia', { out: exitOf[item.tag] }) }}</template>
+      </span>
+
+      <div class="ledger-actions">
+        <v-btn icon size="x-small" @click="showModal(item.id)">
+          <v-icon size="14">mdi-pencil-outline</v-icon>
+          <v-tooltip activator="parent" location="top" :text="$t('actions.edit')"></v-tooltip>
+        </v-btn>
+        <v-btn icon size="x-small" @click="delIndex = index; delDialog = true">
+          <v-icon size="14">mdi-delete-outline</v-icon>
+          <v-tooltip activator="parent" location="top" :text="$t('actions.del')"></v-tooltip>
+        </v-btn>
+        <v-btn icon size="x-small" :loading="cloneLoading" @click="clone(item.id)">
+          <v-icon size="14">mdi-content-duplicate</v-icon>
+          <v-tooltip activator="parent" location="top" :text="$t('actions.clone')"></v-tooltip>
+        </v-btn>
+        <v-btn v-if="item.users && item.users.length > 0" icon size="x-small" @click="showInboundQr(item)">
+          <v-icon size="14">mdi-qrcode</v-icon>
+          <v-tooltip activator="parent" location="top" :text="$t('client.links')"></v-tooltip>
+        </v-btn>
+        <v-btn v-if="Data().enableTraffic" icon size="x-small" @click="showStats(item.tag)">
+          <v-icon size="14">mdi-chart-line</v-icon>
+          <v-tooltip activator="parent" location="top" :text="$t('stats.graphTitle')"></v-tooltip>
+        </v-btn>
+      </div>
+    </div>
+  </div>
+
+  <v-dialog v-model="delDialog" width="320">
+    <v-card :title="$t('actions.del')">
+      <v-divider></v-divider>
+      <v-card-text>{{ $t('confirm') }}</v-card-text>
+      <v-card-actions>
+        <v-spacer></v-spacer>
+        <v-btn variant="text" @click="delDialog = false">{{ $t('no') }}</v-btn>
+        <v-btn color="error" variant="flat" @click="confirmDelInbound">{{ $t('yes') }}</v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 </template>
 
 <script lang="ts" setup>
@@ -246,7 +213,22 @@ const pickClient = (id: number) => {
   qrcode.value.visible = true
 }
 
-let delOverlay = ref(new Array<boolean>)
+// listen 常见是 "::"（IPv6 通配），直接和端口拼会显示成「:::46250」
+const fmtAddr = (item: any) => {
+  const host = String(item.listen ?? '')
+  if (!host || host === '::' || host === '0.0.0.0') return `:${item.listen_port}`
+  return `${host}:${item.listen_port}`
+}
+
+const delDialog = ref(false)
+const delIndex = ref(-1)
+
+const confirmDelInbound = async () => {
+  const item = (<any[]>inbounds.value)[delIndex.value]
+  delDialog.value = false
+  if (item) await delInbound(item.id)
+}
+
 
 const showModal = (id: number) => {
   modal.value.id = id
@@ -258,10 +240,9 @@ const closeModal = () => {
 
 const delInbound = async (id: number) => {
   const index = inbounds.value.findIndex(i => i.id == id)
+  if (index < 0) return
   const tag = inbounds.value[index].tag
-
-  const success = await Data().save("inbounds", "del", tag)
-  if (success) delOverlay.value[index] = false
+  await Data().save("inbounds", "del", tag)
 }
 
 let cloneLoading = ref(false)

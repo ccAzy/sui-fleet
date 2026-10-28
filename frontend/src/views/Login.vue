@@ -1,140 +1,277 @@
 <template>
-    <v-app>
-    <v-container class="fill-height" style="margin-top: 100px;">
-      <v-row justify="center" align="center">
-        <v-col cols="12" sm="8" md="4">
-          <v-card>
-            <v-card-title class="headline" v-text="$t('login.title')"></v-card-title>
-            <v-card-text>
-              <v-form @submit.prevent="login" ref="form">
-                <v-text-field v-model="username" :label="$t('login.username')" :rules="usernameRules" required></v-text-field>
-                <v-text-field v-model="password" :label="$t('login.password')" :rules="passwordRules" type="password" required></v-text-field>
-                <v-btn :loading="loading" type="submit" color="primary" block class="mt-2" v-text="$t('actions.submit')"></v-btn>
-              </v-form>
-              <v-select
-                density="compact"
-                class="mt-2"
-                hide-details
-                variant="solo"
-                :items="languages"
-                v-model="$i18n.locale"
-                @update:modelValue="changeLocale">
-                <template v-slot:append>
-                  <v-menu>
-                    <template v-slot:activator="{ props }">
-                      <v-btn icon v-bind="props">
-                        <v-icon>mdi-palette</v-icon>
-                      </v-btn>
-                    </template>
-                    <v-list density="compact">
-                      <v-list-item
-                        v-for="sk in skins"
-                        :key="sk.id"
-                        @click="changeSkin(sk.id)"
-                        :active="currentSkin === sk.id"
-                      >
-                        <template v-slot:prepend>
-                          <span class="skin-swatch" :style="{ backgroundImage: sk.swatch }"></span>
-                        </template>
-                        <v-list-item-title>{{ $t(`skin.${sk.id}`) }}</v-list-item-title>
-                      </v-list-item>
-                    </v-list>
-                  </v-menu>
-                </template>
-              </v-select>
-              <div class="text-center mt-3">
-                <a href="https://3yuedaohang.com" target="_blank" rel="noopener noreferrer"
-                  class="text-caption text-decoration-none">🌐 {{ $t('menu.site') }} · 3yuedaohang.com</a>
-                <br>
-                <a href="https://www.youtube.com/@zhanzhang3yue" target="_blank" rel="noopener noreferrer"
-                  class="text-caption text-decoration-none">📺 {{ $t('menu.youtube') }} · @zhanzhang3yue</a>
-                <br>
-                <a href="https://3yuedaohang.com/cn2/banwagong" target="_blank" rel="noopener noreferrer"
-                  class="text-caption text-decoration-none">🖥️ {{ $t('menu.vps') }}</a>
-              </div>
-            </v-card-text>
-          </v-card>
-        </v-col>
-      </v-row>
-    </v-container>
-    </v-app>
-  </template>
+  <v-app>
+    <div class="login-page">
+      <div class="login-sheet">
+        <header class="login-head">
+          <h1 class="login-title">s-ui cloud</h1>
+          <p class="login-sub">节点管理 · 配置下发 · 订阅分发</p>
+        </header>
+
+        <form class="login-form" autocomplete="on" @submit.prevent="login">
+          <label class="field">
+            <span class="field-label">{{ $t('login.username') }}</span>
+            <input
+              v-model="username"
+              class="field-input"
+              name="username"
+              autocomplete="username"
+              spellcheck="false"
+              required
+            />
+          </label>
+
+          <label class="field">
+            <span class="field-label">{{ $t('login.password') }}</span>
+            <input
+              v-model="password"
+              class="field-input"
+              name="password"
+              type="password"
+              autocomplete="current-password"
+              required
+            />
+          </label>
+
+          <p v-if="error" class="login-error">{{ error }}</p>
+
+          <button class="login-submit" type="submit" :disabled="loading">
+            {{ loading ? '…' : $t('actions.submit') }}
+          </button>
+        </form>
+
+        <footer class="login-foot">
+          <div class="login-links">
+            <a href="https://3yuedaohang.com" target="_blank" rel="noopener noreferrer">
+              <v-icon size="14">mdi-web</v-icon>
+              <span>{{ $t('menu.site') }}</span>
+            </a>
+            <a href="https://www.youtube.com/@zhanzhang3yue" target="_blank" rel="noopener noreferrer">
+              <v-icon size="14">mdi-youtube</v-icon>
+              <span>{{ $t('menu.youtube') }}</span>
+            </a>
+            <a href="https://3yuedaohang.com/cn2/banwagong" target="_blank" rel="noopener noreferrer">
+              <v-icon size="14">mdi-server-outline</v-icon>
+              <span>{{ $t('menu.vps') }}</span>
+            </a>
+          </div>
+
+          <label class="login-lang">
+            <span class="sr-only">Language</span>
+            <select v-model="$i18n.locale" @change="changeLocale(($i18n.locale as string))">
+              <option v-for="l in languages" :key="l.value" :value="l.value">{{ l.title }}</option>
+            </select>
+          </label>
+        </footer>
+      </div>
+    </div>
+  </v-app>
+</template>
 
 <script lang="ts" setup>
-import { ref } from "vue"
-import { useLocale,useTheme } from 'vuetify'
+import { ref } from 'vue'
+import { useLocale } from 'vuetify'
 import { i18n, languages } from '@/locales'
 import { useRouter } from 'vue-router'
 import HttpUtil from '@/plugins/httputil'
-import { SKINS, savedSkin, applySkinAttr, type SkinId } from '@/plugins/skins'
 
-
-const theme = useTheme()
 const locale = useLocale()
-
-// Same gradient-skin picker as the in-panel app bar, so the login screen shows
-// the chosen skin (default Aurora) and stays in sync with the rest of the UI.
-const skins = SKINS
-const currentSkin = ref<SkinId>(savedSkin().id)
-
 const username = ref('')
-const usernameRules = [
-  (value: string) => {
-    if (value?.length > 0) return true
-    return i18n.global.t('login.unRules')
-  },
-]
-
 const password = ref('')
-const passwordRules = [
-  (value: string) => {
-    if (value?.length > 0) return true
-    return i18n.global.t('login.pwRules')
-  },
-]
-
 const loading = ref(false)
+const error = ref('')
 const router = useRouter()
 
 const login = async () => {
-  if (username.value == '' || password.value == '') return
-  loading.value=true
-  const response = await HttpUtil.post('api/login',{user: username.value, pass: password.value})
-  if(response.success){
+  error.value = ''
+  if (!username.value || !password.value) {
+    error.value = !username.value ? i18n.global.t('login.unRules') : i18n.global.t('login.pwRules')
+    return
+  }
+  loading.value = true
+  const response = await HttpUtil.post('api/login', { user: username.value, pass: password.value })
+  loading.value = false
+  if (response.success) {
     // 首次用默认密码登录：直接带去改密页，避免面板长期用 admin/admin 裸奔
     const mustChange = Boolean((response.obj as any)?.must_change)
-    setTimeout(() => {
-      loading.value=false
-      router.push(mustChange ? '/admins' : '/')
-    }, 500)
+    router.push(mustChange ? '/admins' : '/')
   } else {
-    loading.value=false
+    error.value = String((response as any).msg || 'Invalid login')
   }
 }
-const changeLocale = (l: any) => {
+
+const changeLocale = (l: string) => {
   locale.current.value = l ?? 'en'
   localStorage.setItem('locale', locale.current.value)
 }
-const changeSkin = (id: SkinId) => {
-  const sk = SKINS.find((s) => s.id === id)!
-  theme.change(sk.base)
-  applySkinAttr(id)
-  localStorage.setItem('skin', id)
-  currentSkin.value = id
-}
 </script>
 
-<style>
-.v-overlay .v-list-item,
-.v-field__input {
-  direction: ltr;
+<style scoped>
+/* 扉页：不要卡片框，直接排版在纸面上 */
+.login-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 48px 24px;
+  background: var(--paper);
 }
-.skin-swatch {
-  display: inline-block;
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  margin-inline-end: 10px;
-  border: 1px solid rgba(128, 128, 128, 0.45);
+
+.login-sheet {
+  width: 100%;
+  max-width: 340px;
+}
+
+.login-head {
+  margin-bottom: 40px;
+}
+
+.login-title {
+  font-family: var(--serif);
+  font-size: var(--fs-2xl);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+  margin: 0;
+}
+
+/* 标题下的一条短线，全站统一的纸面语言 */
+.login-title::after {
+  content: "";
+  display: block;
+  width: 28px;
+  height: 1px;
+  margin-top: 14px;
+  background: var(--ink);
+}
+
+.login-sub {
+  margin: 14px 0 0;
+  font-size: var(--fs-sm);
+  color: var(--ink-3);
+  letter-spacing: 0.02em;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.field {
+  display: block;
+}
+
+.field-label {
+  display: block;
+  font-size: var(--fs-xs);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 2px;
+}
+
+.field-input {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--rule-strong);
+  border-radius: 0;
+  padding: 0;
+  height: 30px;
+  line-height: 30px;
+  font-family: var(--sans);
+  font-size: var(--fs-lg);
+  color: var(--ink);
+  outline: none;
+  transition: border-color 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.field-input:focus {
+  border-bottom-color: var(--accent);
+}
+
+.field-input::placeholder {
+  color: var(--ink-3);
+}
+
+.login-error {
+  margin: -8px 0 0;
+  font-size: var(--fs-sm);
+  color: var(--error);
+}
+
+.login-submit {
+  margin-top: 6px;
+  height: 40px;
+  border: 1px solid var(--ink);
+  border-radius: 2px;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--sans);
+  font-size: var(--fs-base);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: opacity 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.login-submit:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+.login-submit:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+
+.login-foot {
+  margin-top: 44px;
+  padding-top: 16px;
+  border-top: 1px solid var(--rule);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.login-links {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.login-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-xs);
+  color: var(--ink-2);
+  text-decoration: none;
+  text-underline-offset: 3px;
+}
+
+.login-links a:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+.login-lang select {
+  background: transparent;
+  border: 1px solid var(--rule-strong);
+  border-radius: 2px;
+  color: var(--ink-2);
+  font-family: var(--sans);
+  font-size: var(--fs-xs);
+  padding: 4px 6px;
+  cursor: pointer;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 </style>

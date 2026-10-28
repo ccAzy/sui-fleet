@@ -48,15 +48,15 @@
       </template>
       <v-list density="compact">
         <v-list-item
-          v-for="sk in skins"
-          :key="sk.id"
-          @click="changeSkin(sk.id)"
-          :active="currentSkin === sk.id"
+          v-for="m in themeModes"
+          :key="m.value"
+          @click="changeTheme(m.value)"
+          :active="themeMode === m.value"
         >
           <template v-slot:prepend>
-            <span class="skin-swatch" :style="{ backgroundImage: sk.swatch }"></span>
+            <v-icon size="16">{{ m.icon }}</v-icon>
           </template>
-          <v-list-item-title>{{ $t(`skin.${sk.id}`) }}</v-list-item-title>
+          <v-list-item-title>{{ $t(m.label) }}</v-list-item-title>
         </v-list-item>
       </v-list>
     </v-menu>
@@ -70,7 +70,7 @@ import { useI18n } from 'vue-i18n'
 import { computed, ref } from 'vue'
 import { languages } from '@/locales'
 import Data from '@/store/modules/data'
-import { SKINS, savedSkin, applySkinAttr, type SkinId } from '@/plugins/skins'
+import { applyThemeMode, savedThemeMode } from '@/plugins/vuetify'
 
 defineProps(['isMobile'])
 
@@ -103,26 +103,20 @@ const changeLocale = (l: string) => {
   window.location.reload()
 }
 const isActiveLocale = (l: string) => i18nLocale.value === l
-// Gradient skins replace the old light/dark/system toggle: each skin carries
-// its own base theme, so picking one sets both the gradient and the contrast.
-const skins = SKINS
-const currentSkin = ref<SkinId>(savedSkin().id)
-const changeSkin = (id: SkinId) => {
-  const sk = SKINS.find((s) => s.id === id)!
-  theme.change(sk.base)
-  applySkinAttr(id)
-  localStorage.setItem('skin', id)
-  currentSkin.value = id
+// 双主题：浅色（白天）/ 深色（夜间）/ 跟随系统。没有渐变皮肤了。
+type ThemeMode = 'light' | 'dark' | 'system'
+const themeModes: Array<{ value: ThemeMode; icon: string; label: string }> = [
+  { value: 'light', icon: 'mdi-white-balance-sunny', label: 'theme.light' },
+  { value: 'dark', icon: 'mdi-weather-night', label: 'theme.dark' },
+  { value: 'system', icon: 'mdi-monitor', label: 'theme.system' },
+]
+const themeMode = ref<ThemeMode>(savedThemeMode())
+const changeTheme = (m: ThemeMode) => {
+  const base = applyThemeMode(m)
+  theme.change(base)
+  themeMode.value = m
 }
 </script>
 
 <style scoped>
-.skin-swatch {
-  display: inline-block;
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  margin-inline-end: 10px;
-  border: 1px solid rgba(128, 128, 128, 0.45);
-}
 </style>

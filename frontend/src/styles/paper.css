@@ -1,0 +1,542 @@
+/* ============================================================================
+ * paper.css — 纸白极简
+ *
+ * 世界：一本摊开的工作账簿。纸面、墨、一条细线分层，没有卡片堆叠、没有阴影、
+ * 没有渐变。颜色只做三件事：分层、（用靛蓝标记）选中、（用朱红标记）异常。
+ *
+ * Operate 模式：世界只借「字体 / 配色 / 密度 / 一个标志性动作」，
+ * 布局与控件保持 Web 平台标准（侧栏 + 顶栏 + 表格/列表）。
+ * 标志性动作 = 账簿式名录 .ledger（见文件末尾）。
+ * ========================================================================== */
+
+/* ---------- 双主题 token ---------- */
+:root,
+.v-theme--light {
+  --paper: #f6f5f1;        /* 纸面（不是纯白，也不是偏黄的米色） */
+  --surface: #fffefb;      /* 内容面板，比纸面略亮一档 */
+  --surface-2: #eeede8;    /* 侧栏/工具栏，沉一档 */
+  --ink: #1a1a19;          /* 墨：正文 15.2:1 */
+  --ink-2: #57564f;        /* 次级：说明文字 7.4:1 */
+  --ink-3: #78766e;        /* 三级/占位 4.7:1 */
+  --rule: #dcdad3;         /* 1px 细线 */
+  --rule-strong: #c3c0b6;  /* 需要更明确的分界 */
+  --accent: #2c4a6e;       /* 墨靛：选中 / 主操作 */
+  --accent-soft: #e6ebf2;
+  --error: #a63a2e;        /* 朱红：异常 */
+  --error-soft: #f4e6e3;
+  --ok: #2f6b4f;           /* 墨绿：正常 */
+  --warn: #8a6a1f;         /* 陈黄：降级 */
+  --shadow-float: 0 6px 24px rgba(26, 26, 25, 0.12), 0 1px 2px rgba(26, 26, 25, 0.06);
+  --scrim: rgba(26, 26, 25, 0.32);
+}
+
+.v-theme--dark {
+  --paper: #121211;
+  --surface: #191918;
+  --surface-2: #101010;
+  --ink: #e9e7e1;
+  --ink-2: #a8a59c;
+  --ink-3: #7e7b73;
+  --rule: #2b2b29;
+  --rule-strong: #3d3d3a;
+  --accent: #8fb2da;
+  --accent-soft: #1c2733;
+  --error: #dd7f72;
+  --error-soft: #2e1a17;
+  --ok: #86c2a1;
+  --warn: #cfae64;
+  --shadow-float: 0 8px 28px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.4);
+  --scrim: rgba(0, 0, 0, 0.6);
+}
+
+/* ---------- 字体：标题衬线，正文无衬线，数据等宽 ---------- */
+:root {
+  --serif: "Source Han Serif SC", "Noto Serif SC", "Source Serif 4", "Songti SC",
+    Georgia, "Times New Roman", serif;
+  --sans: "Segoe UI Variable Text", "Segoe UI", "PingFang SC", "Microsoft YaHei UI",
+    "Noto Sans SC", system-ui, sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", "SFMono-Regular", Consolas, "Liberation Mono",
+    monospace;
+
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs-base: 13px;
+  --fs-lg: 15px;
+  --fs-xl: 19px;
+  --fs-2xl: 26px;
+
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 24px;
+  --s6: 32px;
+  --s7: 48px;
+}
+
+/* ---------- 底座 ---------- */
+html,
+body,
+.v-application {
+  background: var(--paper) !important;
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: var(--fs-base);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* 纸面质感：极淡的一层纹理，避免大片纯色显得空洞（不引图，纯 CSS） */
+.v-application::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.025;
+  background-image: radial-gradient(currentColor 0.5px, transparent 0.5px);
+  background-size: 3px 3px;
+  color: var(--ink);
+}
+
+/* ---------- 浏览器表面（最容易漏、也最能看出「是做的不是拼的」） ---------- */
+::selection {
+  background: var(--accent);
+  color: var(--paper);
+}
+
+* {
+  caret-color: var(--accent);
+}
+
+:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule-strong) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--rule-strong);
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-3);
+  background-clip: content-box;
+}
+
+/* 图标字体必须压过全局 sans 继承：.v-icon 用的是 .mdi 的字形，
+   一旦被 body 的 font-family 继承覆盖，图标会退化成缺字方块。 */
+.mdi::before,
+.mdi-set,
+.v-icon.mdi {
+  font-family: "Material Design Icons" !important;
+}
+
+/* ---------- 排版 ---------- */
+h1,
+h2,
+h3,
+.v-card-title,
+.page-title {
+  font-family: var(--serif);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+}
+
+.page-title {
+  font-size: var(--fs-xl);
+  line-height: 1.3;
+}
+
+/* 页面标题下方的一条短线，替代原来的一整条粗下划线 */
+.page-title::after {
+  content: "";
+  display: block;
+  width: 28px;
+  height: 1px;
+  margin-top: var(--s2);
+  background: var(--ink);
+}
+
+.eyebrow {
+  font-size: var(--fs-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* 数据一律等宽 + 表格数字，右对齐才不跳 */
+.num,
+.mono,
+code,
+kbd,
+.v-table td,
+.v-table th {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+.num {
+  font-size: var(--fs-sm);
+}
+
+.muted {
+  color: var(--ink-2);
+}
+
+.dim {
+  color: var(--ink-3);
+}
+
+/* ---------- 去掉卡片与阴影（世界决定） ---------- */
+.v-card {
+  background: var(--surface) !important;
+  border: 1px solid var(--rule) !important;
+  border-radius: 2px !important;
+  box-shadow: none !important;
+}
+
+.v-card--variant-tonal,
+.v-card--variant-outlined,
+.v-sheet {
+  box-shadow: none !important;
+}
+
+/* 浮层是唯一允许有阴影的地方：带 offset 与柔和模糊 */
+.v-overlay__content > .v-card,
+.v-dialog > .v-card,
+.v-menu > .v-overlay__content {
+  box-shadow: var(--shadow-float) !important;
+  border-radius: 2px !important;
+}
+
+.v-divider {
+  border-color: var(--rule) !important;
+  opacity: 1 !important;
+}
+
+/* ---------- 顶栏 / 侧栏 ---------- */
+.v-app-bar {
+  background: var(--paper) !important;
+  border-bottom: 1px solid var(--rule) !important;
+  box-shadow: none !important;
+}
+
+.v-app-bar .v-toolbar-title {
+  font-family: var(--serif);
+  font-size: var(--fs-lg);
+  letter-spacing: 0.02em;
+}
+
+.v-navigation-drawer {
+  background: var(--surface-2) !important;
+  border-right: 1px solid var(--rule) !important;
+  box-shadow: none !important;
+}
+
+.v-navigation-drawer .v-list-item {
+  min-height: 32px;
+  border-radius: 0;
+}
+
+.v-navigation-drawer .v-list-item--active {
+  background: transparent !important;
+  color: var(--accent) !important;
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.v-navigation-drawer .v-list-subheader {
+  font-size: var(--fs-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  min-height: 28px;
+  padding-inline-start: 16px;
+}
+
+/* ---------- 控件：2px 圆角、1px 边、无填充 ---------- */
+.v-btn {
+  border-radius: 2px !important;
+  box-shadow: none !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  font-weight: 500;
+}
+
+.v-btn--variant-flat {
+  border: 1px solid var(--accent);
+}
+
+.v-btn--variant-outlined {
+  border-color: var(--rule-strong) !important;
+}
+
+.v-btn--variant-text {
+  padding-inline: var(--s2);
+}
+
+.v-field {
+  border-radius: 2px !important;
+  background: var(--surface) !important;
+  box-shadow: none !important;
+}
+
+.v-field--variant-solo-filled .v-field__outline,
+.v-field--variant-filled .v-field__outline {
+  display: none;
+}
+
+.v-field--variant-solo-filled,
+.v-field--variant-filled {
+  border: 1px solid var(--rule-strong);
+}
+
+.v-field--focused {
+  border-color: var(--accent) !important;
+}
+
+.v-field input,
+.v-field textarea,
+.v-select__selection-text {
+  font-size: var(--fs-base) !important;
+}
+
+.v-input__details,
+.v-messages__message {
+  font-size: var(--fs-xs) !important;
+  min-height: 16px;
+  padding-top: 2px;
+}
+
+.v-chip {
+  border-radius: 2px !important;
+  font-size: var(--fs-xs) !important;
+  height: 20px !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.v-chip--variant-outlined {
+  border-color: var(--rule-strong) !important;
+}
+
+.v-table,
+.v-data-table,
+.v-data-table__wrapper,
+.v-table__wrapper {
+  background: transparent !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.v-table {
+  font-size: var(--fs-sm);
+}
+
+.v-table th {
+  font-size: var(--fs-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-weight: 500;
+}
+
+.v-table > .v-table__wrapper > table > tbody > tr > td,
+.v-table > .v-table__wrapper > table > thead > tr > th {
+  border-bottom: 1px solid var(--rule) !important;
+  padding-block: 6px !important;
+}
+
+.v-tabs {
+  border-bottom: 1px solid var(--rule);
+}
+
+.v-tab {
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  font-size: var(--fs-base);
+  min-width: 0;
+  padding-inline: var(--s3);
+}
+
+.v-tab--selected {
+  color: var(--accent) !important;
+}
+
+.v-tabs .v-tab__slider {
+  height: 1px;
+}
+
+/* 通知：纸片式，不带阴影光环 */
+.v-snackbar__wrapper,
+.notification {
+  border-radius: 2px !important;
+  box-shadow: var(--shadow-float) !important;
+}
+
+/* ============================================================================
+ * 标志性动作：账簿式名录 .ledger
+ *
+ * 每一个对象（节点 / 入站 / 用户）是一行账目：左侧状态墨点、中间名称（衬线）、
+ * 右侧等宽数字，1px 细线分隔。不是卡片，不是表格，是一本翻开的账。
+ * ========================================================================== */
+.ledger {
+  border-top: 1px solid var(--rule);
+  margin-top: var(--s3);
+}
+
+.ledger-row {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1.4fr) minmax(0, 2fr) auto;
+  align-items: baseline;
+  gap: var(--s3);
+  padding: 9px var(--s2) 9px 0;
+  border-bottom: 1px solid var(--rule);
+  transition: background-color 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ledger-row:hover {
+  background: var(--accent-soft);
+}
+
+.ledger-row.is-lead {
+  padding-top: 11px;
+  padding-bottom: 11px;
+}
+
+/* 状态墨点：实心=在线，空心=离线，菱形缺口=降级（不靠颜色单独传达） */
+.ledger-mark {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  border: 1px solid var(--ink-3);
+  align-self: center;
+  justify-self: center;
+}
+
+.ledger-mark[data-state="up"] {
+  background: var(--ok);
+  border-color: var(--ok);
+}
+
+.ledger-mark[data-state="down"] {
+  background: transparent;
+  border-color: var(--ink-3);
+}
+
+.ledger-mark[data-state="error"] {
+  background: var(--error);
+  border-color: var(--error);
+}
+
+.ledger-name {
+  font-family: var(--serif);
+  font-size: var(--fs-base);
+  font-weight: 600;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ledger-meta {
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ledger-meta .mono {
+  color: var(--ink-2);
+}
+
+.ledger-state {
+  font-size: var(--fs-xs);
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.ledger-state[data-state="up"] {
+  color: var(--ok);
+}
+
+.ledger-state[data-state="error"] {
+  color: var(--error);
+}
+
+/* 行的操作按钮：默认几乎隐形，hover 才出现（账目不需要满屏图标） */
+.ledger-actions {
+  display: flex;
+  gap: var(--s1);
+  opacity: 0;
+  transition: opacity 140ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ledger-row:hover .ledger-actions,
+.ledger-row:focus-within .ledger-actions {
+  opacity: 1;
+}
+
+.ledger-section-title {
+  font-family: var(--serif);
+  font-size: var(--fs-lg);
+  margin: var(--s6) 0 var(--s2);
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s3);
+}
+
+.ledger-section-title .count {
+  font-family: var(--mono);
+  font-size: var(--fs-sm);
+  color: var(--ink-3);
+}
+
+/* ---------- 动效：一次性、指数缓出，只表达状态 ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  .ledger-row {
+    animation: ledger-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  @keyframes ledger-in {
+    from {
+      opacity: 0;
+      transform: translateY(2px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
+/* ---------- 响应式：结构变化，不是字号缩放 ---------- */
+@media (max-width: 720px) {
+  .ledger-row {
+    grid-template-columns: 14px minmax(0, 1fr) auto;
+  }
+
+  .ledger-meta {
+    display: none;
+  }
+}
