@@ -17,3 +17,8 @@ db/
 .vscode/
 .tmp/
 panel/wrangler.toml
+
+# 本地备份
+*.bak
+*.bak-*
+*.before-*
