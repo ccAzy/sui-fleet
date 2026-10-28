@@ -1,0 +1,9 @@
+*.log
+.pilens/
+.wrangler/
+agent/dist/
+frontend-dist/
+frontend-src/
+frontend-src/node_modules/
+node_modules/
+work/

@@ -1,0 +1,111 @@
+{
+  "ok": true,
+  "unchanged": false,
+  "revision": 3,
+  "node": {
+    "id": "zbd7aq",
+    "name": "HK-01"
+  },
+  "config": {
+    "log": {
+      "level": "info",
+      "timestamp": true
+    },
+    "dns": {
+      "servers": [
+        {
+          "tag": "google",
+          "address": "tls://8.8.8.8",
+          "detour": "direct"
+        }
+      ],
+      "rules": [
+        {
+          "domain": [
+            "geosite:cn"
+          ],
+          "server": "local"
+        }
+      ],
+      "final": "google",
+      "strategy": "prefer_ipv4"
+    },
+    "inbounds": [],
+    "outbounds": [],
+    "route": {
+      "rules": [
+        {
+          "protocol": "dns",
+          "outbound": "dns-out"
+        }
+      ],
+      "rule_set": [],
+      "final": "direct",
+      "auto_detect_interface": true,
+      "default_domain_resolver": "google"
+    },
+    "experimental": {
+      "cache_file": {
+        "enabled": true,
+        "path": "cache.db"
+      },
+      "clash_api": {
+        "external_controller": "127.0.0.1:9090"
+      }
+    }
+  },
+  "settings": {},
+  "inbounds": [
+    {
+      "type": "vless",
+      "tag": "vless-443",
+      "listen": "127.0.0.1",
+      "listen_port": 443,
+      "tls_id": 0,
+      "addrs": [],
+      "out_json": {},
+      "transport": {},
+      "users": [],
+      "id": 1
+    }
+  ],
+  "outbounds": [
+    {
+      "id": 1,
+      "type": "direct",
+      "tag": "direct"
+    }
+  ],
+  "endpoints": [],
+  "services": [],
+  "tls": [],
+  "clients": [
+    {
+      "enable": true,
+      "name": "alice",
+      "config": {
+        "vless": {
+          "uuid": "11111111-2222-3333-4444-555555555555"
+        }
+      },
+      "inbounds": [
+        1
+      ],
+      "volume": 0,
+      "expiry": 0,
+      "up": 0,
+      "down": 0,
+      "desc": "",
+      "group": "",
+      "id": 1,
+      "links": [
+        {
+          "remark": "vless-443",
+          "type": "local",
+          "uri": "vless://11111111-2222-3333-4444-555555555555@1.2.3.4:443?type=tcp#vless-443"
+        }
+      ]
+    }
+  ],
+  "commands": []
+}

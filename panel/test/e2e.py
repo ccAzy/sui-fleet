@@ -1,0 +1,164 @@
+"""本地端到端验证：登录 → 建节点 → 存入站/客户端 → agent pull → report → load/sub。
+用法: python test/e2e.py [base_url]
+只打印结论性摘要，不打印大段响应。
+"""
+import base64
+import http.cookiejar
+import json
+import os
+import sys
+import urllib.error
+import urllib.parse
+import urllib.request
+
+BASE = sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:8787"
+cj = http.cookiejar.CookieJar()
+opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
+
+
+def post(path, form=None, js=None, headers=None, token=None):
+    url = BASE + path
+    data = None
+    hdrs = dict(headers or {})
+    if form is not None:
+        data = urllib.parse.urlencode(form).encode()
+        hdrs["Content-Type"] = "application/x-www-form-urlencoded"
+    elif js is not None:
+        data = json.dumps(js).encode()
+        hdrs["Content-Type"] = "application/json"
+    if token:
+        hdrs["Authorization"] = "Bearer " + token
+    if not url.startswith(("http://", "https://")):
+        raise ValueError("only http(s) is allowed: " + url)
+    req = urllib.request.Request(url, data=data, headers=hdrs)  # noqa: S310  # noqa: S310  # nosec B310 -- BASE 是本地常量
+    with opener.open(req, timeout=15) as r:
+        return r.read().decode()
+
+
+def get(path, token=None):
+    url = BASE + path
+    if not url.startswith(("http://", "https://")):
+        raise ValueError("only http(s) is allowed: " + url)
+    req = urllib.request.Request(url, headers={"Authorization": "Bearer " + token} if token else {})  # noqa: S310  # nosec B310
+    with opener.open(req, timeout=15) as r:
+        return r.read().decode()
+
+
+def j(s):
+    return json.loads(s)
+
+
+fails = []
+
+
+def check(name, cond, detail=""):
+    print(("PASS  " if cond else "FAIL  ") + name + ("" if cond else f"  <- {detail}"))
+    if not cond:
+        fails.append(name)
+
+
+r = j(post("/api/login", form={"user": "admin", "pass": "admin"}))
+check("login", r["success"] is True, r)
+
+# 清掉上一次跑留下的节点，保证每次从干净状态验证
+existing = j(get("/api/servers"))["obj"]["servers"]
+for srv in existing:
+    post("/api/nodes/" + srv["id"] + "/delete", form={})
+
+r = j(post("/api/nodes", form={"name": "HK-01", "address": "1.2.3.4", "remark": "e2e"}))
+check("create node", r["success"] and r["obj"].get("token"), r)
+nid = r["obj"]["id"]
+tok = r["obj"]["token"]
+
+inbound = {
+    "type": "vless",
+    "tag": "vless-443",
+    "listen": "127.0.0.1",
+    "listen_port": 443,
+    "tls_id": 0,
+    "addrs": [],
+    "out_json": {},
+    "transport": {},
+    "users": [],
+}
+r = j(post("/api/save", form={"object": "inbounds", "action": "new", "data": json.dumps(inbound)}))
+inb = r["obj"]["inbounds"][0]
+check("save inbound", inb["id"] == 1 and inb["tag"] == "vless-443", r)
+
+client = {
+    "enable": True,
+    "name": "alice",
+    "config": {"vless": {"uuid": "11111111-2222-3333-4444-555555555555"}},
+    "inbounds": [1],
+    "volume": 0,
+    "expiry": 0,
+    "up": 0,
+    "down": 0,
+    "desc": "",
+    "group": "",
+}
+r = j(post("/api/save", form={"object": "clients", "action": "new", "data": json.dumps(client)}))
+cl = r["obj"]["clients"][0]
+check("save client", cl["name"] == "alice" and len(cl.get("links") or []) == 1, r)
+first_link = (cl.get("links") or [{}])[0]
+check("link generated", isinstance(first_link, dict) and str(first_link.get("uri", "")).startswith("vless://"), cl.get("links"))
+check("link shape", first_link.get("type") == "local" and first_link.get("remark") == "vless-443", str(first_link))
+
+pull_raw = post("/agent/pull", js={"revision": 0}, token=tok)
+r = j(pull_raw)
+PULLED_REV = r["revision"]
+
+# 存一份真实 pull 响应给离线验证用（mock panel 回放它）
+with open(os.path.join(os.path.dirname(__file__), "pull-payload.json"), "w", encoding="utf-8") as f:
+    json.dump(r, f, ensure_ascii=False, indent=2)
+check("agent pull", r["ok"] and len(r["inbounds"]) == 1 and len(r["clients"]) == 1, r)
+check("pull config present", isinstance(r.get("config"), dict) and "route" in r["config"], str(r.get("config")))
+
+r = j(
+    post(
+        "/agent/report",
+        js={
+            "revision_applied": r["revision"],
+            "agent_version": "0.1.0",
+            "core_state": "running",
+            "uptime": 3600,
+            "status": {
+                "cpu": 12.5,
+                "mem": 230000000,
+                "tcp_count": 42,
+                "onlines": {"inbound": ["vless-443"], "outbound": [], "user": ["alice"]},
+            },
+            "traffic": [{"tag": "alice", "up": 1000, "down": 2048}],
+        },
+        token=tok,
+    )
+)
+check("agent report", r["ok"] is True, r)
+
+r = j(get("/agent/pull?x=1", token=tok)) if False else None  # pull 是 POST，下行单独测
+r2 = j(post("/agent/pull", js={"revision": PULLED_REV}, token=tok))
+check("pull unchanged after report", r2.get("unchanged") is True, r2)
+
+r = j(get("/api/load"))
+check("load full", r["success"] and len(r["obj"]["inbounds"]) == 1, r)
+check("traffic accumulated", r["obj"]["clients"][0]["down"] == 2048, r["obj"]["clients"][0])
+
+r = j(get("/api/status"))
+check("status running", r["obj"]["running"] is True and r["obj"]["uptime"] == 3600, r)
+
+load_obj = j(get("/api/load"))["obj"]
+sub_url = load_obj["subURI"]
+check("sub uri has key", "?k=" in sub_url, sub_url)
+sub = get(sub_url.replace(BASE, ""))
+decoded = base64.b64decode(sub).decode()
+check("subscription", decoded.startswith("vless://"), decoded[:80])
+
+try:
+    bad = get("/sub/" + nid)
+    check("sub without key is rejected", bad.strip() in ("", "forbidden"), bad[:60])
+except urllib.error.HTTPError as e:  # noqa: S310 -- 403 是预期结果
+    check("sub without key is rejected", e.code == 403, str(e.code))
+
+print()
+print("RESULT:", "ALL PASS" if not fails else f"{len(fails)} FAILED: {fails}")
+sys.exit(0 if not fails else 1)
