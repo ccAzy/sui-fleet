@@ -798,11 +798,14 @@ app.get('/sub/:nodeId', async (c) => {
     node.id,
   )
   const links: string[] = []
+  // 订阅头需要 client 级的流量/配额（对齐原版 util.GetHeaders）
+  let subClient: Record<string, unknown> | null = null
   for (const row of clients) {
     try {
       const cl = JSON.parse(row.data) as Record<string, unknown>
       if (cl.enable === false) continue
       if (clientFilter && String(cl.name ?? '') !== clientFilter) continue
+      if (!subClient) subClient = cl
       const ls = Array.isArray(cl.links) ? (cl.links as unknown[]) : []
       for (const l of ls) {
         if (typeof l === 'string') links.push(l)
@@ -815,18 +818,31 @@ app.get('/sub/:nodeId', async (c) => {
       console.warn("skip malformed client row", e)
     }
   }
+  // 订阅协议的标准响应头（原版 subHandler.addHeaders 也是这三个）：
+  // 客户端靠 Subscription-Userinfo 显示流量/到期，Profile-Update-Interval 决定自动更新间隔。
+  const up = Number(subClient?.up ?? 0) || 0
+  const down = Number(subClient?.down ?? 0) || 0
+  const total = Number(subClient?.volume ?? 0) || 0
+  const expire = Number(subClient?.expiry ?? 0) || 0
+  const subHeaders: Record<string, string> = {
+    'Profile-Title': encodeURIComponent(node.name || 's-ui'),
+    'Profile-Update-Interval': '12',
+    'Subscription-Userinfo': `upload=${up}; download=${down}; total=${total}; expire=${expire}`,
+    'Cache-Control': 'no-store',
+  }
+
   // ?type=clash 输出 mihomo/Clash 可直接导入的 YAML；默认仍是 base64 链接列表
   const subType = (c.req.query('type') ?? c.req.query('format') ?? embedded.get('format') ?? '').toLowerCase()
   if (subType === 'clash' || subType === 'mihomo') {
-    return c.text(buildClashConfig(links, node.name), 200, { 'Content-Type': 'text/yaml; charset=utf-8' })
+    return c.text(buildClashConfig(links, node.name), 200, { ...subHeaders, 'Content-Type': 'text/yaml; charset=utf-8' })
   }
   if (subType === 'singbox' || subType === 'json') {
-    return c.json(buildSingboxOutbounds(links))
+    return c.body(JSON.stringify(buildSingboxOutbounds(links), null, 2), 200, { ...subHeaders, 'Content-Type': 'application/json; charset=utf-8' })
   }
 
   const text = links.join(String.fromCharCode(10))
   const payload = btoa(String.fromCharCode(...new TextEncoder().encode(text)))
-  return c.text(payload, 200, { 'Content-Type': 'text/plain; charset=utf-8' })
+  return c.text(payload, 200, { ...subHeaders, 'Content-Type': 'text/plain; charset=utf-8' })
 })
 
 // ---------- 定时任务 ----------
