@@ -74,7 +74,7 @@ npx wrangler secret put JWT_SECRET
 先在面板「Servers → Add Server」建节点，**token 只显示一次**，复制下来。然后在服务器上：
 
 ```bash
-scp dist/sui-agent-linux-amd64 install-agent.sh root@你的服务器:/root/
+scp dist/sui-agent-linux-amd64 scripts/install-agent.sh root@你的服务器:/root/
 
 ssh root@你的服务器
 cd /root && bash install-agent.sh \

@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "db:init": "wrangler d1 execute sui-panel --local --file=./schema.sql",
-    "db:init:remote": "wrangler d1 execute sui-panel --remote --file=./schema.sql"
+    "db:init": "wrangler d1 execute DB --local --file=./schema.sql",
+    "db:init:remote": "wrangler d1 execute DB --remote --file=./schema.sql",
+    "build:web": "bash ./build-frontend.sh"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261023.1",
