@@ -3,7 +3,7 @@
 # 用法: bash build-frontend.sh [frontend-src]
 set -e
 
-SRC="${1:-$(cd "$(dirname "$0")/../frontend-src" && pwd)}"
+SRC="${1:-$(cd "$(dirname "$0")/../frontend" && pwd)}"
 OUT="$(cd "$(dirname "$0")" && pwd)/../frontend-dist"
 
 cd "$SRC"

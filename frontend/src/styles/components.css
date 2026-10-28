@@ -1,0 +1,223 @@
+/**
+ * 通用卡片排版（与皮肤无关，所有皮肤都生效）。
+ *
+ * 原来每个字段是 <v-row><v-col>label</v-col><v-col>value</v-col></v-row>，
+ * 50/50 分栏导致行高松散、标签和值离得很远，卡片显得空。
+ * 这里换成 Apple 设置项那种键值行：标签左、值右，行高 26，数字等宽。
+ */
+
+.entity-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.entity-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 16px 8px;
+}
+
+.entity-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.entity-kind {
+  flex: 0 0 auto;
+  font-size: 0.75rem;
+  font-weight: 500;
+  opacity: 0.4;
+}
+
+.entity-note {
+  margin: 0 16px 6px;
+  align-self: flex-start;
+}
+
+.kv-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 2px 16px 12px;
+}
+
+.kv {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 26px;
+}
+
+.kv-k {
+  flex: 0 0 auto;
+  font-size: 0.78125rem;
+  opacity: 0.5;
+}
+
+.kv-v {
+  flex: 1 1 auto;
+  text-align: right;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+/* 动作行：图标间距收紧、上下留白匀称 */
+.entity-card .v-card-actions {
+  margin-top: auto;
+  gap: 2px;
+}
+
+/* 工具栏：一个主操作 + 若干轻量次操作（Apple 的动作分层） */
+.toolbar-primary {
+  min-width: 92px;
+}
+
+.server-switch {
+  font-weight: 500;
+}
+
+.server-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: #30d158;
+  vertical-align: 1px;
+}
+
+.server-switch--remote .server-dot {
+  background: #ffd60a;
+}
+
+/* 首页快捷动作：一排等距的轻量按钮，不再用行内 margin 拼 */
+.quick-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.home-mark {
+  margin-inline: auto;
+  opacity: 0.9;
+}
+
+/* ---------- 侧栏：品牌区 + 分组标题（rail 时收起，悬停展开才出现） ---------- */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 16px 10px;
+}
+
+.brand-mark {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  border-radius: 7px;
+}
+
+.brand-name {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: inherit;
+  white-space: nowrap;
+}
+
+.brand-close {
+  margin-left: auto;
+  opacity: 0.6;
+}
+
+.nav-group {
+  min-height: auto !important;
+  height: auto;
+  padding: 14px 16px 6px !important;
+  font-size: 0.6875rem !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  opacity: 0.45;
+}
+
+/* 侧栏内容区要能滚动：14 项 + 4 个分组标题在 900px 高的屏上放不下。
+   注意 .v-navigation-drawer__content 默认是 block，得先改成 flex 列，
+   否则给 .nav 加 flex/overflow 都不起作用（列表会直接溢出被裁）。 */
+.v-navigation-drawer__content {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.v-navigation-drawer .nav {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.v-navigation-drawer .nav-foot {
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
+.nav-divider {
+  margin: 8px 12px;
+  opacity: 0.6;
+}
+
+/* rail 态：只留图标，文字与分组标题收起 */
+.v-navigation-drawer--rail:not(.v-navigation-drawer--is-hovering) .brand {
+  justify-content: center;
+  padding: 16px 0 10px;
+}
+
+/* rail 就算悬停展开，Vuetify 仍保留 --rail 类，所以要用 :not(--is-hovering) 排除 */
+.v-navigation-drawer--rail:not(.v-navigation-drawer--is-hovering) .brand-name,
+.v-navigation-drawer--rail:not(.v-navigation-drawer--is-hovering) .nav-group {
+  display: none;
+}
+
+/* 悬停展开后恢复内缩的胶囊项，避免整行贴边 */
+.v-navigation-drawer--rail.v-navigation-drawer--is-hovering .v-list-item {
+  margin: 2px 8px;
+  border-radius: 10px;
+}
+
+.v-navigation-drawer--rail .nav-divider {
+  margin: 8px 10px;
+}
+
+/* rail 态不要加外边距：Vuetify 让 prepend 区宽 56 居中，加 margin 会把 item 压窄，
+   图标被 overflow 裁掉（实测只剩右半）。让 Vuetify 自己排版即可。 */
+.v-navigation-drawer--rail .v-list-item {
+  margin: 0;
+  border-radius: 0;
+}
+
+/* 内核版本行 */
+.kernel-ver {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+
+.kernel-latest {
+  margin-inline-start: 8px;
+  font-size: 0.75rem;
+  opacity: 0.45;
+}
+
+.kernel-update {
+  cursor: pointer;
+}

@@ -1,9 +1,17 @@
-*.log
-.pilens/
-.wrangler/
-agent/dist/
-frontend-dist/
-frontend-src/
-frontend-src/node_modules/
+# 依赖与构建产物（开源仓库只放源码）
 node_modules/
-work/
+.wrangler/
+frontend-dist/
+dist/
+*.log
+
+# 本地运行时数据
+db/
+*.db
+*.db-shm
+*.db-wal
+
+# 编辑器
+.DS_Store
+.idea/
+.vscode/

@@ -1,8 +1,9 @@
 {
   "ignore": [
-    "work/**",
-    "frontend-src/**",
+    "node/**",
+    "frontend/**",
     "**/node_modules/**",
-    ".wrangler/**"
+    ".wrangler/**",
+    "docs/**"
   ]
 }
