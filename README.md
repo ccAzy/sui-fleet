@@ -60,8 +60,8 @@ npx wrangler d1 execute DB --remote --file=./schema.sql
 npx wrangler deploy
 ```
 
-首次访问 `/api/login` 会自动按 `ADMIN_USER` / `ADMIN_PASS` 建号（缺省 admin/admin，
-务必在 wrangler.toml 的 `[vars]` 或 dashboard 里改）。
+首次访问 `/api/login` 会按 `ADMIN_USER` / `ADMIN_PASS` 自动建号——**先 `wrangler secret put ADMIN_PASS`
+再登录**，否则会用默认 `admin/admin`（会被强制跳转改密，见下节）。
 
 ## 部署（节点侧）
 
@@ -123,6 +123,7 @@ npx wrangler secret put JWT_SECRET     # 可选，建议配：换库/迁移后�
 
 **但要把 `/agent/*` 和 `/sub/*` 排除在 Access 之外**，否则节点拉配置、客户端拉订阅都会被拦。
 在 Application 的 `Bypass` 策略里加 `panel.你的域名/agent` 与 `panel.你的域名/sub` 两条。
+
 ## 数据流
 
 | 方向 | 端点 | 内容 | 周期 |
@@ -202,8 +203,9 @@ npx wrangler secret put JWT_SECRET     # 可选，建议配：换库/迁移后�
 
 ## 监控默认开启 / 内核版本 / 节点更新
 
-**监控默认开启**：首页的 CPU、内存、网络、内核状态四块卡片默认就渲染（存在 localStorage 的 `reloadItems`，
-首次访问给默认值 `g-cpu,g-mem,h-net,i-sbd`），不用每次进来手动勾选。
+**监控默认开启**：首页 **11 块卡片全部默认打开**（仪表盘 4：CPU/内存/磁盘/Swap；图表 5：CPU/内存/网络/数据包/磁盘 IO；
+信息 2：系统信息/Sing-Box 信息），不用每次进来手动勾选。只有你自己在「Tiles」里勾选过，才按你的选择来
+（存 localStorage 的 `reloadItems`）。
 
 **面板用的是什么内核**：内核（sing-box）**不是运行时下载的**，它在编译时静态链接进 `sui-agent` 二进制。
 所以「内核版本」是每台节点自己的属性：
