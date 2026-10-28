@@ -58,7 +58,7 @@ function _respToMsg(resp: any): Msg {
   if (data == null) {
     return { success: true, msg: "", obj: null }
   } else if (isMsg(data)) {
-    if (data.hasOwnProperty('success')) {
+    if (Object.hasOwn(data, 'success')) {
         return { success: data.success, msg: data.msg, obj: data.obj || null }
     } else {
         return data
@@ -84,7 +84,7 @@ export function getRemoteServer(): string {
 }
 
 const HttpUtils = {
-  async get(url: string, data: object = {}, options: any[] = []): Promise<Msg> {
+  async get(url: string, data: Record<string, unknown> = {}, options: any[] = []): Promise<Msg> {
     let msg: Msg
     try {
         const config: any = { params: data, ...options }

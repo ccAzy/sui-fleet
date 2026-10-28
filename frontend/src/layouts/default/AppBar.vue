@@ -78,8 +78,15 @@ const servers = computed((): any[] => Data().servers ?? [])
 const currentServer = computed((): string => Data().currentServer)
 const currentServerName = computed((): string => {
   const id = Data().currentServer
-  if (!id) return ''
-  const s = (Data().servers || []).find((x: any) => String(x.id) === id)
+  const list = Data().servers || []
+  if (!id) {
+    // 未指定节点时，后端 resolveNode() 会落到第一个启用节点。
+    // cf 版面板没有「本机」这个概念（面板在 Cloudflare、内核在节点上），
+    // 继续显示 s-ui 原版的 "Local" 会让人误以为在操作一台本地机器，
+    // 因此这里直接显示实际会生效的节点名。
+    return list[0]?.name ?? ''
+  }
+  const s = list.find((x: any) => String(x.id) === id)
   return s?.name ?? id
 })
 const selectServer = (id: string) => Data().setCurrentServer(id)

@@ -122,10 +122,14 @@ export default {
   },
   computed: {
     clientSub() {
-      return Data().subURI + this.client.name
+      // subURI 已经是完整的 `.../sub/<id>?k=<sub_key>`，直接拼用户名会污染 k 导致 403。
+      // 用 &client= 表达"只要这个用户的链接"，后端按名字过滤。
+      const base = Data().subURI
+      const name = this.client.name
+      return name ? `${base}&client=${encodeURIComponent(name)}` : base
     },
     singbox() {
-      const url = Data().subURI + this.client.name + "?format=json"
+      const url = this.clientSub + "&type=json"
       return "sing-box://import-remote-profile?url=" +  encodeURIComponent(url) + "#" + this.client.name
     },
     clientLinks() {

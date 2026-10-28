@@ -768,8 +768,30 @@ app.post('/agent/report', async (c) => {
 app.get('/sub/:nodeId', async (c) => {
   const node = await getNode(c.env.DB, c.req.param('nodeId'))
   if (!node || !node.enabled) return c.text('not found', 404)
-  const key = c.req.query('k') ?? ''
-  if (!node.sub_key || key !== node.sub_key) return c.text('forbidden', 403)
+  if (!node.sub_key) return c.text('forbidden', 403)
+
+  // 前端 QrCode.vue 一直把 client 名直接拼在 k 后面（`k=<sub_key><clientName>`），
+  // 而且 sing-box 那条还会再接一个 `?format=json` —— 于是出现形如
+  //   /sub/xxx?k=<sub_key>user-abc?format=clash
+  // 的畸形链接：第二个 ? 之后整段都算在 k 里。这里做三件事：
+  //   ① k 前缀匹配（多余部分当用户名过滤）② 把 k 里夹带的 ?query 拆出来解析
+  //   ③ 兼容 format= 作为 type= 的别名。
+  // 这样老链接与正确链接都能用。
+  let rawKey = c.req.query('k') ?? ''
+  let embeddedQuery = ''
+  const qIdx = rawKey.indexOf('?')
+  if (qIdx >= 0) {
+    embeddedQuery = rawKey.slice(qIdx + 1)
+    rawKey = rawKey.slice(0, qIdx)
+  }
+
+  let clientFilter = (c.req.query('client') ?? '').trim()
+  if (rawKey !== node.sub_key) {
+    if (!rawKey.startsWith(node.sub_key)) return c.text('forbidden', 403)
+    if (!clientFilter) clientFilter = rawKey.slice(node.sub_key.length).trim()
+  }
+
+  const embedded = new URLSearchParams(embeddedQuery)
   const clients = await all<{ data: string }>(
     c.env.DB,
     "SELECT data FROM objects WHERE node_id = ? AND kind = 'clients' ORDER BY obj_id",
@@ -780,6 +802,7 @@ app.get('/sub/:nodeId', async (c) => {
     try {
       const cl = JSON.parse(row.data) as Record<string, unknown>
       if (cl.enable === false) continue
+      if (clientFilter && String(cl.name ?? '') !== clientFilter) continue
       const ls = Array.isArray(cl.links) ? (cl.links as unknown[]) : []
       for (const l of ls) {
         if (typeof l === 'string') links.push(l)
@@ -793,7 +816,7 @@ app.get('/sub/:nodeId', async (c) => {
     }
   }
   // ?type=clash 输出 mihomo/Clash 可直接导入的 YAML；默认仍是 base64 链接列表
-  const subType = (c.req.query('type') ?? '').toLowerCase()
+  const subType = (c.req.query('type') ?? c.req.query('format') ?? embedded.get('format') ?? '').toLowerCase()
   if (subType === 'clash' || subType === 'mihomo') {
     return c.text(buildClashConfig(links, node.name), 200, { 'Content-Type': 'text/yaml; charset=utf-8' })
   }

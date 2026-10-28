@@ -126,7 +126,8 @@ export default {
 
       // Subscription URLs: one per client (covers all its protocols, auto-updates).
       const subBase = Data().subURI
-      this.subList = Data().clients.map((c: any) => ({ name: c.name, uri: subBase + c.name }))
+      // 同上：用 &client= 过滤，不要拼在 k 上（会 403）
+      this.subList = Data().clients.map((c: any) => ({ name: c.name, uri: `${subBase}&client=${encodeURIComponent(c.name)}` }))
 
       // All share links: one request fetches full client rows (with links).
       const ids = Data().clients.map((c: any) => c.id).filter((x: any) => x)
