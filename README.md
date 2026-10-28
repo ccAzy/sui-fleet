@@ -118,3 +118,15 @@ token 在面板「服务器」页新增节点时生成，只显示一次。
 | 客户端链接点开是空 | `client.inbounds` 是 id 数组、`links` 是 `{remark,type,uri}` | 按 s-ui 的真实结构生成，不再用字符串数组 |
 | 节点内核起不来 | `transport:{type:"tcp"}` 是 UI 概念，sing-box 不认 | 存盘前归一化成 `{}` |
 | 内核报 `default outbound not found: direct` | 新建节点没有默认出站 | 建节点时种 `direct`，agent 侧再加一道兜底 |
+
+## 外观：Liquid Glass 皮肤
+
+面板自带 7 套皮肤（右下角调色板切换），默认是 **Liquid Glass**：
+
+- 折射底：深墨底上一层缓慢漂移的靛/青瓷/琥珀光斑（`styles/liquid-glass.css`）
+- 材质四层：半透明染色 + `backdrop-filter` 模糊增饱和 + 渐变发丝边框 + 内顶高光 + 远近双层阴影
+- 按钮改胶囊、输入框做内凹、弹窗用更实的玻璃保证可读性
+- 只降级动效，不按系统"减少透明度"关材质（Windows 关掉透明效果时 Chrome 会上报 reduce，一刀切会变成实心板）
+
+想换回旧皮肤：调色板里选其它任意一套；想把默认改回去，改 `src/plugins/skins.ts` 的 `DEFAULT_SKIN`。
+预览图见 `docs/preview/`。
