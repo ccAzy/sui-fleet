@@ -19,38 +19,67 @@ export async function cronTick(db: D1Database): Promise<void> {
     ts - STALE_SECONDS,
   )
 
-  // 2) 客户端到期 / 超量 / 自动重置
+  // 2) 客户端：延迟启动 → 周期重置 → 到期/超量停用
+  //    顺序与上游 ClientService.ResetClients + DepleteClients 一致：
+  //    先让"首次使用"开始计时、先做周期重置，再判断是否该停用。
   const nodes = await all<{ id: string }>(db, 'SELECT id FROM nodes WHERE enabled = 1')
   for (const n of nodes) {
     const clients = await listObjects(db, n.id, 'clients')
     const stmts = []
     for (const c of clients) {
-      const expiry = Number(c.expiry) || 0
-      const volume = Number(c.volume) || 0
-      const used = (Number(c.up) || 0) + (Number(c.down) || 0)
-      let next = c
+      let cur = c
       let dirty = false
 
-      if (expiry > 0 && expiry < ts && c.enable !== false) {
-        next = { ...next, enable: false }
+      const up = Number(cur.up) || 0
+      const down = Number(cur.down) || 0
+      const resetDays = Number(cur.resetDays) || 0
+      let nextReset = Number(cur.nextReset) || 0
+      let expiry = Number(cur.expiry) || 0
+      const volume = Number(cur.volume) || 0
+      const enable = cur.enable !== false
+
+      // 2a) 延迟启动：勾了这个开关时，计时从"第一次真正产生流量"开始
+      if (cur.delayStart === true && up + down > 0) {
+        if (cur.autoReset === true) {
+          nextReset = ts + resetDays * 86400
+        } else {
+          expiry = ts + resetDays * 86400
+        }
+        cur = { ...cur, delayStart: false }
         dirty = true
       }
-      if (volume > 0 && used >= volume && c.enable !== false) {
-        next = { ...next, enable: false }
+
+      // 2b) 周期重置：把本轮用量归零并顺延，同时恢复启用
+      if (cur.autoReset === true && resetDays > 0 && nextReset > 0 && nextReset <= ts) {
+        cur = {
+          ...cur,
+          totalUp: (Number(cur.totalUp) || 0) + up,
+          totalDown: (Number(cur.totalDown) || 0) + down,
+          up: 0,
+          down: 0,
+          nextReset: ts + resetDays * 86400,
+          enable: true,
+        }
         dirty = true
       }
-      // 周期重置：nextReset 到期把 up/down 归零并顺延
-      const nextReset = Number(c.nextReset) || 0
-      const resetDays = Number(c.resetDays) || 0
-      if (resetDays > 0 && nextReset > 0 && nextReset <= ts) {
-        next = { ...next, up: 0, down: 0, nextReset: ts + resetDays * 86400, enable: true }
-        dirty = true
+
+      // 2c) 停用：累计用量超额，或到期。两者任一满足即停（与上游 > 严格比较一致）
+      const used = (Number(cur.up) || 0) + (Number(cur.down) || 0)
+      if (enable) {
+        if (volume > 0 && used > volume) {
+          cur = { ...cur, enable: false }
+          dirty = true
+        } else if (expiry > 0 && expiry < ts) {
+          cur = { ...cur, enable: false }
+          dirty = true
+        }
       }
+
       if (dirty) {
         stmts.push(
           db
             .prepare('UPDATE objects SET data = ?, updated_at = ? WHERE node_id = ? AND kind = ? AND obj_id = ?')
-            .bind(JSON.stringify(next, null, 2), ts, n.id, 'clients', Number(c.id)),
+            .bind(JSON.stringify(cur, null, 2), ts, n.id, 'clients', Number(cur.id)),
         )
       }
     }
