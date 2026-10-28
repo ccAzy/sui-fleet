@@ -27,6 +27,7 @@ import { cronTick } from './cron'
 import { getKernelInfo, isOutdated, metaGet, metaSet } from './kernel'
 import { exportBundle, importBundle, type Bundle } from './backup'
 import { buildClashConfig } from './clash'
+import { buildSingboxOutbounds } from './singbox'
 
 type Ctx = { Bindings: Env }
 
@@ -214,12 +215,34 @@ app.get('/api/status', async (c) => {
   }
   // 原样透传节点上报的状态对象（cpu / mem / dsk / net / sys / sbd …），
   // 前端的 Gauge / History 组件按 s-ui 的结构读，压平成数字会全部显示 "-/-"。
+  // UsageStats 弹窗（api/status?r=db）要的是"库里各类对象数量 + 客户端累计流量"
+  let dbInfo: Record<string, number> | undefined
+  if ((c.req.query('r') ?? '').split(',').includes('db')) {
+    const counts = await all<{ kind: string; c: number }>(
+      c.env.DB,
+      'SELECT kind, COUNT(*) as c FROM objects WHERE node_id = ? GROUP BY kind',
+      node.id,
+    )
+    const traffic = await first<{ up: number; down: number }>(
+      c.env.DB,
+      "SELECT COALESCE(SUM(CAST(json_extract(data,'$.up') AS INTEGER)),0) AS up, " +
+        "COALESCE(SUM(CAST(json_extract(data,'$.down') AS INTEGER)),0) AS down " +
+        "FROM objects WHERE node_id = ? AND kind = 'clients'",
+      node.id,
+    )
+    dbInfo = { clients: 0, inbounds: 0, outbounds: 0, services: 0, endpoints: 0, clientUp: traffic?.up ?? 0, clientDown: traffic?.down ?? 0 }
+    for (const row of counts) {
+      if (row.kind in dbInfo) dbInfo[row.kind] = row.c
+    }
+  }
+
   const sbd = (status.sbd as Record<string, unknown>) ?? {}
   return json(c, {
     ...status,
     running: node.core_state === 'running',
     // 内核运行态以面板记录的 core_state 为准（节点刚上报时 sbd 可能还没带全）
     sbd: { ...sbd, running: node.core_state === 'running', stats: sbd.stats ?? {} },
+    ...(dbInfo ? { db: dbInfo } : {}),
     kernel: {
       version: node.kernel_ver,
       latest: kernel.latest,
@@ -267,13 +290,47 @@ app.get('/api/changes', async (c) => {
   const node = await resolveNode(c.env.DB, c.req.header('X-Remote-Server'))
   if (!node) return json(c, [])
   const since = parseInt(c.req.query('k') ?? '0', 10) || 0
-  const rows = await all<{ ts: number; actor: string; kind: string; action: string; obj: string }>(
+  const actor = c.req.query('a') ?? ''
+  const count = Math.min(parseInt(c.req.query('c') ?? '100', 10) || 100, 500)
+  const rows = await all<{ id: number; ts: number; actor: string; kind: string; action: string; obj: string }>(
     c.env.DB,
-    'SELECT ts, actor, kind, action, obj FROM changes WHERE node_id = ? AND ts >= ? ORDER BY id DESC LIMIT 100',
-    node.id,
-    since,
+    'SELECT id, ts, actor, kind, action, obj FROM changes WHERE node_id = ? AND ts >= ?' +
+      (actor ? ' AND actor = ?' : '') +
+      ' ORDER BY id DESC LIMIT ?',
+    ...(actor ? [node.id, since, actor, count] : [node.id, since, count]),
   )
-  return json(c, rows)
+  // 前端 Changes.vue 读的是 dateTime / key / obj
+  return json(
+    c,
+    rows.map((r) => ({
+      id: r.id,
+      dateTime: r.ts,
+      actor: r.actor,
+      key: r.kind,
+      action: r.action,
+      obj: r.obj,
+    })),
+  )
+})
+
+// 流量时序：Stats.vue 按 {dateTime(秒), direction, traffic} 逐条消费
+app.get('/api/stats', async (c) => {
+  const node = await resolveNode(c.env.DB, c.req.header('X-Remote-Server'))
+  if (!node) return json(c, [])
+  const tag = c.req.query('tag') ?? ''
+  const limit = Math.min(parseInt(c.req.query('limit') ?? '1', 10) || 1, 168)
+  const since = now() - limit * 3600
+  const rows = await all<{ ts: number; tag: string; up: number; down: number }>(
+    c.env.DB,
+    'SELECT ts, tag, up, down FROM usage WHERE node_id = ? AND ts > ?' + (tag ? ' AND tag = ?' : '') + ' ORDER BY ts ASC',
+    ...(tag ? [node.id, since, tag] : [node.id, since]),
+  )
+  const out: Array<{ dateTime: number; direction: boolean; traffic: number; tag?: string }> = []
+  for (const r of rows) {
+    if (r.up > 0) out.push({ dateTime: r.ts, direction: true, traffic: r.up, tag: r.tag })
+    if (r.down > 0) out.push({ dateTime: r.ts, direction: false, traffic: r.down, tag: r.tag })
+  }
+  return json(c, out)
 })
 
 app.get('/api/updateInfo', async (c) => json(c, { current: 'cf-0.1.0', latest: 'cf-0.1.0' }))
@@ -723,6 +780,9 @@ app.get('/sub/:nodeId', async (c) => {
   const subType = (c.req.query('type') ?? '').toLowerCase()
   if (subType === 'clash' || subType === 'mihomo') {
     return c.text(buildClashConfig(links, node.name), 200, { 'Content-Type': 'text/yaml; charset=utf-8' })
+  }
+  if (subType === 'singbox' || subType === 'json') {
+    return c.json(buildSingboxOutbounds(links))
   }
 
   const text = links.join(String.fromCharCode(10))

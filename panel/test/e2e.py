@@ -214,9 +214,36 @@ check(
 pull3 = j(post("/agent/pull", js={"revision": PULLED_REV}, token=tok))
 check("command delivered once", pull3.get("unchanged") is True, pull3)
 
+# ---- 数据库统计 / 流量时序 / 变更日志（前端三个弹窗依赖） ----
+db = j(get("/api/status?r=db"))["obj"].get("db") or {}
+check("数据库统计", int(db.get("clients", 0)) >= 1 and int(db.get("inbounds", 0)) >= 1, str(db))
+check("客户端累计流量", int(db.get("clientDown", 0)) >= 2048, str(db))
+
+series = j(get("/api/stats?resource=user&tag=alice&limit=24"))["obj"]
+check(
+    "流量时序结构",
+    len(series) == 2 and all({"dateTime", "direction", "traffic"} <= set(x) for x in series),
+    str(series[:1]),
+)
+
+changes = j(get("/api/changes?k=0&c=5"))["obj"]
+check(
+    "变更日志字段",
+    len(changes) > 0 and {"dateTime", "key", "action", "obj"} <= set(changes[0]),
+    str(changes[:1]),
+)
+
 # ---- Clash 订阅 ----
 clash_txt = get(sub_url.replace(BASE, "") + "&type=clash")
 check("clash 订阅", "proxies:" in clash_txt and "type: vless" in clash_txt and "MATCH,PROXY" in clash_txt, clash_txt[:120])
+
+# ---- sing-box JSON 订阅 ----
+sb = j(get(sub_url.replace(BASE, "") + "&type=singbox"))
+check(
+    "sing-box 订阅",
+    isinstance(sb, list) and len(sb) >= 1 and sb[0].get("type") == "vless" and sb[0].get("server_port") == 443,
+    str(sb[:1]),
+)
 
 # ---- 备份 / 恢复 ----
 bundle = j(get("/api/getdb?exclude=stats"))

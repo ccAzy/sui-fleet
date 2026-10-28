@@ -154,10 +154,22 @@ POST /api/importdb                       <- 同一个文件（整库覆盖）
 | --- | --- | --- |
 | `/sub/<nodeId>?k=<sub_key>` | base64 链接列表 | v2rayN / Shadowrocket 等 |
 | `/sub/<nodeId>?k=<sub_key>&type=clash` | Clash / mihomo YAML | Clash Verge / mihomo 系 |
+| `/sub/<nodeId>?k=<sub_key>&type=singbox` | sing-box outbound 数组 | sing-box 系客户端 |
 
 Clash 输出是把已生成的分享链接反解析成 proxy 条目（vless/vmess/trojan/ss/hysteria2/tuic/anytls），
 再套 `PROXY`(select) + `AUTO`(url-test) 两个策略组和 `GEOIP,CN,DIRECT / MATCH,PROXY` 规则。
-解析失败的条目会被跳过，不会污染整份订阅。
+解析失败的条目会被跳过，不会污染整份订阅。sing-box 输出复用同一套 URI 解析（`clash.ts` 的 `linkToProxy`），
+再映射成 outbound 结构，不维护第二份解析逻辑。
+
+### 可观测性接口（前端三个弹窗在用）
+
+| 接口 | 用途 |
+| --- | --- |
+| `GET /api/status?r=db` | 「Usage & Counts」：各类对象数量 + 客户端累计上/下行 |
+| `GET /api/stats?resource=user&tag=<name>&limit=<小时>` | 单个客户端的流量时序（`{dateTime, direction, traffic}`） |
+| `GET /api/changes?k=<since>&a=<actor>&c=<条数>` | 审计日志（`{dateTime, key, action, obj}`） |
+
+`usage` 表按每次上报（30 秒）一行存增量，所以时序图能细到分钟级；明细保留 30 天由 cron 清理。
 
 ### 批量操作
 
