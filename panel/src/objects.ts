@@ -154,10 +154,57 @@ function toArray(data: unknown): unknown[] {
   return Array.isArray(data) ? data : [data]
 }
 
-function idsOf(data: unknown): number[] {
-  return toArray(data)
-    .map((d) => (isObj(d) ? num(d.id) : num(d)))
-    .filter((n) => n > 0)
+/**
+ * 删除时的主键解析。
+ *
+ * 前端删除传的是 **tag** 而不是 id（Inbounds.vue 的 `Data().save("inbounds","del",tag)`），
+ * 而 outbounds/endpoints/services/tls 也各有用 tag 或 id 的调用点，因此这里统一兼容：
+ *   - 数字 / 纯数字字符串 → 直接当 obj_id
+ *   - 其它字符串 → 当 tag 查（name 走同一列，新建时 tag 就取自 tag||name）
+ *   - 对象 → 先看 id，再看 tag/name
+ * 只按 id 解析会让前端删除变成静默空操作（接口返回成功但一行没删）。
+ */
+async function resolveIds(db: D1Database, nodeId: string, kind: ObjectKind, data: unknown): Promise<number[]> {
+  const out: number[] = []
+  const push = (n: number) => {
+    if (n > 0 && !out.includes(n)) out.push(n)
+  }
+  const byTag = async (tag: string) => {
+    const row = await first<{ obj_id: number }>(
+      db,
+      'SELECT obj_id FROM objects WHERE node_id = ? AND kind = ? AND tag = ?',
+      nodeId,
+      kind,
+      tag,
+    )
+    if (row) push(num(row.obj_id))
+  }
+
+  for (const d of toArray(data)) {
+    if (isObj(d)) {
+      const id = num(o(d).id)
+      if (id > 0) {
+        push(id)
+        continue
+      }
+      const tag = s(o(d).tag) || s(o(d).name)
+      if (tag) await byTag(tag)
+      continue
+    }
+    if (typeof d === 'number') {
+      push(d)
+      continue
+    }
+    const str = s(d).trim()
+    if (!str) continue
+    const n = Number(str)
+    if (Number.isInteger(n) && n > 0) {
+      push(n)
+      continue
+    }
+    await byTag(str)
+  }
+  return out
 }
 
 /** 重算某节点的全部 client.links（inbound 变更后调用）。
@@ -268,7 +315,7 @@ export async function saveObject(
     const kind = obj as ObjectKind
 
     if (action === 'del') {
-      const ids = idsOf(data)
+      const ids = await resolveIds(db, nodeId, kind, data)
       for (const id of ids) {
         stmts.push(db.prepare('DELETE FROM objects WHERE node_id = ? AND kind = ? AND obj_id = ?').bind(nodeId, kind, id))
       }
