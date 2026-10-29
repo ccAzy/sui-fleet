@@ -157,7 +157,10 @@ func agentCmd(args []string) {
 	ticker := time.NewTicker(a.interval)
 	defer ticker.Stop()
 
-	a.cycle(!*noCore) // 首轮立即执行
+	// 首轮强制拉起内核：agent 重启（含整机重启）后本地 revision 往往与面板一致，
+	// applied 会是 false，只靠 applied 判断就永远不会启动 sing-box —— 端口全空、
+	// 节点看起来在线但完全不可用。force 保证首轮一定确保内核在跑。
+	a.cycle(!*noCore, true)
 	for {
 		select {
 		case <-stop:
@@ -167,7 +170,7 @@ func agentCmd(args []string) {
 			}
 			return
 		case <-ticker.C:
-			a.cycle(!*noCore)
+			a.cycle(!*noCore, false)
 		}
 	}
 }
@@ -189,11 +192,11 @@ func initAgentLog() {
 	}
 }
 
-func (a *agent) cycle(withCore bool) {
+func (a *agent) cycle(withCore bool, force bool) {
 	applied, cmds, err := a.pullOnce()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "agent: pull:", err)
-	} else if applied && withCore && a.coreSvc != nil {
+	} else if withCore && a.coreSvc != nil && (applied || force) {
 		if err := a.restartCore(); err != nil {
 			fmt.Fprintln(os.Stderr, "agent: restart core:", err)
 		}
@@ -483,23 +486,58 @@ func collectTraffic() []trafficDelta {
 	return nil
 }
 
+// collectOnlines 采集"当前在线"的入站/出站/用户。
+//
+// 不能用 StatsTracker().GetStats()：那个函数对每个计数器做 Swap(0)（读一次就清零），
+// 而 s-ui 自己的流量统计定时任务（cronjob/statsJob.go → SaveStats）也在消费同一份数据，
+// 谁先读谁拿到，后读的永远是空 —— 面板上那三个数字因此长期为 0。
+//
+// 改为读 sing-box 的 clash-api /connections：它返回的是**当前活跃连接**，
+// 语义上才是"在线"，而且不会被谁消费掉。
 func collectOnlines() map[string][]string {
 	on := map[string][]string{"inbound": {}, "outbound": {}, "user": {}}
-	if box := coreInstance(); box != nil {
-		if st := box.StatsTracker(); st != nil {
-			for _, s := range *st.GetStats() {
-				if !s.Direction {
-					continue
-				}
-				switch s.Resource {
-				case "inbound":
-					on["inbound"] = append(on["inbound"], s.Tag)
-				case "outbound":
-					on["outbound"] = append(on["outbound"], s.Tag)
-				case "user":
-					on["user"] = append(on["user"], s.Tag)
-				}
-			}
+
+	client := &http.Client{Timeout: 3 * time.Second}
+	resp, err := client.Get("http://127.0.0.1:9090/connections")
+	if err != nil {
+		return on
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return on
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
+	if err != nil {
+		return on
+	}
+
+	var payload struct {
+		Connections []struct {
+			Metadata struct {
+				Inbound string `json:"inbound"`
+				User    string `json:"user"`
+			} `json:"metadata"`
+			Chains []string `json:"chains"`
+		} `json:"connections"`
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return on
+	}
+
+	seen := map[string]map[string]bool{"inbound": {}, "outbound": {}, "user": {}}
+	add := func(kind, tag string) {
+		if tag == "" || seen[kind][tag] {
+			return
+		}
+		seen[kind][tag] = true
+		on[kind] = append(on[kind], tag)
+	}
+	for _, c := range payload.Connections {
+		add("inbound", c.Metadata.Inbound)
+		add("user", c.Metadata.User)
+		// chains 形如 [入站tag, 出站tag, ...]，最后一个是最终出站
+		if n := len(c.Chains); n > 0 {
+			add("outbound", c.Chains[n-1])
 		}
 	}
 	return on
