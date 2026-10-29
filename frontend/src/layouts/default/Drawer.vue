@@ -31,21 +31,6 @@
         </v-list-item>
       </template>
 
-      <!-- 外链跟着主列表一起滚动，底部只固定"退出登录"，
-           否则底部槽位会吃掉侧栏近三分之一高度（14 项菜单被压到只剩 6 项可见） -->
-      <v-divider class="nav-divider"></v-divider>
-      <v-list-item
-        v-for="link in resources"
-        :key="link.title"
-        :href="link.href"
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        <template v-slot:prepend>
-          <v-icon :icon="link.icon"></v-icon>
-        </template>
-        <v-list-item-title v-text="$t(link.title)"></v-list-item-title>
-      </v-list-item>
     </v-list>
 
     <template v-slot:append>
@@ -107,12 +92,6 @@ const groups = [
       { title: 'pages.settings', icon: 'mdi-cog-outline', path: '/settings' },
     ],
   },
-]
-
-const resources = [
-  { title: 'menu.site', icon: 'mdi-web', href: 'https://3yuedaohang.com' },
-  { title: 'menu.youtube', icon: 'mdi-youtube', href: 'https://www.youtube.com/@zhanzhang3yue' },
-  { title: 'menu.vps', icon: 'mdi-server-outline', href: 'https://3yuedaohang.com/cn2/banwagong' },
 ]
 
 const Logout = async () => {

@@ -287,9 +287,6 @@ export default {
   menu: {
     group: { overview: "概览", nodes: "节点", egress: "出站", system: "系统" },
     logout: "退出登录",
-    site: "站长博客",
-    youtube: "YouTube 频道",
-    vps: "机器推荐",
   },
   admin: {
     changeCred: "更改凭据",

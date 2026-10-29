@@ -40,20 +40,6 @@
         </form>
 
         <footer class="login-foot">
-          <div class="login-links">
-            <a href="https://3yuedaohang.com" target="_blank" rel="noopener noreferrer">
-              <v-icon size="14">mdi-web</v-icon>
-              <span>{{ $t('menu.site') }}</span>
-            </a>
-            <a href="https://www.youtube.com/@zhanzhang3yue" target="_blank" rel="noopener noreferrer">
-              <v-icon size="14">mdi-youtube</v-icon>
-              <span>{{ $t('menu.youtube') }}</span>
-            </a>
-            <a href="https://3yuedaohang.com/cn2/banwagong" target="_blank" rel="noopener noreferrer">
-              <v-icon size="14">mdi-server-outline</v-icon>
-              <span>{{ $t('menu.vps') }}</span>
-            </a>
-          </div>
 
           <label class="login-lang">
             <span class="sr-only">Language</span>
@@ -230,29 +216,8 @@ const changeLocale = (l: string) => {
   border-top: 1px solid var(--rule);
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 16px;
-}
-
-.login-links {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.login-links a {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--fs-xs);
-  color: var(--ink-2);
-  text-decoration: none;
-  text-underline-offset: 3px;
-}
-
-.login-links a:hover {
-  color: var(--ink);
-  text-decoration: underline;
 }
 
 .login-lang select {

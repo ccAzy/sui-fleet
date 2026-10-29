@@ -287,9 +287,6 @@ export default {
   menu: {
     group: { overview: "Overview", nodes: "Nodes", egress: "Egress", system: "System" },
     logout: "Logout",
-    site: "Blog",
-    youtube: "YouTube",
-    vps: "VPS picks",
   },
   admin: {
     changeCred: "Change credentials",
