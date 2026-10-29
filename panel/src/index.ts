@@ -613,6 +613,13 @@ app.get('/api/singbox-config', async (c) => {
 })
 
 // 第三方链接转换：这些需要节点侧内核能力，先明确回错而不是静默成功
+// 出站连通性测试：原版由节点侧内核执行（从节点视角测该出站能否连通）。
+// 面板跑在 Cloudflare，测出来的不是节点视角，因此明确回错而不是假装成功。
+app.get('/api/checkOutbound', async (c) => {
+  const tag = c.req.query('tag') ?? ''
+  return json(c, null, new Error(`checkOutbound(${tag}) 需要节点侧内核能力，暂未开放`))
+})
+
 app.post('/api/linkConvert', async (c) => json(c, null, new Error('linkConvert 需要节点侧能力，暂未开放')))
 app.post('/api/subConvert', async (c) => json(c, null, new Error('subConvert 需要节点侧能力，暂未开放')))
 
