@@ -6,7 +6,9 @@
           <v-col>{{ $t('main.stats.title') }}</v-col>
           <v-spacer></v-spacer>
           <v-col cols="auto">
-            <v-icon icon="mdi-refresh" class="me-2" @click="refresh" v-tooltip:top="$t('actions.update')" />
+            <v-icon icon="mdi-refresh" class="me-2" @click="refresh">
+              <v-tooltip activator="parent" location="top">{{ $t('actions.refresh') }}</v-tooltip>
+            </v-icon>
             <v-icon icon="mdi-close" @click="$emit('update:visible', false)" />
           </v-col>
         </v-row>

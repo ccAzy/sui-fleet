@@ -54,7 +54,9 @@ export default {
         scales: {
           y: {
             min: 0,
-            max: 100,
+            // 不再固定 0-100：CPU 空闲时只有 0.x%，固定上限会让线完全贴在底部看不见。
+            // suggestedMax 让 Chart.js 从小刻度开始，数据超过时自动放大。
+            suggestedMax: 10,
             grid: {
               color: 'rgba(128, 128, 128, 0.18)',
             },
@@ -200,7 +202,8 @@ export default {
           this.oldValues.net = v.net
           break
         case 'h-dio':
-          if (this.oldValues.dio.read) {
+          if (!v.dio) break          // 节点不上报 dio 时安静跳过，别每 2 秒抛一次
+          if (this.oldValues.dio?.read) {
             const downSpeed = (v.dio.read-this.oldValues.dio.read)/2  // Each 2 sec
             const upSpeed = (v.dio.write-this.oldValues.dio.write)/2  // Each 2 sec
             this.updateData2(upSpeed,downSpeed)

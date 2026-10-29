@@ -64,17 +64,18 @@
             <v-card-title>
               {{ menuItems.flatMap(cat => cat.value).find(m => m.value == i)?.title }}
               <template v-if="i == 'i-sys'">
-                <v-icon icon="mdi-update" color="primary"
-                  @click="reloadSys()" size="small" v-tooltip:top="$t('actions.update')"
+                <v-icon icon="mdi-refresh" color="primary"
+                  @click="reloadSys()" size="small"
                   style="margin-inline-start: 10px;">
+                  <v-tooltip activator="parent" location="top">{{ $t('actions.refresh') }}</v-tooltip>
                 </v-icon>
               </template>
               <template v-if="i == 'h-net'">
                 <v-icon icon="mdi-information" color="primary" size="small"
-                  v-tooltip:top="'↓' + 
-                  HumanReadable.sizeFormat(tilesData.net?.recv) + ' - ' + 
-                  HumanReadable.sizeFormat(tilesData.net?.sent) + '↑'"
                   style="margin-inline-start: 10px;">
+                  <v-tooltip activator="parent" location="top">
+                    ↓{{ HumanReadable.sizeFormat(tilesData.net?.recv) }} · ↑{{ HumanReadable.sizeFormat(tilesData.net?.sent) }}
+                  </v-tooltip>
                 </v-icon>
               </template>
             </v-card-title>
@@ -116,8 +117,10 @@
                     </v-chip>
                   </v-col>
                   <v-col cols="3">{{ $t('main.info.uptime') }}</v-col>
-                  <v-col cols="9" v-tooltip:top="$t('main.info.startupTime')
-                    + ': ' + new Date((tilesData.sys?.bootTime || 0) * 1000).toLocaleString(locale)">
+                  <v-col cols="9">
+                    <v-tooltip activator="parent" location="top">
+                      {{ $t('main.info.startupTime') }}: {{ new Date((tilesData.sys?.bootTime || 0) * 1000).toLocaleString(locale) }}
+                    </v-tooltip>
                     {{ HumanReadable.formatSecond((Date.now()/1000) - tilesData.sys?.bootTime) }}
                   </v-col>
                 </v-row>
@@ -233,7 +236,6 @@ const menuItems = [
     { title: i18n.global.t('main.chart.mem'), value: "h-mem" },
     { title: i18n.global.t('main.chart.net'), value: "h-net" },
     { title: i18n.global.t('main.chart.pnet'), value: "hp-net" },
-    { title: i18n.global.t('main.chart.dio'), value: "h-dio" },
     ]
   },
   { title: i18n.global.t('main.infos'), value: [

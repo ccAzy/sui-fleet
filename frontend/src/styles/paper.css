@@ -384,6 +384,23 @@ kbd,
   height: 1px;
 }
 
+/* Tooltip：墨底浅字（纸白主题下 Vuetify 默认是浅底浅字，弹出来像一块空白灰方块） */
+/* 必须抬特异性：Vuetify 自带 `.v-tooltip > .v-overlay__content` 有同权重规则，
+   打包后若排在后面就会把这里的配色盖掉（表现就是浅灰底 + 浅灰字 = 空方块） */
+body .v-tooltip > .v-overlay__content,
+body .v-overlay__content.v-tooltip {
+  background: var(--ink) !important;
+  color: var(--paper) !important;
+  font-family: var(--sans) !important;
+  font-size: var(--fs-xs) !important;
+  line-height: 1.5 !important;
+  padding: 5px 9px !important;
+  border-radius: 2px !important;
+  box-shadow: var(--shadow-float) !important;
+  opacity: 1 !important;
+  max-width: 340px;
+}
+
 /* 通知：纸片式，不带阴影光环 */
 .v-snackbar__wrapper,
 .notification {

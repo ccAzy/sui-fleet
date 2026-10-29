@@ -152,7 +152,10 @@
           </span>
         </template>
         <template v-slot:item.volume="{ item }">
-          <div class="text-start" v-tooltip:top="'↓' + HumanReadable.sizeFormat(item.down) + ' - ' + HumanReadable.sizeFormat(item.up) + '↑'">
+          <div class="text-start">
+            <v-tooltip activator="parent" location="top">
+              ↓{{ HumanReadable.sizeFormat(item.down) }} · ↑{{ HumanReadable.sizeFormat(item.up) }}
+            </v-tooltip>
             <v-chip
               size="small"
               :color="item.volume==0 ? 'success' : item.volume<=(item.up + item.down)? 'error': ''"

@@ -114,7 +114,9 @@
                     chips
                     hide-details>
                     <template v-slot:append>
-                      <v-icon @click="setAllInbounds" icon="mdi-set-all" v-tooltip:top="$t('all')" />
+                      <v-icon @click="setAllInbounds" icon="mdi-set-all">
+                        <v-tooltip activator="parent" location="top">{{ $t('all') }}</v-tooltip>
+                      </v-icon>
                     </template>
                   </v-select>
                 </v-col>
@@ -129,7 +131,9 @@
               <v-row v-for="key in Object.keys(clientConfig)">
                 <v-col cols="12" md="3" align="end" align-self="center">
                     {{ key }}
-                    <v-icon @click="shuffle(key)" icon="mdi-refresh" v-tooltip:top="$t('reset')" />
+                    <v-icon @click="shuffle(key)" icon="mdi-refresh">
+                      <v-tooltip activator="parent" location="top">{{ $t('reset') }}</v-tooltip>
+                    </v-icon>
                 </v-col>
                 <v-col>
                   <v-text-field

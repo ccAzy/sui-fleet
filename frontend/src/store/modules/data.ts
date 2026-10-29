@@ -8,14 +8,17 @@ import { Client } from '@/types/clients'
 const Data = defineStore('Data', {
   state: () => ({ 
     lastLoad: 0,
-    // 默认把所有监看卡片全部打开（仪表盘 4 + 图表 5 + 信息 2 = 11 块）。
-    // 只有用户自己勾选过（写过 localStorage）才尊重他的选择。
+    // 默认打开全部有数据源监看卡片（仪表盘 4 + 图表 4 + 信息 2 = 10 块）。
+    // h-dio 已移除：节点 agent 不上报 dio，图表没有数据源，留着只会是空白块。
     reloadItems: (() => {
       const saved = localStorage.getItem('reloadItems')
-      if (saved && saved.length > 0) return <string[]>saved.split(',')
+      if (saved && saved.length > 0) {
+        // 老版本存过的列表可能含已下线的卡片，读的时候清洗掉
+        return <string[]>saved.split(',').filter((x) => !!x && x !== 'h-dio')
+      }
       return <string[]>[
         'g-cpu', 'g-mem', 'g-dsk', 'g-swp',
-        'h-cpu', 'h-mem', 'h-net', 'hp-net', 'h-dio',
+        'h-cpu', 'h-mem', 'h-net', 'hp-net',
         'i-sys', 'i-sbd',
       ]
     })(),

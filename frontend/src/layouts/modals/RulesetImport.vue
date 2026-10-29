@@ -76,7 +76,9 @@
           <span class="v-card-subtitle">
             {{ $t('rule.import.preview') }}
             <v-badge v-if="importPreview.length > 0" color="success" :content="importPreview.length" inline />
-            <v-badge v-if="importSkipped > 0" color="warning" :content="importSkipped" inline v-tooltip:top="$t('rule.import.skipped')" />
+            <v-badge v-if="importSkipped > 0" color="warning" :content="importSkipped" inline>
+              <v-tooltip activator="parent" location="top">{{ $t('rule.import.skipped') }}</v-tooltip>
+            </v-badge>
           </span>
           <v-table density="compact" striped="even" class="mb-4">
             <thead>
@@ -88,7 +90,10 @@
                   {{ item.tag }}
                 </td>
                 <td>{{ item.format }}</td>
-                <td v-tooltip:top="item.url" dir="ltr">.../{{ item.url.split('/').pop() ?? item.url }}</td>
+                <td dir="ltr">
+                  <v-tooltip activator="parent" location="top">{{ item.url }}</v-tooltip>
+                  .../{{ item.url.split('/').pop() ?? item.url }}
+                </td>
                 <td><v-icon icon="mdi-delete" color="error" @click="importPreview.splice(i, 1)" /></td>
               </tr>
             </tbody>

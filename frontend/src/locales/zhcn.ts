@@ -249,6 +249,7 @@ export default {
     empty: "还没有服务器。把你的其他面板加进来,一键打开。",
   },
   actions: {
+    refresh: "刷新",
     action: "操作",
     add: "添加",
     addbulk: "批量添加",

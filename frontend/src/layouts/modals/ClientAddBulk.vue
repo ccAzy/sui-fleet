@@ -72,7 +72,9 @@
                 hide-details
               >
                 <template v-slot:append>
-                  <v-icon @click="setAllInbounds" icon="mdi-set-all" v-tooltip:top="$t('all')" />
+                  <v-icon @click="setAllInbounds" icon="mdi-set-all">
+                    <v-tooltip activator="parent" location="top">{{ $t('all') }}</v-tooltip>
+                  </v-icon>
                 </template>
               </v-select>
             </v-col>

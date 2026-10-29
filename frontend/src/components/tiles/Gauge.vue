@@ -12,7 +12,8 @@ const data = computed(() => {
   if (!d.mem && !d.cpu) return { percent: 0, text: '-' }
   switch (props.type) {
     case 'g-cpu':
-      return { percent: d.cpu, text: Math.ceil(d.cpu) + "%" }
+      // 保留一位小数：Math.ceil 会把 0.4% 显示成 1%，看着像卡住了
+      return { percent: d.cpu, text: Number(d.cpu ?? 0).toFixed(1) + "%" }
     case 'g-mem':
       return gaugeData(d.mem)
     case 'g-dsk':

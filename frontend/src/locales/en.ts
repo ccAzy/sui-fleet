@@ -249,6 +249,7 @@ export default {
     empty: "No servers yet. Add your other panels here to open them in one click.",
   },
   actions: {
+    refresh: "Refresh",
     action: "Action",
     add: "Add",
     addbulk: "Add Bulk",

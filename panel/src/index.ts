@@ -312,6 +312,9 @@ app.get("/api/status", async (c) => {
   const node = await resolveNode(c.env.DB, c.req.header("X-Remote-Server"));
   if (!node) return json(c, {});
   const kernel = await getKernelInfo(c.env.DB);
+  // 没配更新源时这里是空串；下面必须区分「空」和「版本不同」
+  const agentReleaseVersion =
+    (await metaGet(c.env.DB, "agent_release_version")) ?? "";
   let status: Record<string, unknown> = {};
   try {
     status = JSON.parse(node.status_json) as Record<string, unknown>;
@@ -370,10 +373,13 @@ app.get("/api/status", async (c) => {
     // 不能拿上游 sing-box tag 当更新依据——内核编译进 agent，换 tag ≠ 手上有新包。
     agent: {
       version: node.agent_ver,
-      latest: await metaGet(c.env.DB, "agent_release_version"),
+      latest: agentReleaseVersion,
+      // 必须要求 latest 非空：没配更新源时 release_version 是空串，
+      // 只比「版本不相等」会把每台节点都判成可更新，界面上就永远挂着一个点了没用的按钮。
       outdated:
         Boolean(node.agent_ver) &&
-        node.agent_ver !== (await metaGet(c.env.DB, "agent_release_version")),
+        Boolean(agentReleaseVersion) &&
+        node.agent_ver !== agentReleaseVersion,
     },
   });
 });
@@ -621,7 +627,7 @@ async function saveServers(
       return { servers: [{ id, name, url: address, remark, token }] };
     }
   } else {
-    throw new Error("unknown action: " + action);
+    throw new Error(`unknown action: ${action}`);
   }
 
   const nodes = await listNodes(c.env.DB);
@@ -761,7 +767,7 @@ app.post("/api/importdb", async (c) => {
       data = (await c.req.json()) as Bundle;
     }
   } catch (e) {
-    return json(c, null, new Error("备份文件解析失败: " + String(e)));
+    return json(c, null, new Error(`备份文件解析失败: ${String(e)}`));
   }
   try {
     return json(c, await importBundle(c.env.DB, data));

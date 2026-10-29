@@ -103,7 +103,9 @@
             {{ $t('rule.ruleset') }}
             <v-badge v-if="parsed.rule_set?.length > 0" color="success" :content="parsed.rule_set?.length" inline />
             <span v-if="skippedRulesets > 0">
-              <v-badge color="warning" :content="skippedRulesets" inline v-tooltip:top="$t('rule.import.skipped')" />
+              <v-badge color="warning" :content="skippedRulesets" inline>
+                <v-tooltip activator="parent" location="top">{{ $t('rule.import.skipped') }}</v-tooltip>
+              </v-badge>
             </span>
           </span>
           <v-table v-if="parsed.rule_set?.length" density="compact" striped="even">
