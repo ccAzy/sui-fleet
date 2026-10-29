@@ -143,3 +143,30 @@ export default {
   },
 }
 </script>
+
+<style scoped>
+/* 变更记录里的对象详情：铜版纸上的小票 —— 有内缩、有细边、等宽排版 */
+.changes-chip {
+  padding: 6px 12px;
+  font-size: var(--fs-xs);
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+}
+
+.changes-body {
+  padding: 10px 12px;
+  margin-top: 6px;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+}
+
+.changes-body pre {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--ink-2);
+}
+</style>
