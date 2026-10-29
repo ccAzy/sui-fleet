@@ -60,7 +60,7 @@
       </v-row>
       <v-row>
         <v-col cols="12" sm="6" md="3" v-for="i in reloadItems" :key="i">
-          <v-card class="tile-card">
+          <v-card :class="i.charAt(0) === 'g' ? 'tile-card tile-gauge' : 'tile-card'">
             <v-card-title>
               {{ menuItems.flatMap(cat => cat.value).find(m => m.value == i)?.title }}
               <template v-if="i == 'i-sys'">
@@ -112,7 +112,7 @@
                   </v-col>
                   <v-col cols="3">S-UI</v-col>
                   <v-col cols="9">
-                    <v-chip density="compact" color="blue">
+                    <v-chip density="compact" variant="outlined">
                       v{{ tilesData.sys?.appVersion }}
                     </v-chip>
                   </v-col>
@@ -176,26 +176,38 @@
                   <v-col cols="4">{{ $t('online') }}</v-col>
                   <v-col cols="8">
                     <template v-if="tilesData.sbd?.running">
-                      <v-chip density="compact" variant="outlined" v-if="Data().onlines.user">
+                      <v-chip density="compact" variant="outlined" class="online-chip"
+                        v-if="Data().onlines.user" @click="$router.push('/clients')">
                         <v-tooltip activator="parent" location="top" overflow="auto">
-                          <span v-text="$t('pages.clients')" style="font-weight: bold;"></span><br/>
-                          <span v-for="user in Data().onlines.user">{{ user }}<br /></span>
+                          <span style="font-weight: bold;">{{ $t('pages.clients') }}</span>
+                          <template v-if="Data().onlines.user?.length">
+                            <br /><span v-for="u in Data().onlines.user" :key="u">{{ u }}<br /></span>
+                          </template>
+                          <template v-else><br />{{ $t('main.info.noOnline') }}</template>
                         </v-tooltip>
-                        {{ Data().onlines.user?.length }}
+                        {{ Data().onlines.user?.length || 0 }}
                       </v-chip>
-                      <v-chip density="compact" color="success" variant="flat" v-if="Data().onlines.inbound">
-                        <v-tooltip activator="parent" location="top" :text="$t('pages.inbounds')">
-                          <span v-text="$t('pages.inbounds')" style="font-weight: bold;"></span><br/>
-                          <span v-for="i in Data().onlines.inbound">{{ i }}<br /></span>
+                      <v-chip density="compact" variant="outlined" class="online-chip"
+                        v-if="Data().onlines.inbound" @click="$router.push('/inbounds')">
+                        <v-tooltip activator="parent" location="top" overflow="auto">
+                          <span style="font-weight: bold;">{{ $t('pages.inbounds') }}</span>
+                          <template v-if="Data().onlines.inbound?.length">
+                            <br /><span v-for="t in Data().onlines.inbound" :key="t">{{ t }}<br /></span>
+                          </template>
+                          <template v-else><br />{{ $t('main.info.noOnline') }}</template>
                         </v-tooltip>
-                        {{ Data().onlines.inbound?.length }}
+                        {{ Data().onlines.inbound?.length || 0 }}
                       </v-chip>
-                      <v-chip density="compact" color="info" variant="flat" v-if="Data().onlines.outbound">
-                        <v-tooltip activator="parent" location="top" :text="$t('pages.outbounds')">
-                          <span v-text="$t('pages.outbounds')" style="font-weight: bold;"></span><br/>
-                          <span v-for="o in Data().onlines.outbound">{{ o }}<br /></span>
+                      <v-chip density="compact" variant="outlined" class="online-chip"
+                        v-if="Data().onlines.outbound" @click="$router.push('/outbounds')">
+                        <v-tooltip activator="parent" location="top" overflow="auto">
+                          <span style="font-weight: bold;">{{ $t('pages.outbounds') }}</span>
+                          <template v-if="Data().onlines.outbound?.length">
+                            <br /><span v-for="o in Data().onlines.outbound" :key="o">{{ o }}<br /></span>
+                          </template>
+                          <template v-else><br />{{ $t('main.info.noOnline') }}</template>
                         </v-tooltip>
-                        {{ Data().onlines.outbound?.length }}
+                        {{ Data().onlines.outbound?.length || 0 }}
                       </v-chip>
                     </template>
                   </v-col>
@@ -329,7 +341,9 @@ const restartSingbox = async () => {
  * - 标题是小号大写标签（数据才是主角）
  * - Gauge 用 padding-bottom:50% 撑半圆，所以高度必须容得下「标题 + 半圆」
  */
-.tile-card {
+/* 高度只给 Gauge：它用 padding-bottom:50% 撑半圆，必须有确定高度；
+   信息卡片内容更高，套同一个高度会把最后一行（Online）挤到边缘。 */
+.tile-gauge {
   height: 196px;
 }
 

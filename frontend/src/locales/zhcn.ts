@@ -172,6 +172,7 @@ export default {
       dio: "Disk I/O",
     },
     info: {
+      noOnline: "暂无在线",
       upToDate: "已最新",
       kernel: "内核",
       sys: "系统信息",

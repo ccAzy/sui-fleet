@@ -172,6 +172,7 @@ export default {
       dio: "Disk I/O",
     },
     info: {
+      noOnline: "none online",
       upToDate: "up to date",
       kernel: "Kernel",
       sys: "System Info",
