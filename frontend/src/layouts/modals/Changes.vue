@@ -1,6 +1,6 @@
 <template>
   <v-dialog transition="dialog-bottom-transition" width="90%" max-width="800" :loading="loading">
-    <v-card class="rounded-lg">
+    <v-card>
       <v-card-title>
         <v-row>
           <v-col>{{ $t('admin.changes') }}</v-col>
@@ -69,8 +69,8 @@
           <template v-slot:expanded-row="{ columns, item }">
             <tr>
               <td :colspan="columns.length">
-                <v-card dir="ltr" v-if="item.index>0">Index: {{ item.index }}</v-card>
-                <v-card style="background-color: background" dir="ltr"><pre>{{ item.obj }}</pre></v-card>
+                <v-card dir="ltr" v-if="item.index>0" class="changes-chip">Index: {{ item.index }}</v-card>
+                <v-card style="background-color: background" dir="ltr" class="changes-body"><pre>{{ item.obj }}</pre></v-card>
               </td>
             </tr>
           </template>

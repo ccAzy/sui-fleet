@@ -23,7 +23,8 @@ ChartJS.register(
   Title,
   Filler
 )
-ChartJS.defaults.font.family = 'Vazirmatn'
+// 与全站同一套正文栈（原来写死 Vazirmatn，Windows 上不存在会回退到默认宋体）
+ChartJS.defaults.font.family = '"Segoe UI Variable Text", "Segoe UI", "PingFang SC", "Microsoft YaHei UI", "Noto Sans SC", system-ui, sans-serif'
 export default {
   components: {
     Line
@@ -55,7 +56,7 @@ export default {
             min: 0,
             max: 100,
             grid: {
-              color: '#777777',
+              color: 'rgba(128, 128, 128, 0.18)',
             },
             beginAtZero: true,
             ticks: {
@@ -86,7 +87,7 @@ export default {
         scales: {
           y: {
             grid: {
-              color: '#777777',
+              color: 'rgba(128, 128, 128, 0.18)',
             },
             beginAtZero: true,
             ticks: {
@@ -133,8 +134,8 @@ export default {
         datasets: [
           {
             label: '',
-            backgroundColor: 'rgba(255, 165, 0, 0.2)',
-            borderColor: 'rgba(255, 165, 0,0.8)',
+            backgroundColor: '#4a6f9c1f',
+            borderColor: '#4a6f9ccc',
             fill: true,
             data: newData
           }
@@ -156,8 +157,8 @@ export default {
         datasets: [
           {
             label: '',
-            backgroundColor: 'rgba(255, 165, 0, 0.2)',
-            borderColor: 'rgba(255, 165, 0,0.8)',
+            backgroundColor: '#4a6f9c1f',
+            borderColor: '#4a6f9ccc',
             fill: true,
             data: newData1
           },

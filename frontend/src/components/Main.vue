@@ -15,7 +15,7 @@
             <template v-slot:activator="{ props }">
               <v-btn v-bind="props" variant="text" class="toolbar-ghost" prepend-icon="mdi-star-plus">{{ $t('main.tiles') }}</v-btn>
             </template>
-            <v-card rounded="xl">
+            <v-card>
               <v-card-title>
                 <v-row>
                   <v-col>
@@ -60,7 +60,7 @@
       </v-row>
       <v-row>
         <v-col cols="12" sm="6" md="3" v-for="i in reloadItems" :key="i">
-          <v-card rounded="lg" height="210px">
+          <v-card class="tile-card">
             <v-card-title>
               {{ menuItems.flatMap(cat => cat.value).find(m => m.value == i)?.title }}
               <template v-if="i == 'i-sys'">
@@ -96,13 +96,13 @@
                   </v-col>
                   <v-col cols="3">IP</v-col>
                   <v-col cols="9">
-                    <v-chip density="compact" color="primary" variant="flat" v-if="tilesData.sys?.ipv4?.length>0">
+                    <v-chip density="compact" variant="outlined" v-if="tilesData.sys?.ipv4?.length>0">
                       <v-tooltip activator="parent" location="top" style="direction: ltr;">
                         <span v-html="tilesData.sys?.ipv4?.join('<br />')"></span>
                       </v-tooltip>
                       IPv4
                     </v-chip>
-                    <v-chip density="compact" color="primary" variant="flat" v-if="tilesData.sys?.ipv6?.length>0">
+                    <v-chip density="compact" variant="outlined" v-if="tilesData.sys?.ipv6?.length>0">
                       <v-tooltip activator="parent" location="top" style="direction: ltr;">
                         <span v-html="tilesData.sys?.ipv6?.join('<br />')"></span>
                       </v-tooltip>
@@ -158,13 +158,13 @@
                   </v-col>
                   <v-col cols="4">{{ $t('main.info.memory') }}</v-col>
                   <v-col cols="8">
-                    <v-chip density="compact" color="primary" variant="flat" v-if="tilesData.sbd?.stats?.Alloc">
+                    <v-chip density="compact" variant="outlined" v-if="tilesData.sbd?.stats?.Alloc">
                       {{ HumanReadable.sizeFormat(tilesData.sbd?.stats?.Alloc) }}
                     </v-chip> 
                   </v-col>
                   <v-col cols="4">{{ $t('main.info.threads') }}</v-col>
                   <v-col cols="8">
-                    <v-chip density="compact" color="primary" variant="flat" v-if="tilesData.sbd?.stats?.NumGoroutine">
+                    <v-chip density="compact" variant="outlined" v-if="tilesData.sbd?.stats?.NumGoroutine">
                       {{ tilesData.sbd?.stats?.NumGoroutine }}
                     </v-chip>
                   </v-col>
@@ -173,7 +173,7 @@
                   <v-col cols="4">{{ $t('online') }}</v-col>
                   <v-col cols="8">
                     <template v-if="tilesData.sbd?.running">
-                      <v-chip density="compact" color="primary" variant="flat" v-if="Data().onlines.user">
+                      <v-chip density="compact" variant="outlined" v-if="Data().onlines.user">
                         <v-tooltip activator="parent" location="top" overflow="auto">
                           <span v-text="$t('pages.clients')" style="font-weight: bold;"></span><br/>
                           <span v-for="user in Data().onlines.user">{{ user }}<br /></span>
@@ -320,3 +320,31 @@ const restartSingbox = async () => {
   loading.value = false
 }
 </script>
+
+<style scoped>
+/*
+ * 监看卡片：账簿世界里的读数面板
+ * - 标题是小号大写标签（数据才是主角）
+ * - Gauge 用 padding-bottom:50% 撑半圆，所以高度必须容得下「标题 + 半圆」
+ */
+.tile-card {
+  height: 196px;
+}
+
+.tile-card :deep(.v-card-title) {
+  padding: 10px 14px 0;
+  font-family: var(--sans);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  line-height: 1.35;
+  min-height: 0;
+  white-space: normal;
+}
+
+.tile-card :deep(.v-card-text) {
+  padding: 4px 12px 10px !important;
+}
+</style>
