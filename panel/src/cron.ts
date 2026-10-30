@@ -22,22 +22,29 @@ export async function cronTick(db: D1Database): Promise<void> {
   // 2) 客户端：延迟启动 → 周期重置 → 到期/超量停用
   //    顺序与上游 ClientService.ResetClients + DepleteClients 一致：
   //    先让"首次使用"开始计时、先做周期重置，再判断是否该停用。
-/**
- * 下一个自然月起点（按 +08:00 算）。
- * "每月"应该指自然月，而不是"设置那一刻起 30 天"——后者第一次清零会落在
- * 11/29 20:49 这种说不出所以然的时刻。
- */
-function nextMonthStart(ts: number): number {
-  const d = new Date((ts + 8 * 3600) * 1000);
-  // Date.UTC 自动处理跨年：m 传 12 会归一成次年 1 月
-  const ms = Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1) - 8 * 3600 * 1000;
-  return Math.floor(ms / 1000);
-}
+  /**
+   * 下一个自然月起点（按 +08:00 算）。
+   * "每月"应该指自然月，而不是"设置那一刻起 30 天"——后者第一次清零会落在
+   * 11/29 20:49 这种说不出所以然的时刻。
+   */
+  function nextMonthStart(ts: number): number {
+    const d = new Date((ts + 8 * 3600) * 1000);
+    // Date.UTC 自动处理跨年：m 传 12 会归一成次年 1 月
+    const ms =
+      Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1) - 8 * 3600 * 1000;
+    return Math.floor(ms / 1000);
+  }
 
-/** 本轮周期结束时刻：resetMode=month 按月首，否则按 resetDays 滚动 */
-function periodEnd(cur: { resetMode?: unknown }, ts: number, resetDays: number): number {
-  return cur.resetMode === "month" ? nextMonthStart(ts) : ts + resetDays * 86400;
-}
+  /** 本轮周期结束时刻：resetMode=month 按月首，否则按 resetDays 滚动 */
+  function periodEnd(
+    cur: { resetMode?: unknown },
+    ts: number,
+    resetDays: number,
+  ): number {
+    return cur.resetMode === "month"
+      ? nextMonthStart(ts)
+      : ts + resetDays * 86400;
+  }
 
   const nodes = await all<{ id: string }>(
     db,
