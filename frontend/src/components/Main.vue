@@ -2,223 +2,155 @@
   <LogVue v-model="logModal.visible" :control="logModal" :visible="logModal.visible" />
   <Backup v-model="backupModal.visible" :control="backupModal" :visible="backupModal.visible" />
   <UsageStats v-model:visible="usageStatsModal.visible" />
-  <v-container class="fill-height" :loading="loading">
-    <v-responsive :class="reloadItems.length>0 ? 'fill-height text-center' : 'align-center'" >
-      <v-row class="d-flex align-center justify-center">
-        <v-col cols="auto">
-          <v-img src="@/assets/logo.svg" :width="reloadItems.length>0 ? 88 : 132" class="home-mark"></v-img>
-        </v-col>
-      </v-row>
-      <v-row class="d-flex align-center justify-center">
-        <v-col cols="auto" class="quick-actions">
-          <v-dialog v-model="menu" :close-on-content-click="false" transition="scale-transition" max-width="800">
+  <div>
+    <div class="sheet">
+      <!-- 页头：一台机器就是一条账目抬头，不再是居中 logo + 一排圆形仪表 -->
+      <div class="sheet-head">
+        <span class="ledger-mark" :data-state="running ? 'up' : 'error'" aria-hidden="true"></span>
+        <span class="sheet-name">{{ nodeName }}</span>
+        <span class="sheet-meta">{{ headMeta }}</span>
+        <div class="sheet-actions">
+          <v-dialog v-model="menu" :close-on-content-click="false" transition="scale-transition" max-width="760">
             <template v-slot:activator="{ props }">
-              <v-btn v-bind="props" variant="text" class="toolbar-ghost" prepend-icon="mdi-star-plus">{{ $t('main.tiles') }}</v-btn>
+              <v-btn v-bind="props" variant="text" size="small" class="toolbar-ghost" prepend-icon="mdi-star-plus">{{ $t('main.tiles') }}</v-btn>
             </template>
             <v-card>
-              <v-card-title>
-                <v-row>
-                  <v-col>
-                    {{ $t('main.tiles') }}
-                  </v-col>
-                  <v-spacer></v-spacer>
-                  <v-col cols="auto"><v-icon icon="mdi-close" @click="menu = false"></v-icon></v-col>
-                </v-row>
-              </v-card-title>
+              <v-card-title>{{ $t('main.tiles') }}</v-card-title>
               <v-divider></v-divider>
-              <v-row v-for="items in menuItems" density="compact">
-                <v-col cols="12">
-                  <v-card :subtitle="items.title" variant="flat">
-                    <v-card-text>
-                      <v-row density="compact">
-                        <v-col cols="12" md="6" lg="3" v-for="item in items.value">
-                          <v-switch
-                          density="compact"
-                          v-model="reloadItems"
-                          :value="item.value"
-                          color="primary"
-                          :label="item.title"
-                          hide-details></v-switch>
-                        </v-col>
-                      </v-row>
-                    </v-card-text>
-                  </v-card>
-                </v-col>
-              </v-row>
+              <v-card-text>
+                <div v-for="items in menuItems" :key="items.title" class="tiles-group">
+                  <div class="metre-label">{{ items.title }}</div>
+                  <div class="tiles-grid">
+                    <v-switch
+                      v-for="item in items.value"
+                      :key="item.value"
+                      density="compact"
+                      v-model="reloadItems"
+                      :value="item.value"
+                      color="primary"
+                      :label="item.title"
+                      hide-details
+                    ></v-switch>
+                  </div>
+                </div>
+              </v-card-text>
             </v-card>
           </v-dialog>
-          <v-btn variant="text" class="toolbar-ghost" prepend-icon="mdi-backup-restore" @click="backupModal.visible = true">
+          <v-btn variant="text" size="small" class="toolbar-ghost" prepend-icon="mdi-backup-restore" @click="backupModal.visible = true">
             {{ $t('main.backup.title') }}
           </v-btn>
-          <v-btn variant="text" class="toolbar-ghost" prepend-icon="mdi-list-box-outline" @click="logModal.visible = true">
+          <v-btn variant="text" size="small" class="toolbar-ghost" prepend-icon="mdi-list-box-outline" @click="logModal.visible = true">
             {{ $t('basic.log.title') }}
           </v-btn>
-          <v-btn variant="text" class="toolbar-ghost" prepend-icon="mdi-chart-box-outline" @click="usageStatsModal.visible = true">
+          <v-btn variant="text" size="small" class="toolbar-ghost" prepend-icon="mdi-chart-box-outline" @click="usageStatsModal.visible = true">
             {{ $t('main.stats.title') }}
           </v-btn>
-        </v-col>
-      </v-row>
-      <v-row>
-        <v-col cols="12" sm="6" md="3" v-for="i in reloadItems" :key="i">
-          <v-card :class="i.charAt(0) === 'g' ? 'tile-card tile-gauge' : 'tile-card'">
-            <v-card-title>
-              {{ menuItems.flatMap(cat => cat.value).find(m => m.value == i)?.title }}
-              <template v-if="i == 'i-sys'">
-                <v-icon icon="mdi-refresh" color="primary"
-                  @click="reloadSys()" size="small"
-                  style="margin-inline-start: 10px;">
-                  <v-tooltip activator="parent" location="top">{{ $t('actions.refresh') }}</v-tooltip>
+        </div>
+      </div>
+
+      <!-- 什么都没选：给出下一步，而不是一片空白 -->
+      <div v-if="reloadItems.length === 0" class="sheet-empty">
+        <span>{{ $t('main.emptyHint') }}</span>
+        <v-btn variant="outlined" size="small" prepend-icon="mdi-star-plus" @click="menu = true">{{ $t('main.tiles') }}</v-btn>
+      </div>
+
+      <template v-else>
+        <!-- 读数：四个数，一把尺 -->
+        <div v-if="gauges.length" class="metres">
+          <Gauge v-for="i in gauges" :key="i" :tilesData="tilesData" :type="i" />
+        </div>
+
+        <!-- 曲线：细线、无卡片、无图例框；带宽独占一行 -->
+        <div v-if="charts.length" class="sparks">
+          <div v-for="i in charts" :key="i" class="spark" :class="{ 'is-wide': i === 'h-net' || i === 'hp-net' }">
+            <div class="spark-title">
+              {{ title(i) }}
+              <span v-if="i === 'h-net'" class="spark-legend">↓ {{ HumanReadable.sizeFormat(tilesData.net?.recv) }} · ↑ {{ HumanReadable.sizeFormat(tilesData.net?.sent) }}</span>
+              <v-icon v-if="i === 'h-net'" icon="mdi-refresh" size="12" class="spark-refresh" @click="reloadSys()"></v-icon>
+            </div>
+            <div class="spark-body"><History :tilesData="tilesData" :type="i" /></div>
+          </div>
+        </div>
+
+        <!-- 对账：左边系统，右边内核 -->
+        <div v-if="infos.length" class="sheet-rows">
+          <section v-if="infos.includes('i-sys')" class="sheet-block">
+            <h3>{{ $t('main.info.sys') }}</h3>
+            <div class="row-line"><span class="k">{{ $t('main.info.host') }}</span><span class="v is-text">{{ tilesData.sys?.hostName || '-' }}</span></div>
+            <div class="row-line">
+              <span class="k">{{ $t('main.info.cpu') }}</span>
+              <span class="v" :title="tilesData.sys?.cpuType">{{ tilesData.sys?.cpuCount || '-' }} {{ $t('main.info.core') }}</span>
+            </div>
+            <div class="row-line"><span class="k">IP</span><span class="v" :title="[...(tilesData.sys?.ipv4 || []), ...(tilesData.sys?.ipv6 || [])].join('  ')">{{ sysIp }}</span></div>
+            <div class="row-line"><span class="k">S-UI</span><span class="v">v{{ tilesData.sys?.appVersion || '-' }}</span></div>
+            <div class="row-line">
+              <span class="k">{{ $t('main.info.uptime') }}</span>
+              <span class="v" :title="new Date((tilesData.sys?.bootTime || 0) * 1000).toLocaleString(locale)">{{ HumanReadable.formatSecond(Date.now() / 1000 - tilesData.sys?.bootTime) }}</span>
+            </div>
+          </section>
+
+          <section v-if="infos.includes('i-sbd')" class="sheet-block">
+            <h3>{{ $t('main.info.sbd') }}</h3>
+            <div class="row-line">
+              <span class="k">{{ $t('main.info.running') }}</span>
+              <span class="v">
+                <span :data-state="tilesData.sbd?.running ? 'up' : 'error'" class="state-text">{{ tilesData.sbd?.running ? $t('yes') : $t('no') }}</span>
+                <v-icon v-if="tilesData.sbd?.running && !loading" icon="mdi-restart" size="14" class="ms-2 state-action" @click="restartSingbox()">
+                  <v-tooltip activator="parent" location="top">{{ $t('actions.restartSb') }}</v-tooltip>
                 </v-icon>
-              </template>
-              <template v-if="i == 'h-net'">
-                <v-icon icon="mdi-information" color="primary" size="small"
-                  style="margin-inline-start: 10px;">
-                  <v-tooltip activator="parent" location="top">
-                    ↓{{ HumanReadable.sizeFormat(tilesData.net?.recv) }} · ↑{{ HumanReadable.sizeFormat(tilesData.net?.sent) }}
-                  </v-tooltip>
+              </span>
+            </div>
+            <div class="row-line">
+              <span class="k">{{ $t('main.info.kernel') }}</span>
+              <span class="v">
+                {{ tilesData.kernel?.version || '-' }}
+                <v-icon v-if="tilesData.agent?.outdated" icon="mdi-download" size="14" class="ms-2 state-action" :class="{ 'is-busy': updating }" @click="updateAgent">
+                  <v-tooltip activator="parent" location="top">{{ tilesData.agent?.latest }}</v-tooltip>
                 </v-icon>
-              </template>
-            </v-card-title>
-            <v-card-text style="padding: 0 16px;" align="center" justify="center">
-              <Gauge :tilesData="tilesData" :type="i" v-if="i.charAt(0) == 'g'" />
-              <History :tilesData="tilesData" :type="i" v-if="i.charAt(0) == 'h'" />
-              <template v-if="i == 'i-sys'">
-                <v-row>
-                  <v-col cols="3">{{ $t('main.info.host') }}</v-col>
-                  <v-col cols="9" style="text-wrap: nowrap; overflow: hidden">{{ tilesData.sys?.hostName }}</v-col>
-                  <v-col cols="3">{{ $t('main.info.cpu') }}</v-col>
-                  <v-col cols="9">
-                    <v-chip density="compact" variant="flat">
-                      <v-tooltip activator="parent" location="top" style="direction: ltr;">
-                        {{ tilesData.sys?.cpuType }}
-                      </v-tooltip>
-                     {{ tilesData.sys?.cpuCount }} {{ $t('main.info.core') }}
-                    </v-chip>
-                  </v-col>
-                  <v-col cols="3">IP</v-col>
-                  <v-col cols="9">
-                    <v-chip density="compact" variant="outlined" v-if="tilesData.sys?.ipv4?.length>0">
-                      <v-tooltip activator="parent" location="top" style="direction: ltr;">
-                        <span v-html="tilesData.sys?.ipv4?.join('<br />')"></span>
-                      </v-tooltip>
-                      IPv4
-                    </v-chip>
-                    <v-chip density="compact" variant="outlined" v-if="tilesData.sys?.ipv6?.length>0">
-                      <v-tooltip activator="parent" location="top" style="direction: ltr;">
-                        <span v-html="tilesData.sys?.ipv6?.join('<br />')"></span>
-                      </v-tooltip>
-                      IPv6
-                    </v-chip>
-                  </v-col>
-                  <v-col cols="3">S-UI</v-col>
-                  <v-col cols="9">
-                    <v-chip density="compact" variant="outlined">
-                      v{{ tilesData.sys?.appVersion }}
-                    </v-chip>
-                  </v-col>
-                  <v-col cols="3">{{ $t('main.info.uptime') }}</v-col>
-                  <v-col cols="9">
-                    <v-tooltip activator="parent" location="top">
-                      {{ $t('main.info.startupTime') }}: {{ new Date((tilesData.sys?.bootTime || 0) * 1000).toLocaleString(locale) }}
+              </span>
+            </div>
+            <div class="row-line"><span class="k">{{ $t('main.info.memory') }}</span><span class="v">{{ tilesData.sbd?.stats?.Alloc ? HumanReadable.sizeFormat(tilesData.sbd.stats.Alloc) : '-' }}</span></div>
+            <div class="row-line"><span class="k">{{ $t('main.info.threads') }}</span><span class="v">{{ tilesData.sbd?.stats?.NumGoroutine || '-' }}</span></div>
+            <div class="row-line"><span class="k">{{ $t('main.info.uptime') }}</span><span class="v">{{ HumanReadable.formatSecond(tilesData.sbd?.stats?.Uptime) }}</span></div>
+            <div class="row-line">
+              <span class="k">{{ $t('online') }}</span>
+              <span class="v">
+                <template v-if="tilesData.sbd?.running">
+                  <a class="online-num" @click="$router.push('/clients')">
+                    <v-tooltip activator="parent" location="top" overflow="auto">
+                      <span style="font-weight: bold;">{{ $t('pages.clients') }}</span>
+                      <template v-if="Data().onlines.user?.length"><br /><span v-for="u in Data().onlines.user" :key="u">{{ u }}<br /></span></template>
+                      <template v-else><br />{{ $t('main.info.noOnline') }}</template>
                     </v-tooltip>
-                    {{ HumanReadable.formatSecond((Date.now()/1000) - tilesData.sys?.bootTime) }}
-                  </v-col>
-                </v-row>
-              </template>
-              <template v-if="i == 'i-sbd'">
-                <v-row>
-                  <v-col cols="4">{{ $t('main.info.running') }}</v-col>
-                  <v-col cols="8">
-                    <v-chip density="compact" color="success" variant="flat" v-if="tilesData.sbd?.running">{{ $t('yes') }}</v-chip> 
-                    <v-chip density="compact" color="error" variant="flat" v-else>{{ $t('no') }}</v-chip>
-                    <v-chip density="compact" color="transparent" v-if="tilesData.sbd?.running && !loading" style="cursor: pointer;" @click="restartSingbox()">
-                      <v-tooltip activator="parent" location="top">
-                        {{ $t('actions.restartSb') }}
-                      </v-tooltip>
-                      <v-icon icon="mdi-restart" color="warning" />
-                    </v-chip>
-                  </v-col>
-                  <v-col cols="4">{{ $t('main.info.kernel') }}</v-col>
-                  <v-col cols="8">
-                    <span class="kernel-ver">{{ tilesData.kernel?.version || '-' }}</span>
-                    <!-- 可更新只看"节点包版本 vs 面板配置的分发包版本"；
-                         上游 sing-box 新 tag 只作为参考，不代表你手上有新包 -->
-                    <v-chip
-                      v-if="tilesData.agent?.outdated"
-                      size="x-small"
-                      color="warning"
-                      variant="tonal"
-                      class="ms-2 kernel-update"
-                      :disabled="updating"
-                      @click="updateAgent"
-                    >
-                      <v-icon icon="mdi-download" size="14" class="me-1" />
-                      {{ tilesData.agent?.latest }}
-                    </v-chip>
-                    <span v-else-if="tilesData.kernel?.latest" class="kernel-latest">
-                      {{ $t('main.info.upToDate') }}
-                    </span>
-                  </v-col>
-                  <v-col cols="4">{{ $t('main.info.memory') }}</v-col>
-                  <v-col cols="8">
-                    <v-chip density="compact" variant="outlined" v-if="tilesData.sbd?.stats?.Alloc">
-                      {{ HumanReadable.sizeFormat(tilesData.sbd?.stats?.Alloc) }}
-                    </v-chip> 
-                  </v-col>
-                  <v-col cols="4">{{ $t('main.info.threads') }}</v-col>
-                  <v-col cols="8">
-                    <v-chip density="compact" variant="outlined" v-if="tilesData.sbd?.stats?.NumGoroutine">
-                      {{ tilesData.sbd?.stats?.NumGoroutine }}
-                    </v-chip>
-                  </v-col>
-                  <v-col cols="4">{{ $t('main.info.uptime') }}</v-col>
-                  <v-col cols="8">{{ HumanReadable.formatSecond(tilesData.sbd?.stats?.Uptime) }}</v-col>
-                  <v-col cols="4">{{ $t('online') }}</v-col>
-                  <v-col cols="8">
-                    <template v-if="tilesData.sbd?.running">
-                      <v-chip density="compact" variant="outlined" class="online-chip"
-                        v-if="Data().onlines.user" @click="$router.push('/clients')">
-                        <v-tooltip activator="parent" location="top" overflow="auto">
-                          <span style="font-weight: bold;">{{ $t('pages.clients') }}</span>
-                          <template v-if="Data().onlines.user?.length">
-                            <br /><span v-for="u in Data().onlines.user" :key="u">{{ u }}<br /></span>
-                          </template>
-                          <template v-else><br />{{ $t('main.info.noOnline') }}</template>
-                        </v-tooltip>
-                        {{ Data().onlines.user?.length || 0 }}
-                      </v-chip>
-                      <v-chip density="compact" variant="outlined" class="online-chip"
-                        v-if="Data().onlines.inbound" @click="$router.push('/inbounds')">
-                        <v-tooltip activator="parent" location="top" overflow="auto">
-                          <span style="font-weight: bold;">{{ $t('pages.inbounds') }}</span>
-                          <template v-if="Data().onlines.inbound?.length">
-                            <br /><span v-for="t in Data().onlines.inbound" :key="t">{{ t }}<br /></span>
-                          </template>
-                          <template v-else><br />{{ $t('main.info.noOnline') }}</template>
-                        </v-tooltip>
-                        {{ Data().onlines.inbound?.length || 0 }}
-                      </v-chip>
-                      <v-chip density="compact" variant="outlined" class="online-chip"
-                        v-if="Data().onlines.outbound" @click="$router.push('/outbounds')">
-                        <v-tooltip activator="parent" location="top" overflow="auto">
-                          <span style="font-weight: bold;">{{ $t('pages.outbounds') }}</span>
-                          <template v-if="Data().onlines.outbound?.length">
-                            <br /><span v-for="o in Data().onlines.outbound" :key="o">{{ o }}<br /></span>
-                          </template>
-                          <template v-else><br />{{ $t('main.info.noOnline') }}</template>
-                        </v-tooltip>
-                        {{ Data().onlines.outbound?.length || 0 }}
-                      </v-chip>
-                    </template>
-                  </v-col>
-                </v-row>
-              </template>
-            </v-card-text>
-          </v-card>
-        </v-col>
-      </v-row>
-    </v-responsive>
-  </v-container>
+                    {{ Data().onlines.user?.length || 0 }}
+                  </a>
+                  <span class="sep">·</span>
+                  <a class="online-num" @click="$router.push('/inbounds')">
+                    <v-tooltip activator="parent" location="top" overflow="auto">
+                      <span style="font-weight: bold;">{{ $t('pages.inbounds') }}</span>
+                      <template v-if="Data().onlines.inbound?.length"><br /><span v-for="t in Data().onlines.inbound" :key="t">{{ t }}<br /></span></template>
+                      <template v-else><br />{{ $t('main.info.noOnline') }}</template>
+                    </v-tooltip>
+                    {{ Data().onlines.inbound?.length || 0 }}
+                  </a>
+                  <span class="sep">·</span>
+                  <a class="online-num" @click="$router.push('/outbounds')">
+                    <v-tooltip activator="parent" location="top" overflow="auto">
+                      <span style="font-weight: bold;">{{ $t('pages.outbounds') }}</span>
+                      <template v-if="Data().onlines.outbound?.length"><br /><span v-for="o in Data().onlines.outbound" :key="o">{{ o }}<br /></span></template>
+                      <template v-else><br />{{ $t('main.info.noOnline') }}</template>
+                    </v-tooltip>
+                    {{ Data().onlines.outbound?.length || 0 }}
+                  </a>
+                </template>
+                <span v-else>-</span>
+              </span>
+            </div>
+          </section>
+        </div>
+      </template>
+    </div>
+  </div>
 </template>
 
 <script lang="ts" setup>
@@ -269,8 +201,39 @@ const reloadItems = computed({
   }
 })
 
+// 按用户选择把读数分三组，顺序跟着选择走
+const pick = (prefixes: string) => reloadItems.value.filter((i: string) => prefixes.includes(i.charAt(0)))
+const gauges = computed(() => pick('g'))
+const charts = computed(() => pick('h'))
+const infos = computed(() => pick('i'))
+
+const title = (v: string) => menuItems.flatMap(c => c.value).find(m => m.value === v)?.title ?? v
+
+// 抬头显示的是「实际会被操作的机器」：未选节点时后端会落到第一台
+const nodeName = computed(() => {
+  const list = Data().servers || []
+  const id = Data().currentServer
+  if (!id) return list[0]?.name ?? 'Local'
+  return list.find((x: any) => String(x.id) === id)?.name ?? id
+})
+const running = computed(() => !!tilesData.value.sbd?.running)
+const headMeta = computed(() => {
+  const bits: string[] = []
+  if (tilesData.value.kernel?.version) bits.push('sing-box ' + tilesData.value.kernel.version)
+  if (tilesData.value.sys?.bootTime) bits.push('up ' + HumanReadable.formatSecond(Date.now() / 1000 - tilesData.value.sys.bootTime))
+  if (tilesData.value.agent?.outdated) bits.push('update ' + tilesData.value.agent.latest)
+  return bits.join(' · ')
+})
+const sysIp = computed(() => {
+  const v4 = tilesData.value.sys?.ipv4 || []
+  const v6 = tilesData.value.sys?.ipv6 || []
+  if (v4.length) return v4[0]
+  if (v6.length) return v6[0]
+  return '-'
+})
+
 const reloadData = async () => {
-  const request = [...new Set(reloadItems.value.map(r => r.split('-')[1]))]
+  const request = [...new Set(reloadItems.value.map((r: string) => r.split('-')[1]))]
   if (tilesData.value?.sys?.appVersion) request.filter(r => r != 'sys')
   const data = await HttpUtils.get('api/status',{ r: request.join(',')})
   if (data.success) {
@@ -336,31 +299,65 @@ const restartSingbox = async () => {
 </script>
 
 <style scoped>
-/*
- * 监看卡片：账簿世界里的读数面板
- * - 标题是小号大写标签（数据才是主角）
- * - Gauge 用 padding-bottom:50% 撑半圆，所以高度必须容得下「标题 + 半圆」
- */
-/* 高度只给 Gauge：它用 padding-bottom:50% 撑半圆，必须有确定高度；
-   信息卡片内容更高，套同一个高度会把最后一行（Online）挤到边缘。 */
-.tile-gauge {
-  height: 196px;
-}
-
-.tile-card :deep(.v-card-title) {
-  padding: 10px 14px 0;
-  font-family: var(--sans);
-  font-size: var(--fs-xs);
-  font-weight: 500;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+.sheet-empty {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s6) 0;
   color: var(--ink-3);
-  line-height: 1.35;
-  min-height: 0;
-  white-space: normal;
+  font-size: var(--fs-sm);
 }
 
-.tile-card :deep(.v-card-text) {
-  padding: 4px 12px 10px !important;
+.sheet-head .ledger-mark {
+  align-self: center;
+}
+
+.state-text[data-state='up'] {
+  color: var(--ok);
+}
+
+.state-text[data-state='error'] {
+  color: var(--error);
+}
+
+.state-action {
+  cursor: pointer;
+  color: var(--ink-3);
+  vertical-align: -2px;
+}
+
+.state-action:hover {
+  color: var(--accent);
+}
+
+.state-action.is-busy {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.online-num {
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.spark-refresh {
+  color: var(--ink-3);
+  cursor: pointer;
+  margin-left: var(--s2);
+}
+
+.tiles-group + .tiles-group {
+  margin-top: var(--s4);
+}
+
+.tiles-group .metre-label {
+  margin-bottom: var(--s2);
+}
+
+.tiles-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0 var(--s4);
 }
 </style>

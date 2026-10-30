@@ -5,80 +5,86 @@
     :server="editModal.server"
     @close="closeEdit"
   />
-  <v-row justify="center" align="center">
-    <v-col cols="auto">
-      <v-btn color="primary" prepend-icon="mdi-server-plus" @click="showEdit(null)">{{ $t('server.add') }}</v-btn>
-    <v-btn v-if="servers.length > 0" variant="text" class="toolbar-ghost" prepend-icon="mdi-restart" @click="bulkCommand('restart_core')">
-      {{ $t('server.restartAll') }}
-    </v-btn>
-    <v-btn v-if="servers.length > 0" variant="text" class="toolbar-ghost" prepend-icon="mdi-download" @click="bulkUpdate">
-      {{ $t('server.updateAll') }}
-    </v-btn>
-    </v-col>
-  </v-row>
-  <v-row v-if="servers.length === 0">
-    <v-col cols="12" style="text-align: center; opacity: 0.6; margin-top: 30px;">{{ $t('server.empty') }}</v-col>
-  </v-row>
-  <v-row>
-    <v-col cols="12" sm="6" md="4" lg="3" v-for="(item, index) in servers" :key="item.id">
-      <v-card rounded="xl" elevation="5" min-width="200" :title="item.name"
-        :color="currentServer === String(item.id) ? 'primary' : undefined">
-        <v-card-subtitle style="margin-top: -15px; overflow-wrap: anywhere;">{{ item.url }}</v-card-subtitle>
-        <v-card-text>
-          <div style="margin-bottom: 6px;">
-            <v-chip v-if="st(item).state === 'testing'" size="small" color="grey" variant="tonal">
-              <v-progress-circular size="12" width="2" indeterminate class="mr-1" />{{ $t('server.testing') }}
-            </v-chip>
-            <v-chip v-else-if="st(item).state === 'online'" size="small" color="success" variant="tonal" prepend-icon="mdi-check-circle">
-              {{ st(item).latency }} ms
-            </v-chip>
-            <v-chip v-else-if="st(item).state === 'offline'" size="small" color="error" variant="flat" prepend-icon="mdi-alert-circle">
-              {{ $t('server.offline') }}
-            </v-chip>
-          </div>
-          <div v-if="currentServer === String(item.id)" style="font-weight: bold;">● {{ $t('server.managing') }}</div>
-          <div v-if="item.remark" style="opacity: 0.7;">{{ item.remark }}</div>
-          <div v-if="item.kernel_ver" class="server-ver">sing-box {{ item.kernel_ver }}</div>
-        </v-card-text>
-        <v-divider></v-divider>
-        <v-card-actions style="padding: 0;">
-          <v-btn icon="mdi-lan-pending" @click.stop="testServer(item)">
-            <v-icon />
-            <v-tooltip activator="parent" location="top" :text="$t('server.test')"></v-tooltip>
-          </v-btn>
-          <v-btn icon="mdi-download" @click.stop="updateNode(item)">
-            <v-icon />
-            <v-tooltip activator="parent" location="top" :text="$t('actions.update')"></v-tooltip>
-          </v-btn>
-          <v-btn icon="mdi-cog" color="primary" @click.stop="manage(item)">
-            <v-icon />
-            <v-tooltip activator="parent" location="top" :text="$t('server.manage')"></v-tooltip>
-          </v-btn>
-          <v-btn icon="mdi-file-edit" @click.stop="showEdit(item)">
-            <v-icon />
-            <v-tooltip activator="parent" location="top" :text="$t('actions.edit')"></v-tooltip>
-          </v-btn>
-          <v-btn icon="mdi-file-remove" color="warning" @click.stop="delOverlay[index] = true">
-            <v-icon />
-            <v-tooltip activator="parent" location="top" :text="$t('actions.del')"></v-tooltip>
-          </v-btn>
-          <v-overlay v-model="delOverlay[index]" contained class="align-center justify-center">
-            <v-card :title="$t('actions.del')" rounded="lg">
-              <v-divider></v-divider>
-              <v-card-text>
-                {{ $t('confirm') }}
-                <v-checkbox v-model="wipeNodes[index]" :label="$t('server.wipeNodes')" density="compact" hide-details color="error" class="mt-2" />
-              </v-card-text>
-              <v-card-actions>
-                <v-btn color="error" variant="flat" @click.stop="delServer(item, index)">{{ $t('yes') }}</v-btn>
-                <v-btn variant="text" class="confirm-cancel" @click.stop="delOverlay[index] = false">{{ $t('no') }}</v-btn>
-              </v-card-actions>
-            </v-card>
-          </v-overlay>
-        </v-card-actions>
-      </v-card>
-    </v-col>
-  </v-row>
+  <v-dialog v-model="delModal.visible" max-width="360">
+    <v-card :title="$t('actions.del')">
+      <v-divider></v-divider>
+      <v-card-text>
+        <div class="del-name">{{ delModal.item?.name }}</div>
+        {{ $t('confirm') }}
+        <v-checkbox v-model="delModal.wipe" :label="$t('server.wipeNodes')" density="compact" hide-details color="error" class="mt-2" />
+      </v-card-text>
+      <v-card-actions>
+        <v-btn color="error" variant="flat" @click="delServer()">{{ $t('yes') }}</v-btn>
+        <v-btn variant="text" class="confirm-cancel" @click="delModal.visible = false">{{ $t('no') }}</v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <!-- 工具栏：动作靠右，左侧只放一句数量；节点本身按账簿一行一台排下去 -->
+  <div class="page-head">
+    <span class="page-head-note">{{ servers.length }} {{ $t('pages.servers') }}</span>
+    <div class="page-head-actions">
+      <v-btn v-if="servers.length > 0" variant="text" size="small" class="toolbar-ghost" prepend-icon="mdi-restart" @click="bulkCommand('restart_core')">
+        {{ $t('server.restartAll') }}
+      </v-btn>
+      <v-btn v-if="servers.length > 0" variant="text" size="small" class="toolbar-ghost" prepend-icon="mdi-download" @click="bulkUpdate">
+        {{ $t('server.updateAll') }}
+      </v-btn>
+      <v-btn size="small" variant="outlined" prepend-icon="mdi-server-plus" @click="showEdit(null)">{{ $t('server.add') }}</v-btn>
+    </div>
+  </div>
+
+  <div v-if="servers.length === 0" class="servers-empty">{{ $t('server.empty') }}</div>
+
+  <div v-else class="ledger ledger--servers">
+    <div
+      v-for="(item, index) in servers"
+      :key="item.id"
+      class="ledger-row"
+      :class="{ 'is-lead': currentServer === String(item.id) }"
+    >
+      <span class="ledger-mark" :data-state="markState(item)" aria-hidden="true"></span>
+
+      <span class="ledger-name">
+        {{ item.name }}
+        <span v-if="currentServer === String(item.id)" class="managing">● {{ $t('server.managing') }}</span>
+      </span>
+
+      <span class="ledger-meta">
+        <span class="mono">{{ item.url }}</span>
+        <template v-if="item.remark"><span class="sep">·</span>{{ item.remark }}</template>
+        <template v-if="item.kernel_ver"><span class="sep">·</span><span class="mono">sing-box {{ item.kernel_ver }}</span></template>
+      </span>
+
+      <span class="ledger-state" :data-state="markState(item)">
+        <v-progress-circular v-if="st(item).state === 'testing'" size="10" width="1" indeterminate class="me-1" />
+        {{ stateText(item) }}
+      </span>
+
+      <span class="ledger-actions">
+        <v-btn icon="mdi-lan-pending" size="x-small" variant="text" @click.stop="testServer(item)">
+          <v-icon />
+          <v-tooltip activator="parent" location="top" :text="$t('server.test')"></v-tooltip>
+        </v-btn>
+        <v-btn icon="mdi-download" size="x-small" variant="text" @click.stop="updateNode(item)">
+          <v-icon />
+          <v-tooltip activator="parent" location="top" :text="$t('actions.update')"></v-tooltip>
+        </v-btn>
+        <v-btn icon="mdi-cog" size="x-small" variant="text" color="primary" @click.stop="manage(item)">
+          <v-icon />
+          <v-tooltip activator="parent" location="top" :text="$t('server.manage')"></v-tooltip>
+        </v-btn>
+        <v-btn icon="mdi-file-edit" size="x-small" variant="text" @click.stop="showEdit(item)">
+          <v-icon />
+          <v-tooltip activator="parent" location="top" :text="$t('actions.edit')"></v-tooltip>
+        </v-btn>
+        <v-btn icon="mdi-file-remove" size="x-small" variant="text" color="warning" @click.stop="askDelete(item, index)">
+          <v-icon />
+          <v-tooltip activator="parent" location="top" :text="$t('actions.del')"></v-tooltip>
+        </v-btn>
+      </span>
+    </div>
+  </div>
 </template>
 
 <script lang="ts" setup>
@@ -95,12 +101,31 @@ const servers = computed((): any[] => Data().servers ?? [])
 const currentServer = computed((): string => Data().currentServer)
 
 const editModal = ref<{ visible: boolean, server: any }>({ visible: false, server: null })
-const delOverlay = ref<boolean[]>([])
-const wipeNodes = ref<boolean[]>([])
+
+// 删除确认改成全页唯一的 dialog。上一版是每行塞一个 v-overlay，
+// 8 台机器就有 8 个浮层挂在 DOM 上，而且 contained 的 overlay 会被行高裁掉。
+const delModal = ref<{ visible: boolean, item: any, index: number, wipe: boolean }>({
+  visible: false, item: null, index: -1, wipe: false,
+})
 
 type ServerStatus = { state: 'idle' | 'testing' | 'online' | 'offline', latency?: number, error?: string }
 const statusMap = ref<Record<string, ServerStatus>>({})
 const st = (item: any): ServerStatus => statusMap.value[item.id] || { state: 'idle' }
+
+const markState = (item: any) => {
+  const s = st(item).state
+  if (s === 'online') return 'up'
+  if (s === 'offline') return 'error'
+  return 'down'
+}
+
+const stateText = (item: any) => {
+  const s = st(item)
+  if (s.state === 'testing') return ''
+  if (s.state === 'online') return `${s.latency} ms`
+  if (s.state === 'offline') return 'offline'
+  return '—'
+}
 
 // Probe a server's reachability + token through the backend (it calls the
 // remote APIv2 and times the round-trip).
@@ -159,8 +184,14 @@ const wipeRemoteNodes = async (id: string) => {
   }
 }
 
-const delServer = async (item: any, index: number) => {
-  if (wipeNodes.value[index]) {
+const askDelete = (item: any, index: number) => {
+  delModal.value = { visible: true, item, index, wipe: false }
+}
+
+const delServer = async () => {
+  const item = delModal.value.item
+  if (!item) return
+  if (delModal.value.wipe) {
     // If the server is unreachable we can't clear its nodes — drop the entry anyway.
     try { await wipeRemoteNodes(String(item.id)) } catch { /* ignore */ }
   }
@@ -169,8 +200,55 @@ const delServer = async (item: any, index: number) => {
     // If we just removed the server we were managing, fall back to the local
     // panel so subsequent api/load calls aren't proxied to a gone remote.
     if (String(item.id) === Data().currentServer) Data().setCurrentServer('')
-    delOverlay.value[index] = false
-    wipeNodes.value[index] = false
+    delModal.value = { visible: false, item: null, index: -1, wipe: false }
   }
 }
 </script>
+
+<style scoped>
+/* 账簿行的五列版：状态与操作各占一列，操作 hover 才显形 */
+.ledger--servers .ledger-row {
+  grid-template-columns: 14px minmax(0, 1.1fr) minmax(0, 2.4fr) auto auto;
+  align-items: center;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.ledger--servers .ledger-meta {
+  line-height: 1.55;
+}
+
+.ledger-state {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  min-width: 64px;
+}
+
+.ledger-actions {
+  margin-left: var(--s2);
+}
+
+.servers-empty {
+  padding: var(--s6) 0;
+  color: var(--ink-3);
+  font-size: var(--fs-sm);
+}
+
+.del-name {
+  font-family: var(--serif);
+  font-size: var(--fs-lg);
+  margin-bottom: var(--s2);
+}
+
+@media (max-width: 900px) {
+  .ledger--servers .ledger-row {
+    grid-template-columns: 14px minmax(0, 1fr) auto;
+  }
+
+  .ledger--servers .ledger-meta,
+  .ledger--servers .ledger-state {
+    display: none;
+  }
+}
+</style>

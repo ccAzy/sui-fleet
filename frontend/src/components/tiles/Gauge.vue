@@ -2,119 +2,70 @@
 import { HumanReadable } from '@/plugins/utils'
 import { computed } from 'vue'
 
+/**
+ * 读数格（metre）。
+ *
+ * 上一版是三段半圆仪表盘：它的形状来自仪表盘模板，而且半圆里除了数字没有别的
+ * 信息，8 台机器里 7 台恒为 0 的时候，三个空半圆把版面撑得像坏了。
+ * 同一份数据落在账簿上应该是一个数 + 一把刻度尺：数字用等宽字对齐，
+ * 细条只表达「占了几成」，下面的小字给出分母。
+ */
 const props = defineProps({
   tilesData: <any>{},
-  type: String
+  type: String,
 })
 
 const data = computed(() => {
   const d = props.tilesData
-  if (!d.mem && !d.cpu) return { percent: 0, text: '-' }
+  if (!d.mem && !d.cpu) return { value: '-', percent: 0, foot: '', level: '' }
   switch (props.type) {
     case 'g-cpu':
       // 保留一位小数：Math.ceil 会把 0.4% 显示成 1%，看着像卡住了
-      return { percent: d.cpu, text: Number(d.cpu ?? 0).toFixed(1) + "%" }
+      return metre(d.cpu, 100, Number(d.cpu ?? 0).toFixed(1) + '%')
     case 'g-mem':
-      return gaugeData(d.mem)
+      return metre(d.mem)
     case 'g-dsk':
-      return gaugeData(d.dsk)
+      return metre(d.dsk)
     case 'g-swp':
-      return gaugeData(d.swp)
+      return metre(d.swp)
   }
-  return { percent: 0, text: '-'}
+  return { value: '-', percent: 0, foot: '', level: '' }
 })
 
-const gaugeData = (d:any) :any => {
-  if (!d) return { percent: 0, text: '-' }
-  const curr = HumanReadable.sizeFormat(d.current,0).split(' ')
-  const total = HumanReadable.sizeFormat(d.total,0).split(' ')
-  if (curr[1] == total[1]) curr[1] = ''
+const fmt = (n: number) => {
+  const [num, unit] = HumanReadable.sizeFormat(n, 0).split(' ')
+  return { num, unit: unit ?? '' }
+}
+
+/** 有分母的读数：主数字是已用量，脚注是分母与占比 */
+const metre = (d: any, total = 0, text?: string) => {
+  if (!d && text === undefined) return { value: '-', percent: 0, foot: '', level: '' }
+  const percent = text === undefined ? (d.total > 0 ? Math.ceil((d.current * 100) / d.total) : 0) : clamp(Number(d))
+  if (text !== undefined) {
+    return { value: text, percent: clamp(Number(d)), foot: '', level: level(clamp(Number(d))) }
+  }
+  const used = fmt(d.current)
+  const all = fmt(d.total)
+  const sameUnit = used.unit === all.unit
   return {
-    percent: Math.ceil(d.current*100/d.total),
-    text: curr[0] + "<sup>" + (curr[1]?? ' ') + "</sup>/" +  total[0] + "<sup>" + (total[1]?? '') + "</sup>"
+    value: `${used.num}<sup>${used.unit}</sup>`,
+    percent: clamp(percent),
+    foot: `of ${all.num}${sameUnit ? '' : ' ' + all.unit} · ${clamp(percent)}%`,
+    level: level(clamp(percent)),
   }
 }
 
-const cssTransformRotateValue = computed(() => {
-  const percentageAsFraction = data.value.percent / 100
-  const halfPercentage = percentageAsFraction / 2
-
-  return `${halfPercentage}turn`
-})
-
-const gaugeColor = computed(() => {
-  if (data.value.percent > 90) return 'error'
-  if (data.value.percent > 70) return 'warning'
-  return 'info'
-})
+const clamp = (n: number) => Math.max(0, Math.min(100, Number.isFinite(n) ? n : 0))
+const level = (n: number) => (n > 90 ? 'error' : n > 70 ? 'warn' : '')
 </script>
 
 <template>
-  <div class="gauge__outer">
-    <div class="gauge__inner">
-      <div
-        class="gauge__fill" 
-        :style="{ 
-          transform: `rotate(${cssTransformRotateValue})`,
-          background: `rgb(var(--v-theme-${gaugeColor}))`
-          }">
-      </div>
-      <div class="gauge__cover"><span dir="ltr" v-html="data.text"></span></div>
+  <div class="metre">
+    <div class="metre-label">{{ $t(type === 'g-cpu' ? 'main.gauge.cpu' : type === 'g-mem' ? 'main.gauge.mem' : type === 'g-dsk' ? 'main.gauge.dsk' : 'main.gauge.swp') }}</div>
+    <div class="metre-value" v-html="data.value"></div>
+    <div class="metre-track">
+      <div class="metre-fill" :style="{ width: data.percent + '%' }" :data-level="data.level"></div>
     </div>
+    <div class="metre-foot">{{ data.foot || '&nbsp;' }}</div>
   </div>
 </template>
-
-<style scoped>
-.gauge__outer {
-  width: 100%;
-  max-width: 250px;
-}
-
-.gauge__inner {
-  width: 100%;
-  height: 0;
-  padding-bottom: 50%;
-  background: rgb(var(--v-theme-surface));
-  position: relative;
-  border-top-left-radius: 100% 200%;
-  border-top-right-radius: 100% 200%;
-  overflow: hidden;
-}
-
-.gauge__fill {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  width: inherit;
-  height: 100%;
-  background: rgb(var(--v-theme-primary));
-  transform-origin: center top;
-  transform: rotate(0turn);
-  transition: transform 0.2s ease-out;
-}
-
-.gauge__cover {
-  width: 75%;
-  height: 150%;
-  background: rgb(var(--v-theme-background));
-  position: absolute;
-  top: 25%;
-  left: 50%;
-  transform: translateX(-50%);
-  border-radius: 50%;
-
-  /* Text */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding-bottom: 25%;
-  box-sizing: border-box;
-  font-family: 'Lexend', sans-serif;
-  font-weight: bold;
-  font-size: 32px;
-}
-
-sup {
-  font-size: 16px;
-}
-</style>

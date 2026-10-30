@@ -20,7 +20,7 @@
     :tag="stats.tag"
     @close="closeStats"
   />
-  <v-row justify="center" align="center">
+  <v-row class="page-toolbar">
     <v-col cols="auto">
       <v-btn color="primary" @click="showModal(0)">{{ $t('actions.add') }}</v-btn>
     </v-col>

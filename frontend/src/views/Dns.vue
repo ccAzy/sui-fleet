@@ -22,7 +22,7 @@
     @save="saveDnsRuleModal"
   />
   <v-row>
-    <v-col cols="12" justify="center" align="center">
+    <v-col cols="12" class="page-toolbar">
       <v-btn color="primary" @click="showDnsModal(-1)" style="margin: 0 5px;">{{ $t('dns.add') }}</v-btn>
       <v-btn color="primary" @click="showDnsRuleModal(-1)" style="margin: 0 5px;">{{ $t('dns.rule.add') }}</v-btn>
       <v-btn color="primary" variant="elevated" @click="saveConfig" :loading="loading" :disabled="stateChange">

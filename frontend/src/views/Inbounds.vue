@@ -53,7 +53,7 @@
     </v-card>
   </v-dialog>
   <v-row>
-    <v-col cols="12" justify="center" align="center">
+    <v-col cols="12" class="page-toolbar">
       <v-btn color="primary" class="toolbar-primary" @click="showModal(0)">{{ $t('actions.add') }}</v-btn>
       <v-btn variant="text" class="toolbar-ghost" prepend-icon="mdi-flash" @click="templateModal = true">
         {{ $t('quickTemplate.btn') }}

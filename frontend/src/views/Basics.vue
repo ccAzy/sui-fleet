@@ -1,6 +1,6 @@
 <template>
   <v-row style="margin-bottom: 10px;">
-    <v-col cols="12" justify="center" align="center">
+    <v-col cols="12" class="page-toolbar">
       <v-btn color="primary" variant="elevated" @click="saveConfig" :loading="loading" :disabled="stateChange">
         {{ $t('actions.save') }}
       </v-btn>

@@ -2,7 +2,7 @@
   <v-app-bar :elevation="5">
     <v-icon v-if="isMobile" icon="mdi-menu" @click="$emit('toggleDrawer')" />
     <span v-else style="width: 24px"></span>
-    <v-app-bar-title :text="$t(<string>route.name)" class="align-center text-center " />
+    <v-app-bar-title :text="$t(<string>route.name)" class="align-center top-title" />
     <v-menu v-if="servers.length > 0 || currentServer">
       <template v-slot:activator="{ props }">
         <v-btn v-bind="props" variant="text" size="small" class="me-1 server-switch"
@@ -119,4 +119,9 @@ const changeTheme = (m: ThemeMode) => {
 </script>
 
 <style scoped>
+/* 页名左对齐：居中标题是模板的默认值，账簿上抬头永远在左边 */
+.top-title :deep(.v-toolbar-title__placeholder) {
+  font-size: var(--fs-xl);
+  line-height: 1.2;
+}
 </style>

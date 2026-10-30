@@ -35,7 +35,7 @@
     :tag="stats.tag"
     @close="closeStats"
   />
-  <v-row justify="center" align="center">
+  <v-row class="page-toolbar">
     <v-col cols="auto">
       <v-btn color="primary" @click="showModal(0)">{{ $t('actions.add') }}</v-btn>
     </v-col>
@@ -183,7 +183,7 @@
         <template v-slot:item.online="{ item }">
           <div class="text-start">
             <template v-if="isOnline(item.name).value">
-              <v-chip density="comfortable" size="small" color="success" variant="flat">{{ $t('online') }}</v-chip>
+              <span class="online-flag"><span class="ledger-mark" data-state="up" aria-hidden="true"></span>{{ $t('online') }}</span>
             </template>
             <template v-else>-</template>
           </div>
@@ -425,3 +425,20 @@ const percent = (c: Client) => { return c.volume>0 ? Math.round((c.up+c.down) *1
 const percentColor = (c: Client) => { return (c.up+c.down) >= c.volume ? 'error' : percent(c)>90 ? 'warning' : 'success' }
 
 </script>
+
+<style scoped>
+/* 在线状态用墨点 + 文字，不用整块绿色底：账目上颜色只标记，不铺底 */
+.online-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-xs);
+  color: var(--ok);
+  letter-spacing: 0.04em;
+}
+
+.online-flag .ledger-mark {
+  width: 5px;
+  height: 5px;
+}
+</style>

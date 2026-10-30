@@ -19,7 +19,7 @@
     @close="closeTokenModal"
   />
   <v-row>
-    <v-col cols="12" justify="center" align="center">
+    <v-col cols="12" class="page-toolbar">
       <v-btn color="primary" @click="showChangesModal('')" style="margin: 0 5px;">{{ $t('admin.changes') }}</v-btn>
       <v-btn color="primary" @click="showTokenModal()">{{ $t('admin.api.token') }}</v-btn>
     </v-col>

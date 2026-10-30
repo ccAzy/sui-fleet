@@ -38,7 +38,7 @@
     @close="closeImportRulesets"
   />
   <v-row>
-    <v-col cols="12" justify="center" align="center">
+    <v-col cols="12" class="page-toolbar">
       <v-btn color="primary" @click="showRuleModal(-1)" style="margin: 0 5px;">{{ $t('rule.add') }}</v-btn>
       <v-btn color="primary" @click="showRulesetModal(-1)" style="margin: 0 5px;">{{ $t('ruleset.add') }}</v-btn>
       <v-menu v-model="actionMenu" :close-on-content-click="false" location="bottom center">

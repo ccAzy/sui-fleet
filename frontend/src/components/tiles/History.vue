@@ -25,6 +25,13 @@ ChartJS.register(
 )
 // 与全站同一套正文栈（原来写死 Vazirmatn，Windows 上不存在会回退到默认宋体）
 ChartJS.defaults.font.family = '"Segoe UI Variable Text", "Segoe UI", "PingFang SC", "Microsoft YaHei UI", "Noto Sans SC", system-ui, sans-serif'
+// 账簿上的曲线是一根线，不是坐标纸：细线、无点、无边框，只留几条极淡的横线
+ChartJS.defaults.font.size = 10
+ChartJS.defaults.color = 'rgba(107, 105, 97, 0.85)'
+ChartJS.defaults.borderColor = 'rgba(128, 128, 128, 0.10)'
+ChartJS.defaults.elements.point.radius = 0
+ChartJS.defaults.elements.point.hoverRadius = 2
+ChartJS.defaults.elements.line.borderWidth = 1.5
 export default {
   components: {
     Line
@@ -52,14 +59,21 @@ export default {
           }
         },
         scales: {
+          x: {
+            grid: { display: false },
+            border: { display: false },
+            ticks: { display: false },
+          },
           y: {
             min: 0,
             // 不再固定 0-100：CPU 空闲时只有 0.x%，固定上限会让线完全贴在底部看不见。
             // suggestedMax 让 Chart.js 从小刻度开始，数据超过时自动放大。
             suggestedMax: 10,
             grid: {
-              color: 'rgba(128, 128, 128, 0.18)',
+              color: 'rgba(128, 128, 128, 0.10)',
+              drawTicks: false,
             },
+            border: { display: false },
             beginAtZero: true,
             ticks: {
                 beginAtZero: true,
@@ -87,10 +101,17 @@ export default {
           }
         },
         scales: {
+          x: {
+            grid: { display: false },
+            border: { display: false },
+            ticks: { display: false },
+          },
           y: {
             grid: {
-              color: 'rgba(128, 128, 128, 0.18)',
+              color: 'rgba(128, 128, 128, 0.10)',
+              drawTicks: false,
             },
+            border: { display: false },
             beginAtZero: true,
             ticks: {
               callback: (label:any, index: number) => { return parseInt(label).toString() },

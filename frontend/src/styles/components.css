@@ -221,3 +221,297 @@
 .kernel-update {
   cursor: pointer;
 }
+
+/* ============================================================================
+ * 账页（sheet）：一屏一张体检单
+ *
+ * 取代上一版的「仪表盘网格」——那种四张等大方块 + 三张图表的排法，是模板的
+ * 形状，不是账簿的形状。账簿上，读数是一列数字，不是四个同心圆。
+ * ========================================================================== */
+.sheet {
+  max-width: 1040px;
+  padding-top: var(--s3);
+}
+
+/* 页头：名字在左，身份信息跟在后面，动作用最轻的方式靠右 */
+.sheet-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--s2) var(--s3);
+  padding-bottom: var(--s2);
+  border-bottom: 1px solid var(--rule-strong);
+}
+
+.sheet-head .sheet-name {
+  font-family: var(--serif);
+  font-size: var(--fs-xl);
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.2;
+}
+
+.sheet-head .sheet-meta {
+  font-family: var(--mono);
+  font-size: var(--fs-sm);
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.sheet-head .sheet-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+}
+
+/* ---------- 读数栏：四个数，不是四个圆 ---------- */
+.metres {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-bottom: 1px solid var(--rule);
+}
+
+.metre {
+  padding: var(--s4) var(--s4) var(--s4) 0;
+  min-width: 0;
+}
+
+.metre + .metre {
+  padding-left: var(--s4);
+  border-left: 1px solid var(--rule);
+}
+
+.metre-label {
+  font-family: var(--sans);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  line-height: 1.2;
+}
+
+.metre-value {
+  margin-top: var(--s1);
+  font-family: var(--mono);
+  font-size: var(--fs-2xl);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.metre-value sup {
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--ink-3);
+  vertical-align: baseline;
+  margin-left: 1px;
+}
+
+/* 3px 细条当刻度尺：够看，不抢字 */
+.metre-track {
+  margin-top: var(--s3);
+  height: 3px;
+  background: var(--rule);
+  overflow: hidden;
+}
+
+.metre-fill {
+  height: 100%;
+  background: var(--ink);
+  transition: width 240ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.metre-fill[data-level="warn"] {
+  background: var(--warn);
+}
+
+.metre-fill[data-level="error"] {
+  background: var(--error);
+}
+
+.metre-foot {
+  margin-top: var(--s1);
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- 曲线：细线、无边框、无网格底 ---------- */
+.sparks {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 var(--s6);
+  padding-top: var(--s4);
+  border-bottom: 1px solid var(--rule);
+}
+
+.spark {
+  min-width: 0;
+  padding-bottom: var(--s4);
+}
+
+.spark.is-wide {
+  grid-column: 1 / -1;
+}
+
+.spark-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s2);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.spark-title .spark-legend {
+  margin-left: auto;
+  font-family: var(--mono);
+  letter-spacing: 0;
+  text-transform: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.spark-body {
+  margin-top: var(--s1);
+  height: 88px;
+}
+
+.spark.is-wide .spark-body {
+  height: 112px;
+}
+
+/* ---------- 两列对账：系统 / 内核 ---------- */
+.sheet-rows {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 var(--s6);
+  padding-top: var(--s4);
+}
+
+.sheet-block {
+  min-width: 0;
+}
+
+.sheet-block h3 {
+  font-family: var(--serif);
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  margin: 0 0 var(--s1);
+  color: var(--ink);
+}
+
+.row-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s3);
+  padding: 5px 0;
+  border-bottom: 1px solid var(--rule);
+  font-size: var(--fs-sm);
+  min-width: 0;
+}
+
+.row-line .k {
+  color: var(--ink-3);
+  flex: none;
+}
+
+.row-line .v {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row-line .v.is-text {
+  font-family: var(--sans);
+}
+
+/* ---------- 页头（列表页共用）：标题左，工具右，一条细线收口 ---------- */
+.page-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s3);
+  padding: 0 0 var(--s2);
+  border-bottom: 1px solid var(--rule-strong);
+  margin-bottom: var(--s2);
+}
+
+.page-head .page-head-note {
+  font-family: var(--mono);
+  font-size: var(--fs-sm);
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.page-head .page-head-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+}
+
+/* 账簿行里的次要信息（地址、备注）用同一行铺开 */
+.ledger-meta .sep {
+  color: var(--rule-strong);
+  padding: 0 6px;
+}
+
+.ledger-name .managing {
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  color: var(--accent);
+  margin-left: var(--s2);
+  letter-spacing: 0.04em;
+}
+
+@media (max-width: 900px) {
+  .metres {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .metre:nth-child(3) {
+    border-left: none;
+    padding-left: 0;
+  }
+
+  .metre:nth-child(1),
+  .metre:nth-child(2) {
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .sparks,
+  .sheet-rows {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* 列表页的统一工具条：动作靠右、一条细线收口。
+   上一版每页都把自己那排按钮居中浮在列表上方，页面之间没有一致性。 */
+.page-toolbar {
+  display: flex !important;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s2);
+  padding: 0 0 var(--s2) 0 !important;
+  border-bottom: 1px solid var(--rule-strong);
+  margin-bottom: var(--s2);
+}
+
+.page-toolbar .v-btn {
+  margin: 0 !important;
+}

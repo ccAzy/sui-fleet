@@ -37,7 +37,7 @@
       </v-card-actions>
     </v-card>
   </v-dialog>
-  <v-row justify="center" align="center">
+  <v-row class="page-toolbar">
     <v-col cols="auto">
       <v-btn color="primary" prepend-icon="mdi-transit-connection-variant" @click="wizardModal = true">{{ $t('relay.btn') }}</v-btn>
     </v-col>

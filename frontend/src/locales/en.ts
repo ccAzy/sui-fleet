@@ -155,6 +155,7 @@ export default {
   },
   main: {
     tiles: "Tiles",
+    emptyHint: "Nothing on this sheet yet — pick the readings you want to watch.",
     gauges: "Gauges",
     charts: "Charts",
     infos: "Information",
