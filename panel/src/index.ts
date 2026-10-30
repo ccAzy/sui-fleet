@@ -10,14 +10,7 @@ import {
   signJWT,
   verifyJWT,
 } from "./auth";
-import {
-  ensureOtpSchema,
-  first,
-  now,
-  run,
-  type Env,
-  type UserRow,
-} from "./db";
+import { ensureOtpSchema, first, now, run, type Env, type UserRow } from "./db";
 import {
   MARKER_COOKIE,
   currentUser,
@@ -77,7 +70,6 @@ app.use("*", async (c, next) => {
   await next();
   for (const [k, v] of Object.entries(SECURITY_HEADERS)) c.header(k, v);
 });
-
 
 /** 发正式会话 cookie（密码登录与二次验证后共用） */
 async function issueSession(c: any, user: UserRow) {
@@ -170,7 +162,11 @@ app.post("/api/login/otp", async (c) => {
     ts - 300,
   );
   if ((recent?.c ?? 0) >= 8)
-    return json(c, null, new Error("too many failed attempts, retry in a few minutes"));
+    return json(
+      c,
+      null,
+      new Error("too many failed attempts, retry in a few minutes"),
+    );
 
   const body = await readBody(c);
   const ticket = String(body.ticket ?? "");

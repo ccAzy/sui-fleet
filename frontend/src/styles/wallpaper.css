@@ -59,8 +59,8 @@ html[data-wallpaper='glass'] .v-application__wrap {
 /* 半透明面板：显式开启才生效，且把浮层的实心背景一起换掉 */
 html[data-wallpaper='glass'] .v-card:not(.v-overlay .v-card),
 html[data-wallpaper='glass'] .v-sheet:not(.v-overlay .v-sheet) {
-  background: color-mix(in srgb, var(--surface) 78%, transparent) !important;
-  backdrop-filter: blur(14px) saturate(1.1);
+  background: color-mix(in srgb, var(--surface) 88%, transparent) !important;
+  backdrop-filter: blur(18px) saturate(1.1);
 }
 
 html[data-wallpaper='glass'] .v-data-table,
@@ -81,25 +81,54 @@ html[data-wallpaper='glass'] .v-table {
    因为那里的文字本来就没有自己的底面。 */
 html[data-wallpaper='on'] .page-shell,
 html[data-wallpaper='glass'] .page-shell {
-  background: var(--surface);
+  /* 94% 而非 100%：留一点点"薄纸"的通透感，壁纸的明暗会渗进纸面，
+     但不影响正文对比度（这是与玻璃档 86% 之间的中间档）。 */
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  backdrop-filter: blur(10px) saturate(1.05);
   border: 1px solid var(--rule);
   border-radius: 2px;
-  /* 桌面在四周留一圈，纸才有厚度感：视口再宽也至少露出 28px 桌面 */
-  width: min(1240px, calc(100% - 56px));
-  margin: 18px auto 28px;
-  padding: 22px 26px 56px;
+  /* 桌面要留得出来，纸才像"摊在桌上"：
+     视口再宽也至少露出 60px 桌面，内容宽度收在 1080 —— 之前是 56px/1240，
+     纸几乎顶满视口，壁纸只剩顶上一条，看着像横幅而不是背景。 */
+  width: min(1080px, calc(100% - 120px));
+  margin: 22px auto 44px;
+  padding: 26px 30px 56px;
+  /* 壁纸模式下唯一允许的阴影：给纸一点离地高度，
+     否则它和背景之间是一条硬切边，观感像"屏风挡住墙"而不是"纸上写字"。
+     （DESIGN.md 里"页面元素不加阴影"的例外，只在开壁纸时生效。） */
+  box-shadow: 0 20px 44px -30px rgba(0, 0, 0, 0.28);
 }
 
+/* 玻璃模式：纸本身半透明，壁纸透进内容区（默认关闭，显式开启才生效）。
+   86% 而不是 78%：再透就和正文抢对比度了——实测 78% 时照片亮部会把
+   --ink-3 的说明文字压到 3:1 附近，正文 13px 看着发虚。 */
 html[data-wallpaper='glass'] .page-shell {
-  background: color-mix(in srgb, var(--surface) 78%, transparent);
-  backdrop-filter: blur(14px) saturate(1.1);
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  backdrop-filter: blur(22px) saturate(1.15);
+}
+
+/* 顶栏与侧栏也要让壁纸透出来。
+   它们原来是不透明的 --paper / --surface-2，把窗口最上面 64px 全盖住了——
+   这正是"壁纸只在中间露一条横幅"的根因。 */
+html[data-wallpaper='on'] .v-app-bar,
+html[data-wallpaper='glass'] .v-app-bar {
+  background: color-mix(in srgb, var(--paper) 76%, transparent) !important;
+  backdrop-filter: blur(16px) saturate(1.05);
+}
+
+html[data-wallpaper='on'] .v-navigation-drawer,
+html[data-wallpaper='glass'] .v-navigation-drawer {
+  background: color-mix(in srgb, var(--surface-2) 84%, transparent) !important;
+  backdrop-filter: blur(16px) saturate(1.05);
 }
 
 @media (max-width: 960px) {
   html[data-wallpaper='on'] .page-shell,
   html[data-wallpaper='glass'] .page-shell {
-    margin: 10px 8px 20px;
-    padding: 14px 14px 40px;
+    width: calc(100% - 24px);
+    margin: 12px auto 24px;
+    padding: 16px 16px 40px;
     border-radius: 2px;
+    box-shadow: 0 12px 28px -22px rgba(0, 0, 0, 0.22);
   }
 }

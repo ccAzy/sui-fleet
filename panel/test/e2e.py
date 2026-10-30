@@ -65,7 +65,6 @@ def check(name, cond, detail=""):
         fails.append(name)
 
 
-
 # ---- 二次验证（TOTP）所需 ----
 
 
@@ -75,8 +74,9 @@ def _totp(secret, at=None):
     step = int((at or time.time()) // 30)
     mac = hmac.new(key, struct.pack(">Q", step), hashlib.sha1).digest()
     off = mac[-1] & 0x0F
-    num = struct.unpack(">I", mac[off:off + 4])[0] & 0x7FFFFFFF
+    num = struct.unpack(">I", mac[off : off + 4])[0] & 0x7FFFFFFF
     return str(num % 1000000).zfill(6)
+
 
 r = j(post("/api/login", form={"user": "admin", "pass": "admin"}))
 check("login", r["success"] is True, r)
@@ -397,7 +397,12 @@ r = j(post("/api/otp/setup"))
 secret = r["obj"]["secret"]
 check("2fa 生成密钥", len(secret) == 32, r)
 
-r = j(post("/api/otp/enable", form={"code": "000000" if _totp(secret) != "000000" else "111111"}))
+r = j(
+    post(
+        "/api/otp/enable",
+        form={"code": "000000" if _totp(secret) != "000000" else "111111"},
+    )
+)
 check("2fa 错码不能启用", r["success"] is False, r)
 
 r = j(post("/api/otp/enable", form={"code": _totp(secret)}))

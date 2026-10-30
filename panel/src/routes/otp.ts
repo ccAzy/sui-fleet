@@ -33,9 +33,18 @@ async function checkProof(
 ): Promise<boolean> {
   const digits = code.replace(/\D/g, "");
   if (digits.length === 6 && user.otp_secret) {
-    const step = await totpVerify(user.otp_secret, digits, Number(user.otp_last_step ?? 0));
+    const step = await totpVerify(
+      user.otp_secret,
+      digits,
+      Number(user.otp_last_step ?? 0),
+    );
     if (step > 0) {
-      await run(db, "UPDATE users SET otp_last_step = ? WHERE id = ?", step, user.id);
+      await run(
+        db,
+        "UPDATE users SET otp_last_step = ? WHERE id = ?",
+        step,
+        user.id,
+      );
       return true;
     }
     return false;
@@ -78,7 +87,12 @@ export function registerOtpAdmin(app: Hono<{ Bindings: Env }>) {
     if (user.otp_on === 1)
       return json(c, null, new Error("二次验证已开启，请先关闭再重新绑定"));
     const secret = newSecret();
-    await run(c.env.DB, "UPDATE users SET otp_secret = ? WHERE id = ?", secret, user.id);
+    await run(
+      c.env.DB,
+      "UPDATE users SET otp_secret = ? WHERE id = ?",
+      secret,
+      user.id,
+    );
     return json(c, {
       secret,
       uri: otpauthURI(secret, user.username),
@@ -88,13 +102,16 @@ export function registerOtpAdmin(app: Hono<{ Bindings: Env }>) {
   app.post("/api/otp/enable", async (c) => {
     const user = await me(c);
     if (!user) return json(c, null, new Error("Invalid login"));
-    if (!user.otp_secret)
-      return json(c, null, new Error("请先生成密钥"));
+    if (!user.otp_secret) return json(c, null, new Error("请先生成密钥"));
     const body = await readBody(c);
     const code = String(body.code ?? "");
     const step = await totpVerify(user.otp_secret, code, 0);
     if (!step)
-      return json(c, null, new Error("验证码不正确（检查手机时间是否自动同步）"));
+      return json(
+        c,
+        null,
+        new Error("验证码不正确（检查手机时间是否自动同步）"),
+      );
 
     const codes = newRecoveryCodes(10);
     const hashed: string[] = [];

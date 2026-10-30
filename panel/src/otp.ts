@@ -17,7 +17,8 @@ export function newSecret(bytes = 20): string {
   let bits = "";
   for (const b of raw) bits += b.toString(2).padStart(8, "0");
   let out = "";
-  for (let i = 0; i + 5 <= bits.length; i += 5) out += B32[parseInt(bits.slice(i, i + 5), 2)];
+  for (let i = 0; i + 5 <= bits.length; i += 5)
+    out += B32[parseInt(bits.slice(i, i + 5), 2)];
   return out;
 }
 
@@ -35,7 +36,8 @@ export function base32Decode(input: string): Uint8Array<ArrayBuffer> {
   }
   const len = Math.floor(bits.length / 8);
   const out = new Uint8Array(new ArrayBuffer(len));
-  for (let i = 0; i < len; i++) out[i] = parseInt(bits.slice(i * 8, i * 8 + 8), 2);
+  for (let i = 0; i < len; i++)
+    out[i] = parseInt(bits.slice(i * 8, i * 8 + 8), 2);
   return out;
 }
 
@@ -105,12 +107,21 @@ export function newRecoveryCodes(count = 10): string[] {
 /** 恢复码只在库里存 sha256；比对时统一去掉空格与连字符 */
 export async function hashRecovery(code: string): Promise<string> {
   const norm = code.toUpperCase().replace(/[^A-Z0-9]/g, "");
-  const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(norm));
-  return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  const d = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(norm),
+  );
+  return [...new Uint8Array(d)]
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 /** otpauth:// URI，交给前端生成二维码 */
-export function otpauthURI(secret: string, account: string, issuer = "s-ui cloud") {
+export function otpauthURI(
+  secret: string,
+  account: string,
+  issuer = "s-ui cloud",
+) {
   const label = encodeURIComponent(`${issuer}:${account}`);
   const params = new URLSearchParams({
     secret,
