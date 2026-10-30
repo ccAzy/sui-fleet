@@ -101,3 +101,24 @@ export async function refreshSessionCookie(
     secure: https,
   });
 }
+
+/**
+ * 读请求体：同时支持 JSON 与 form-urlencoded。
+ *
+ * 前端 axios 把 Content-Type 定成 form-urlencoded，但对象体可能是 JSON 串，
+ * Hono 的 parseBody() 只按 Content-Type 解析——两边任一对不上就拿到空对象。
+ * 与其猜，不如两种都试。
+ */
+export async function readBody(c: any): Promise<Record<string, string>> {
+  const ct = (c.req.header("content-type") || "").toLowerCase();
+  if (ct.includes("application/json")) {
+    const j = await c.req.json().catch(() => ({}));
+    return (j || {}) as Record<string, string>;
+  }
+  const f = await c.req.parseBody().catch(() => ({}));
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(f as Record<string, unknown>)) {
+    out[k] = typeof v === "string" ? v : String(v);
+  }
+  return out;
+}

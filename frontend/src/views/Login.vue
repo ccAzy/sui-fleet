@@ -7,7 +7,7 @@
           <p class="login-sub">节点管理 · 配置下发 · 订阅分发</p>
         </header>
 
-        <form class="login-form" autocomplete="on" @submit.prevent="login">
+        <form v-if="step === 'pass'" class="login-form" autocomplete="on" @submit.prevent="login">
           <label class="field">
             <span class="field-label">{{ $t('login.username') }}</span>
             <input
@@ -39,6 +39,44 @@
           </button>
         </form>
 
+
+        <!-- 第二步：二次验证。密码只换到一张 120 秒的票据，真正的会话在这里才发。 -->
+        <form v-else class="login-form" autocomplete="off" @submit.prevent="submitOtp">
+          <p class="login-note">
+            {{ useRecovery ? $t('login.useRecoveryHint') : $t('login.otpHint') }}
+          </p>
+
+          <label class="field">
+            <span class="field-label">{{ useRecovery ? $t('login.recoveryCode') : $t('login.otpCode') }}</span>
+            <input
+              v-model="code"
+              class="field-input"
+              :class="{ 'field-input--code': !useRecovery }"
+              :name="useRecovery ? 'recovery' : 'otp'"
+              :inputmode="useRecovery ? 'text' : 'numeric'"
+              :autocomplete="useRecovery ? 'one-time-code' : 'one-time-code'"
+              :maxlength="useRecovery ? 12 : 6"
+              spellcheck="false"
+              autofocus
+              required
+            />
+          </label>
+
+          <p v-if="error" class="login-error">{{ error }}</p>
+
+          <button class="login-submit" type="submit" :disabled="loading">
+            {{ loading ? '…' : $t('actions.submit') }}
+          </button>
+
+          <div class="login-alt">
+            <button type="button" class="linkish" @click="toggleRecovery">
+              {{ useRecovery ? $t('login.useTotp') : $t('login.useRecovery') }}
+            </button>
+            <span class="dot">·</span>
+            <button type="button" class="linkish" @click="backToPass">{{ $t('login.back') }}</button>
+          </div>
+        </form>
+
         <footer class="login-foot">
 
           <label class="login-lang">
@@ -67,6 +105,25 @@ const loading = ref(false)
 const error = ref('')
 const router = useRouter()
 
+// 两步登录：pass → otp。ticket 是密码换来的 120 秒临时票据，不能直接当会话用。
+const step = ref<'pass' | 'otp'>('pass')
+const ticket = ref('')
+const code = ref('')
+const useRecovery = ref(false)
+
+const toggleRecovery = () => {
+  useRecovery.value = !useRecovery.value
+  code.value = ''
+  error.value = ''
+}
+
+const backToPass = () => {
+  step.value = 'pass'
+  code.value = ''
+  ticket.value = ''
+  error.value = ''
+}
+
 const login = async () => {
   error.value = ''
   if (!username.value || !password.value) {
@@ -76,13 +133,43 @@ const login = async () => {
   loading.value = true
   const response = await HttpUtil.post('api/login', { user: username.value, pass: password.value })
   loading.value = false
-  if (response.success) {
-    // 首次用默认密码登录：直接带去改密页，避免面板长期用 admin/admin 裸奔
-    const mustChange = Boolean((response.obj as any)?.must_change)
-    router.push(mustChange ? '/admins' : '/')
-  } else {
+  if (!response.success) {
     error.value = String((response as any).msg || 'Invalid login')
+    return
   }
+  // 开了二次验证：后端不会发会话 cookie，只给一张票据
+  const obj = (response.obj || {}) as any
+  if (obj.need_otp) {
+    ticket.value = String(obj.ticket || '')
+    step.value = 'otp'
+    code.value = ''
+    error.value = ''
+    return
+  }
+  finish(obj)
+}
+
+const submitOtp = async () => {
+  error.value = ''
+  const value = code.value.trim()
+  if (!value) {
+    error.value = i18n.global.t('login.otpRequired')
+    return
+  }
+  loading.value = true
+  const response = await HttpUtil.post('api/login/otp', { ticket: ticket.value, code: value })
+  loading.value = false
+  if (!response.success) {
+    error.value = String((response as any).msg || i18n.global.t('login.otpInvalid'))
+    code.value = ''
+    return
+  }
+  finish((response.obj || {}) as any)
+}
+
+const finish = (obj: any) => {
+  // 首次用默认密码登录：直接带去改密页，避免面板长期用 admin/admin 裸奔
+  router.push(Boolean(obj?.must_change) ? '/admins' : '/')
 }
 
 const changeLocale = (l: string) => {
@@ -238,5 +325,52 @@ const changeLocale = (l: string) => {
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
+}
+
+.login-note {
+  margin: 0 0 20px;
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+  color: var(--ink-3);
+}
+
+/* 6 位码用等宽 + 字距，一眼看清每一位 */
+.field-input--code {
+  font-family: var(--mono);
+  font-size: var(--fs-xl);
+  letter-spacing: 0.32em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.login-alt {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 18px;
+  font-size: var(--fs-sm);
+  color: var(--ink-3);
+}
+
+.linkish {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--rule-strong);
+}
+
+.linkish:hover {
+  color: var(--accent);
+  text-decoration-color: var(--accent);
+}
+
+.login-alt .dot {
+  color: var(--rule-strong);
 }
 </style>

@@ -4,10 +4,14 @@
 """
 
 import base64
+import hashlib
+import hmac
 import http.cookiejar
 import json
 import os
+import struct
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -19,7 +23,8 @@ opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
 
 def post(path, form=None, js=None, headers=None, token=None):
     url = BASE + path
-    data = None
+    # urllib 里 data=None 会变成 GET；无 body 的 POST 必须给 b""
+    data = b""
     hdrs = dict(headers or {})
     if form is not None:
         data = urllib.parse.urlencode(form).encode()
@@ -40,9 +45,9 @@ def get(path, token=None):
     url = BASE + path
     if not url.startswith(("http://", "https://")):
         raise ValueError("only http(s) is allowed: " + url)
-    req = urllib.request.Request(
+    req = urllib.request.Request(  # noqa: S310  # nosec B310
         url, headers={"Authorization": "Bearer " + token} if token else {}
-    )  # noqa: S310  # nosec B310
+    )
     with opener.open(req, timeout=15) as r:
         return r.read().decode()
 
@@ -59,6 +64,19 @@ def check(name, cond, detail=""):
     if not cond:
         fails.append(name)
 
+
+
+# ---- 二次验证（TOTP）所需 ----
+
+
+def _totp(secret, at=None):
+    pad = "=" * ((8 - len(secret) % 8) % 8)
+    key = base64.b32decode(secret + pad)
+    step = int((at or time.time()) // 30)
+    mac = hmac.new(key, struct.pack(">Q", step), hashlib.sha1).digest()
+    off = mac[-1] & 0x0F
+    num = struct.unpack(">I", mac[off:off + 4])[0] & 0x7FFFFFFF
+    return str(num % 1000000).zfill(6)
 
 r = j(post("/api/login", form={"user": "admin", "pass": "admin"}))
 check("login", r["success"] is True, r)
@@ -370,6 +388,55 @@ try:
     check("sub without key is rejected", bad.strip() in ("", "forbidden"), bad[:60])
 except urllib.error.HTTPError as e:  # noqa: S310 -- 403 是预期结果
     check("sub without key is rejected", e.code == 403, str(e.code))
+
+# ---- 二次验证：绑定 → 登录要码 → 防重放 → 恢复码 → 关闭 ----
+st = j(get("/api/otp/status"))
+check("2fa 初始关闭", (st.get("obj") or {}).get("on") is False, st)
+
+r = j(post("/api/otp/setup"))
+secret = r["obj"]["secret"]
+check("2fa 生成密钥", len(secret) == 32, r)
+
+r = j(post("/api/otp/enable", form={"code": "000000" if _totp(secret) != "000000" else "111111"}))
+check("2fa 错码不能启用", r["success"] is False, r)
+
+r = j(post("/api/otp/enable", form={"code": _totp(secret)}))
+check("2fa 正确码启用", r["success"] is True, r)
+codes = (r.get("obj") or {}).get("recovery") or []
+check("2fa 发放 10 个恢复码", len(codes) == 10, str(len(codes)))
+
+get("/api/logout")
+cj.clear()
+r = j(post("/api/login", form={"user": "admin", "pass": "admin"}))
+obj = r.get("obj") or {}
+check("2fa 登录要码", obj.get("need_otp") is True and bool(obj.get("ticket")), r)
+ticket = obj.get("ticket", "")
+
+r = j(post("/api/login/otp", form={"ticket": ticket, "code": "000000"}))
+check("2fa 登录错码被拒", r["success"] is False, r)
+
+code = _totp(secret)
+r = j(post("/api/login/otp", form={"ticket": ticket, "code": code}))
+check("2fa 登录放行", r["success"] is True, r)
+
+# 防重放：同一 30 秒窗口内同一个码不能再用
+get("/api/logout")
+cj.clear()
+t2 = j(post("/api/login", form={"user": "admin", "pass": "admin"}))["obj"]["ticket"]
+r = j(post("/api/login/otp", form={"ticket": t2, "code": code}))
+check("2fa 同一码重放被拒", r["success"] is False, r)
+
+# 恢复码：可用一次，且用掉即减少
+r = j(post("/api/login/otp", form={"ticket": t2, "code": codes[0]}))
+check("2fa 恢复码可用", r["success"] is True, r)
+st = j(get("/api/otp/status"))
+check("2fa 恢复码已消耗", (st.get("obj") or {}).get("recovery_left") == 9, st)
+
+# 关闭（用恢复码，模拟手机丢失）
+r = j(post("/api/otp/disable", form={"code": codes[1]}))
+check("2fa 可用恢复码关闭", r["success"] is True, r)
+st = j(get("/api/otp/status"))
+check("2fa 关闭后为 off", (st.get("obj") or {}).get("on") is False, st)
 
 print()
 print("RESULT:", "ALL PASS" if not fails else f"{len(fails)} FAILED: {fails}")
