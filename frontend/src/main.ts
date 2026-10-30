@@ -22,7 +22,9 @@ import { registerPlugins } from '@/plugins'
 // Paper world: 纸白极简（双主题）
 import '@/styles/paper.css'
 import '@/styles/components.css'
+import '@/styles/wallpaper.css'
 import { applyThemeMode, savedThemeMode } from '@/plugins/vuetify'
+import { applyWp, initWallpaper, readWp } from '@/plugins/wallpaper'
 
 // Locale
 import { i18n } from '@/locales'
@@ -48,6 +50,9 @@ const loading = ref(false)
 
 // 在挂载前把明暗刷到 <html>，避免首帧闪烁
 applyThemeMode(savedThemeMode())
+// 壁纸同理：参数同步刷上，大图异步换（首帧不闪）
+applyWp(readWp())
+void initWallpaper()
 
 const app = createApp(App)
 app.provide('loading', loading)

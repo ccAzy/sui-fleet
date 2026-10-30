@@ -6,7 +6,43 @@
   <link rel="icon" href="assets/favicon.ico" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <script>
-    window.BASE_URL = "{{ .BASE_URL }}"
+    // 首帧前先把壁纸参数刷到 <html>：否则会先白一下再出图。
+      // 只读 localStorage 里的轻量配置（缩略图 + 数值），大图由插件异步替换。
+      try {
+        var wp = JSON.parse(localStorage.getItem('ui.wallpaper') || '{}')
+        var isDark = document.documentElement.getAttribute('data-theme') === 'dark' ||
+          (document.documentElement.getAttribute('data-theme') !== 'light' &&
+            window.matchMedia('(prefers-color-scheme: dark)').matches)
+        var thumb = isDark ? (wp.thumbDark || wp.thumbLight) : (wp.thumbLight || wp.thumbDark)
+        var pattern = wp.builtin && wp.builtin !== 'none'
+        if (wp.on && (thumb || pattern)) {
+          var img = '', size = wp.fit || 'cover'
+          if (pattern) {
+            if (wp.builtin === 'grid') {
+              img = 'linear-gradient(rgba(0,0,0,.06) 1px, transparent 1px),linear-gradient(90deg, rgba(0,0,0,.06) 1px, transparent 1px)'
+              size = '24px 24px, 24px 24px'
+            } else if (wp.builtin === 'dots') {
+              img = 'radial-gradient(rgba(0,0,0,.10) 1px, transparent 1px)'
+              size = '16px 16px'
+            } else {
+              img = 'repeating-linear-gradient(90deg, rgba(0,0,0,.035) 0 1px, transparent 1px 3px),repeating-linear-gradient(0deg, rgba(0,0,0,.025) 0 1px, transparent 1px 4px)'
+              size = 'auto, auto'
+            }
+          } else {
+            img = 'url("' + thumb + '")'
+          }
+          var r = document.documentElement.style
+          r.setProperty('--wp-image', img)
+          r.setProperty('--wp-size', size)
+          r.setProperty('--wp-blur', (wp.blur || 0) + 'px')
+          r.setProperty('--wp-contrast', (wp.contrast || 100) + '%')
+          r.setProperty('--wp-saturate', (wp.saturate || 100) + '%')
+          r.setProperty('--wp-veil', String((wp.veil || 0) / 100))
+          r.setProperty('--wp-grain', '0.008')
+          document.documentElement.setAttribute('data-wallpaper', wp.glass ? 'glass' : 'on')
+        }
+      } catch (e) {}
+      window.BASE_URL = "{{ .BASE_URL }}"
 
     // Dev Mode
     if (window.BASE_URL.charAt(0) === '{') window.BASE_URL = "/app/"
@@ -15,7 +51,9 @@
 </head>
 
 <body>
-  <div id="app"></div>
+  <div id="wp-layer" aria-hidden="true"></div>
+    <div id="wp-veil" aria-hidden="true"></div>
+    <div id="app"></div>
   <script type="module" src="/src/main.ts"></script>
 </body>
 

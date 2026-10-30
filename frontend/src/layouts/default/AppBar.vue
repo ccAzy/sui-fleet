@@ -1,6 +1,6 @@
 <template>
   <v-app-bar :elevation="5">
-    <v-icon v-if="isMobile" icon="mdi-menu" @click="$emit('toggleDrawer')" />
+    <v-icon v-if="isMobile" icon="mdi-menu" role="button" tabindex="0" aria-label="Menu" @click="$emit('toggleDrawer')" />
     <span v-else style="width: 24px"></span>
     <v-app-bar-title :text="$t(<string>route.name)" class="align-center top-title" />
     <v-menu v-if="servers.length > 0 || currentServer">
@@ -25,7 +25,7 @@
     </v-menu>
     <v-menu>
       <template v-slot:activator="{ props }">
-        <v-btn icon v-bind="props">
+        <v-btn icon v-bind="props" :aria-label="$t('language') || 'Language'">
           <v-icon>mdi-translate</v-icon>
         </v-btn>
       </template>
@@ -42,7 +42,7 @@
     </v-menu>
     <v-menu>
       <template v-slot:activator="{ props }">
-        <v-btn icon v-bind="props">
+        <v-btn icon v-bind="props" aria-label="Theme">
           <v-icon>mdi-palette</v-icon>
         </v-btn>
       </template>

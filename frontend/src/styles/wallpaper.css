@@ -1,0 +1,105 @@
+/**
+ * styles/wallpaper.css
+ *
+ * 壁纸只铺「桌面」，不铺「纸」。
+ *
+ * 页面上有两层纸：页面底 `--paper`（桌面）与内容面板 `--surface`（纸）。
+ * 壁纸只替换桌面。所有承载文字的面板保持不透明——半透明面板会同时带来
+ * 两件事：对比度不可控，以及这个世界（1px 线、无阴影、无玻璃）被破坏。
+ * 需要玻璃效果时开 `data-wallpaper="glass"`，那是显式选择的另一套外观。
+ */
+
+#wp-layer,
+#wp-veil {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+#wp-layer {
+  background-color: var(--paper);
+  background-image: var(--wp-image, none);
+  background-size: var(--wp-size, cover);
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: blur(var(--wp-blur, 0px)) saturate(var(--wp-saturate, 100%)) contrast(var(--wp-contrast, 100%));
+  /* blur 会在四边漏出透明缝，稍微放大盖住 */
+  transform: scale(1.06);
+  opacity: 0;
+  transition: opacity 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+html[data-wallpaper='on'] #wp-layer,
+html[data-wallpaper='glass'] #wp-layer {
+  opacity: 1;
+}
+
+/* 遮罩：一层纸色，按比例压在图上。它不是装饰，是对比度工具 */
+#wp-veil {
+  background: var(--paper);
+  opacity: var(--wp-veil, 0);
+  transition: opacity 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* 应用主体浮在壁纸之上 */
+#app {
+  position: relative;
+  z-index: 1;
+}
+
+/* 打开了壁纸：应用容器让位，露出下面的桌面 */
+html[data-wallpaper='on'] .v-application,
+html[data-wallpaper='glass'] .v-application,
+html[data-wallpaper='on'] .v-application__wrap,
+html[data-wallpaper='glass'] .v-application__wrap {
+  background: transparent !important;
+}
+
+/* 半透明面板：显式开启才生效，且把浮层的实心背景一起换掉 */
+html[data-wallpaper='glass'] .v-card:not(.v-overlay .v-card),
+html[data-wallpaper='glass'] .v-sheet:not(.v-overlay .v-sheet) {
+  background: color-mix(in srgb, var(--surface) 78%, transparent) !important;
+  backdrop-filter: blur(14px) saturate(1.1);
+}
+
+html[data-wallpaper='glass'] .v-data-table,
+html[data-wallpaper='glass'] .v-table {
+  background: transparent !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #wp-layer,
+  #wp-veil {
+    transition: none;
+  }
+}
+
+/* 开了壁纸，账簿就要真的「摊在桌上」：
+   内容区从页面底浮起来变成一张纸，壁纸只在纸的四周露出来。
+   不起这一步，Home 的读数会直接压在照片上——对比度守门员算得再准也没用，
+   因为那里的文字本来就没有自己的底面。 */
+html[data-wallpaper='on'] .page-shell,
+html[data-wallpaper='glass'] .page-shell {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  /* 桌面在四周留一圈，纸才有厚度感：视口再宽也至少露出 28px 桌面 */
+  width: min(1240px, calc(100% - 56px));
+  margin: 18px auto 28px;
+  padding: 22px 26px 56px;
+}
+
+html[data-wallpaper='glass'] .page-shell {
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  backdrop-filter: blur(14px) saturate(1.1);
+}
+
+@media (max-width: 960px) {
+  html[data-wallpaper='on'] .page-shell,
+  html[data-wallpaper='glass'] .page-shell {
+    margin: 10px 8px 20px;
+    padding: 14px 14px 40px;
+    border-radius: 2px;
+  }
+}
