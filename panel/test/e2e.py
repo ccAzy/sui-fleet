@@ -153,7 +153,11 @@ check("kernel version reported", kernel.get("version") == "v1.13.18", str(kernel
 load_obj = j(get("/api/load"))["obj"]
 sub_url = load_obj["subURI"]
 check("sub uri has key", "?k=" in sub_url, sub_url)
-sub = get(sub_url.replace(BASE, ""))
+# subURI 是绝对地址（用的是 PANEL_BASE），直接拿它去请求会打到线上。
+# 只取 path+query，拼回本机 BASE——这样本地/线上都能测。
+_sp = urllib.parse.urlsplit(sub_url)
+SUB_PATH = _sp.path + (("?" + _sp.query) if _sp.query else "")
+sub = get(SUB_PATH)
 decoded = base64.b64decode(sub).decode()
 check("subscription", decoded.startswith("vless://"), decoded[:80])
 
@@ -234,11 +238,11 @@ check(
 )
 
 # ---- Clash 订阅 ----
-clash_txt = get(sub_url.replace(BASE, "") + "&type=clash")
+clash_txt = get(SUB_PATH + "&type=clash")
 check("clash 订阅", "proxies:" in clash_txt and "type: vless" in clash_txt and "MATCH,PROXY" in clash_txt, clash_txt[:120])
 
 # ---- sing-box JSON 订阅 ----
-sb = j(get(sub_url.replace(BASE, "") + "&type=singbox"))
+sb = j(get(SUB_PATH + "&type=singbox"))
 check(
     "sing-box 订阅",
     isinstance(sb, list) and len(sb) >= 1 and sb[0].get("type") == "vless" and sb[0].get("server_port") == 443,

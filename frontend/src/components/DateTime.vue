@@ -40,12 +40,21 @@
 </template>
 
 <script lang="ts">
-import DatePicker from 'vue3-persian-datetime-picker'
+import { defineAsyncComponent } from 'vue'
 import { i18n, locale } from '@/locales'
-import 'moment/locale/ru'
-import 'moment/locale/vi'
-import 'moment/locale/zh-cn'
-import 'moment/locale/zh-tw'
+
+// 波斯日历（vue3-persian-datetime-picker）及其 moment 语言包合计 175KB，
+// 只有弹窗里选到期时间才用到。做成异步：主包不再背它，点开弹窗才下载。
+// moment 的 locale 是副作用导入，必须和组件一起异步拉，否则会拖回主包。
+const DatePicker = defineAsyncComponent(async () => {
+  await Promise.all([
+    import('moment/locale/ru'),
+    import('moment/locale/vi'),
+    import('moment/locale/zh-cn'),
+    import('moment/locale/zh-tw'),
+  ])
+  return import('vue3-persian-datetime-picker')
+})
 
 export default {
   props: ['expiry'],

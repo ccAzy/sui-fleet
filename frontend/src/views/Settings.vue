@@ -289,11 +289,13 @@
 
 <script lang="ts" setup>
 import { i18n } from '@/locales'
-import { Ref, computed, inject, onMounted, onUnmounted, ref } from 'vue'
+import { Ref, computed, defineAsyncComponent, inject, onMounted, onUnmounted, ref } from 'vue'
 import HttpUtils, { quietNetworkErrors } from '@/plugins/httputil'
 import { FindDiff } from '@/plugins/utils'
-import SubJsonExtVue from '@/components/SubJsonExt.vue'
-import SubClashExtVue from '@/components/SubClashExt.vue'
+// 订阅扩展只在点开对应 tab 时才需要（JSON/Clash 各占几十 KB），
+// 静态引入会让「打开设置」顺带下载两个用不到的编辑器
+const SubJsonExtVue = defineAsyncComponent(() => import('@/components/SubJsonExt.vue'))
+const SubClashExtVue = defineAsyncComponent(() => import('@/components/SubClashExt.vue'))
 import { push } from 'notivue'
 import {
   DEFAULT_WP,
