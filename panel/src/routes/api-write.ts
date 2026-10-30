@@ -1,13 +1,7 @@
 import type { Hono } from "hono";
 import { setCookie } from "hono/cookie";
 import { COOKIE, login as doLogin, sha256, signJWT } from "../auth";
-import {
-  json,
-  okMsg,
-  randHex,
-  resolveNode,
-  secretOf,
-} from "../http";
+import { json, okMsg, randHex, resolveNode, secretOf } from "../http";
 import { getNode, listNodes, now, run, type Env } from "../db";
 import {
   getConfig,
@@ -422,6 +416,4 @@ export function registerApiWrite(app: Hono<{ Bindings: Env }>) {
   });
 
   // ---------- agent 接口 ----------
-
-
 }

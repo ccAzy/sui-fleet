@@ -5,13 +5,7 @@ import { Hono } from "hono";
 import { deleteCookie, setCookie } from "hono/cookie";
 import { COOKIE, ensureAdmin, login as doLogin, signJWT } from "./auth";
 import { first, now, run, type Env } from "./db";
-import {
-  MARKER_COOKIE,
-  currentUser,
-  json,
-  okMsg,
-  secretOf,
-} from "./http";
+import { MARKER_COOKIE, currentUser, json, okMsg, secretOf } from "./http";
 import { cronTick } from "./cron";
 import { registerSub } from "./routes/sub";
 import { registerAgentApi } from "./routes/agent-api";
@@ -20,19 +14,45 @@ import { registerApiWrite } from "./routes/api-write";
 
 type Ctx = { Bindings: Env };
 
-
 const app = new Hono<Ctx>();
 
 registerSub(app);
 registerAgentApi(app);
 
-// 基础安全响应头（面板自带登录，这几项成本几乎为零）
+// 安全响应头：对所有响应生效（含静态 HTML——它以前完全裸奔，
+// 因为 run_worker_first 只覆盖 /api /agent /sub，页面由 Assets 直接吐出）。
+//
+// 说明两处折中：
+//  - style-src 必须留 'unsafe-inline'：Vue 的 :style 绑定会生成 style 属性。
+//  - img-src 允许 https:：壁纸可以粘任意图片链接（跨域图无法降采样时直接用 URL）。
+// script-src 是 'self'——内联脚本已抽到 /boot.js，没有再放行的理由。
+const SECURITY_HEADERS: Record<string, string> = {
+  "Content-Security-Policy": [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: https:",
+    "font-src 'self' data:",
+    "connect-src 'self' https://cloudflareinsights.com",
+    "frame-ancestors 'none'",
+    "base-uri 'none'",
+    "form-action 'self'",
+    "object-src 'none'",
+  ].join("; "),
+  "Strict-Transport-Security": "max-age=15552000",
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "no-referrer",
+  "Permissions-Policy": "geolocation=(), microphone=(), camera=(), payment=(), usb=()",
+  "Cross-Origin-Opener-Policy": "same-origin",
+  "Cross-Origin-Resource-Policy": "same-origin",
+  // 私有面板不该被搜索引擎收录
+  "X-Robots-Tag": "noindex, nofollow",
+};
+
 app.use("*", async (c, next) => {
   await next();
-  c.header("X-Content-Type-Options", "nosniff");
-  c.header("X-Frame-Options", "DENY");
-  c.header("Referrer-Policy", "no-referrer");
-  c.header("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
+  for (const [k, v] of Object.entries(SECURITY_HEADERS)) c.header(k, v);
 });
 
 // ---------- 登录 ----------
@@ -143,7 +163,14 @@ app.all("/__cron", async (c) => {
   return c.text("ok");
 });
 
-app.get("/", (c) => c.text("s-ui cloud panel"));
+// 未命中任何 Worker 路由 = 前端静态资源（含 SPA 深链兜底）。
+// 交给 Assets 取，然后补上同一套安全头——静态响应不经过上面的 c.header。
+app.notFound(async (c) => {
+  const res = await c.env.ASSETS.fetch(c.req.raw);
+  const out = new Response(res.body, res);
+  for (const [k, v] of Object.entries(SECURITY_HEADERS)) out.headers.set(k, v);
+  return out;
+});
 
 export default {
   fetch: app.fetch,

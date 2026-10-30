@@ -1,8 +1,14 @@
 // D1 访问层：薄封装 + 行类型，避免 handler 里散落 SQL 与 any。
 import type { D1Database, D1PreparedStatement, D1Result } from '@cloudflare/workers-types'
 
+/** 静态资源绑定：只声明我们要用到的 fetch，签名按 DOM 类型写。 */
+export type AssetsBinding = {
+  fetch: (input: Request) => Promise<Response>
+}
+
 export type Env = {
   DB: D1Database
+  ASSETS: AssetsBinding
   JWT_SECRET: string
   PANEL_BASE: string
   ADMIN_USER?: string

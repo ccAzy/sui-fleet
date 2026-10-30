@@ -259,7 +259,12 @@ export function registerApiRead(app: Hono<{ Bindings: Env }>) {
     const tag = c.req.query("tag") ?? "";
     const limit = Math.min(parseInt(c.req.query("limit") ?? "1", 10) || 1, 168);
     const since = now() - limit * 3600;
-    const rows = await all<{ ts: number; tag: string; up: number; down: number }>(
+    const rows = await all<{
+      ts: number;
+      tag: string;
+      up: number;
+      down: number;
+    }>(
       c.env.DB,
       "SELECT ts, tag, up, down FROM usage WHERE node_id = ? AND ts > ?" +
         (tag ? " AND tag = ?" : "") +
@@ -274,7 +279,12 @@ export function registerApiRead(app: Hono<{ Bindings: Env }>) {
     }> = [];
     for (const r of rows) {
       if (r.up > 0)
-        out.push({ dateTime: r.ts, direction: true, traffic: r.up, tag: r.tag });
+        out.push({
+          dateTime: r.ts,
+          direction: true,
+          traffic: r.up,
+          tag: r.tag,
+        });
       if (r.down > 0)
         out.push({
           dateTime: r.ts,
@@ -366,5 +376,4 @@ export function registerApiRead(app: Hono<{ Bindings: Env }>) {
   });
 
   /** servers 对象映射到 nodes 表（前端的服务器管理页直接可用来建/改/删节点）。 */
-
 }

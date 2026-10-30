@@ -12,8 +12,7 @@ const VLESS =
   "?type=tcp&security=reality&pbk=TrsKws6hJseeVGwMIqUtY9z_uZLwUpmBC_nX9DgRrBc" +
   "&fp=chrome&sni=www.apple.com&sid=84223ca3&flow=xtls-rprx-vision#vless-test";
 
-const SS =
-  "ss://YWVzLTI1Ni1nY206cGFzc3dvcmQ=@5.6.7.8:8388#ss-test";
+const SS = "ss://YWVzLTI1Ni1nY206cGFzc3dvcmQ=@5.6.7.8:8388#ss-test";
 
 const HY2 = "hysteria2://pass@9.9.9.9:443?sni=www.bing.com#hy2-test";
 

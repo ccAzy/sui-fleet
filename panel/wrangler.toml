@@ -30,4 +30,6 @@ binding = "ASSETS"
 not_found_handling = "single-page-application"
 
 # API / agent / 订阅走 Worker，其余交给静态资源
-run_worker_first = ["/api/*", "/agent/*", "/sub/*", "/__cron"]
+# 全部走 Worker：静态 HTML 也必须经过 Worker，否则拿不到安全响应头
+# （之前只覆盖 /api /agent /sub，页面由 Assets 直出 = 无 XFO/CSP/HSTS）
+run_worker_first = ["/*"]

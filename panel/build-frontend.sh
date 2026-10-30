@@ -40,11 +40,9 @@ for sub in ['assets', '.']:
             print('pruned', rel)
 PY
 
-# 前端 index.html 里 window.BASE_URL 由 Go 模板注入，这里是静态托管，
-# 直接固定成 "/"：路由和 axios 的相对路径都会解析到根。
-sed -i 's|{{ .BASE_URL }}|/|g' "$OUT/index.html"
-sed -i 's|window.BASE_URL = "/app/"|window.BASE_URL = "/"|g' "$OUT/index.html"
-grep -o 'window.BASE_URL = "[^"]*"' "$OUT/index.html" | head -2
+# BASE_URL 不再由 sed 注入：index.html 里已经没有内联脚本，
+# 改由 frontend/public/boot.js 在首帧前给出（见该文件注释——抽出去是为了 CSP 能写死 'self'）。
+grep -o '<script src="[^"]*"></script>' "$OUT/index.html" | head -2
 
 # 完整性门禁：panel/frontend-dist 是提交进仓库、直接上传到 Worker 的产物。
 # 曾被 pi-lens 的 autofix 在打包后改写压缩代码（let→const 等），造成线上白屏——
