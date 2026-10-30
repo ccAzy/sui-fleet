@@ -83,7 +83,13 @@ export async function cronTick(db: D1Database): Promise<void> {
         )
       }
     }
-    if (stmts.length) await batch(db, stmts)
+    if (stmts.length) {
+      await batch(db, stmts)
+      // 关键：cron 改了 client（重置归零 / 超额停用 / 延迟启动）必须推进 revision，
+      // 否则节点永远收不到这次变化——月度重置后节点还按旧的 up/down 判断，
+      // 结果是"面板已经清零，节点侧仍然把用户停着"。
+      await run(db, 'UPDATE nodes SET revision = revision + 1, updated_at = ? WHERE id = ?', ts, n.id)
+    }
   }
 
   // 3) 用量明细只留 30 天
