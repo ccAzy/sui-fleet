@@ -3,7 +3,11 @@
 把 **s-ui 的管理面板**放到 Cloudflare，代理节点仍然跑在你自己的服务器上。
 
 [![License: GPL v3](https://img.shields.io/badge/license-GPL%20V3-blue.svg)](./LICENSE)
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/YOUR_GITHUB_USER/sui-cf/tree/main/panel)
 
+> 上面的按钮：点一下就用你自己的 Cloudflare 账号跑起来。Cloudflare 会 fork 仓库到你的 GitHub、**自动创建 D1 数据库**、构建并部署，最后提示你填 `ADMIN_PASS`。
+> （把 `YOUR_GITHUB_USER` 换成实际仓库地址后才能点。）
+>
 > 仅用于个人学习与交流，请遵守你所在地区的法律法规。上游版权归原作者所有。
 
 ---
@@ -50,25 +54,45 @@
 
 需要：Node.js 18+、Cloudflare 账号、（推荐）一个自己的域名。
 
-```bash
-# 构建前端（产物在 frontend-dist/）
-cd panel && npm install && npm run build:web
-cp wrangler.toml.example wrangler.toml   # 真实配置不入库
+#### 方式 A：一键（点按钮）
 
-# 建库，把返回的 database_id 填进 panel/wrangler.toml
-npx wrangler login
-npx wrangler d1 create sui-panel
-
-# 建表 + 部署
-npx wrangler d1 execute DB --remote --file=./schema.sql
-npx wrangler deploy
-
-# 设管理员密码（必须在 deploy 之后，secret 要求 Worker 已存在）
-npx wrangler secret put ADMIN_PASS
-npx wrangler secret put JWT_SECRET
+```markdown
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/YOUR_GITHUB_USER/sui-cf/tree/main/panel)
 ```
 
-`panel/wrangler.toml` 里要改两处：`database_id`、`PANEL_BASE`（你的面板域名）。
+Cloudflare 会读仓库里的 `panel/wrangler.toml`，自动创建 D1 并把真实 `database_id` 回填到你克隆出的仓库，然后部署。前端产物（`panel/frontend-dist`）已随仓库提交，所以**部署时不需要构建**。
+
+#### 方式 B：一条命令（本地跑）
+
+```bash
+cd panel
+bash deploy.sh --domain panel.example.com   # 不填域名则只能用 *.workers.dev
+```
+
+脚本会依次完成：装依赖 → 构建前端 → 登录 → 建 D1（幂等，不会重复建）→ 填真实 `database_id` → 建表 → 部署 → 设 `ADMIN_PASS` / `JWT_SECRET`。
+
+#### 方式 C：手动
+
+```bash
+cd panel
+npm install && npm run build:web        # 产物写到 panel/frontend-dist
+cp wrangler.toml wrangler.local.toml    # 真实配置用 local，不入库
+npx wrangler login
+npx wrangler d1 create sui-panel        # 把返回的 database_id 填进 wrangler.local.toml
+npm run deploy:local                    # 建表 + 部署（都会用 local 配置）
+
+npx wrangler --config wrangler.local.toml secret put ADMIN_PASS
+npx wrangler --config wrangler.local.toml secret put JWT_SECRET
+```
+
+#### 两份配置的区别（重要）
+
+| 文件 | 是否入库 | 用途 |
+| --- | --- | --- |
+| `wrangler.toml` | ✅ 入库 | 占位版，给 Deploy 按钮读。`database_id` 是全零占位，Cloudflare 部署时自动回填 |
+| `wrangler.local.toml` | ❌ gitignore | 你本地的真实配置：真实 `database_id`、面板域名、自定义域名路由 |
+
+**不要直接改 `wrangler.toml` 里的 `database_id`** —— 那是共享的占位文件。改 `wrangler.local.toml`，并用 `--config wrangler.local.toml`（或 `npm run deploy:local`）。
 
 ### 2. 接入节点
 
@@ -93,8 +117,11 @@ cd /root && bash install-agent.sh \
 ```text
 panel/            Cloudflare Worker（Hono + D1 + 静态前端托管）
   src/            路由、对象语义、agent 协议、订阅、备份、定时任务
-  schema.sql      D1 表结构
-  wrangler.toml   ★ 部署前改 database_id 和 PANEL_BASE
+  schema.sql      D1 表结构（幂等，可重复执行）
+  frontend-dist/  前端构建产物（★ 已提交，一键部署时无需构建）
+  wrangler.toml   ★ 占位配置（入库，供 Deploy 按钮读取）
+  wrangler.local.toml  你的真实配置（gitignore）
+  .dev.vars.example    本地 secret 模板（ADMIN_PASS / JWT_SECRET）
   test/e2e.py     32 项端到端自检
 
 frontend/         前端（Vue 3 + Vuetify），派生自 s-ui-frontend

@@ -1,7 +1,6 @@
 # 依赖与构建产物（开源仓库只放源码）
 node_modules/
 .wrangler/
-frontend-dist/
 dist/
 *.log
 
@@ -16,9 +15,15 @@ db/
 .idea/
 .vscode/
 .tmp/
-panel/wrangler.toml
+
+# 本地真实配置（含 database_id / 域名，绝不入库）
+panel/wrangler.local.toml
+panel/.dev.vars
 
 # 本地备份
 *.bak
 *.bak-*
 *.before-*
+
+# 本地验证截图
+shots/

@@ -1029,6 +1029,13 @@ app.get("/sub/:nodeId", async (c) => {
   }
 
   let clientFilter = (c.req.query("client") ?? "").trim();
+  // 与 k 同理：老前端把 `?format=` 拼在 client 后面，整段会算进 client 值，
+  // 导致名字永远匹配不上、静默返回空订阅。这里拆出来。
+  const clientQ = clientFilter.indexOf("?");
+  if (clientQ >= 0) {
+    if (!embeddedQuery) embeddedQuery = clientFilter.slice(clientQ + 1);
+    clientFilter = clientFilter.slice(0, clientQ).trim();
+  }
   if (rawKey !== node.sub_key) {
     if (!rawKey.startsWith(node.sub_key)) return c.text("forbidden", 403);
     if (!clientFilter) clientFilter = rawKey.slice(node.sub_key.length).trim();
@@ -1073,6 +1080,14 @@ app.get("/sub/:nodeId", async (c) => {
     "Subscription-Userinfo": `upload=${up}; download=${down}; total=${total}; expire=${expire}`,
     "Cache-Control": "no-store",
   };
+
+  // 过滤后为空又确实指定了 client：说明名字对不上（拼错/已删除/被禁用）。
+  // 直接报 404 并带上名字，避免客户端拿到 200 + 空内容却无从排查。
+  if (links.length === 0 && clientFilter) {
+    return c.text(`client not found: ${clientFilter}`, 404, {
+      "Cache-Control": "no-store",
+    });
+  }
 
   // ?type=clash 输出 mihomo/Clash 可直接导入的 YAML；默认仍是 base64 链接列表
   const subType = (

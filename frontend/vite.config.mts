@@ -5,15 +5,6 @@ import vuetify, { transformAssetUrls } from 'vite-plugin-vuetify'
 // Utilities
 import { defineConfig } from 'vite'
 import { fileURLToPath, URL } from 'node:url'
-import { randomBytes } from 'crypto'
-
-function getUniqueFileName(template: string): string {
-  if (template.includes('.js') || template.includes('.css')) {
-    const hash = randomBytes(8).toString('hex')
-    return template.replace('[name]', hash)
-  }
-  return template
-}
 
 export default defineConfig({
   base: '',
@@ -32,18 +23,22 @@ export default defineConfig({
     manifest: false,
     outDir: 'dist',
     chunkSizeWarningLimit: 2000,
-    rollupOptions: {
+    // Vite 8 用 Rolldown：rollupOptions 已更名 rolldownOptions。
+    // codeSplitting 必须开（上游 s-ui 原本关掉打单包 1.9MB）：
+    // 关掉后 chart.js / 各路由页面全进首屏，开掉后只有首页需要的才首屏下载。
+    // 文件名用内容哈希 [hash]（原来是随机 8 字节，每次构建都变，缓存彻底失效）。
+    rolldownOptions: {
       output: {
-        codeSplitting: false,
-        entryFileNames: getUniqueFileName('assets/[name].js'),
-        chunkFileNames: getUniqueFileName('assets/[name].js'),
+        entryFileNames: 'assets/[name]-[hash].js',
+        chunkFileNames: 'assets/[name]-[hash].js',
         assetFileNames: (assetInfo) => {
-          if (assetInfo.names.some(name => name.endsWith('.css')))
-            return getUniqueFileName('assets/[name].css')
-          return 'assets/' + assetInfo.names[0]
+          const hashed = assetInfo.names.some(name => name.endsWith('.css'))
+            ? 'assets/[name]-[hash].css'
+            : 'assets/[name]-[hash][extname]'
+          return hashed
         },
       },
-    }
+    },
   },
   define: { 'process.env': {} },
   resolve: {

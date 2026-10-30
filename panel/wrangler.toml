@@ -1,0 +1,33 @@
+# 这份配置是给「Deploy to Cloudflare」按钮和首次部署用的占位版。
+# Cloudflare 会在部署时自动创建 D1 并回填真实 database_id 到用户自己克隆的仓库。
+#
+# 本地开发/部署请不要改这份文件 —— 改用 wrangler.local.toml（已被 .gitignore 忽略）：
+#   cp wrangler.toml wrangler.local.toml
+#   然后填入真实的 database_id、PANEL_BASE 和自定义域名
+#   npx wrangler deploy --config wrangler.local.toml
+
+name = "sui-panel"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "sui-panel"
+database_id = "00000000-0000-0000-0000-000000000000"
+
+[triggers]
+crons = ["*/2 * * * *"]
+
+[vars]
+# 部署后改成你的面板域名，例如 https://panel.example.com
+PANEL_BASE = "http://127.0.0.1:8787"
+
+# 前端静态资源（panel/frontend-dist，已随仓库提交，部署时无需构建）
+[assets]
+directory = "./frontend-dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+# API / agent / 订阅走 Worker，其余交给静态资源
+run_worker_first = ["/api/*", "/agent/*", "/sub/*", "/__cron"]

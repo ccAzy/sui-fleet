@@ -4,10 +4,11 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
-    "db:init": "wrangler d1 execute DB --local --file=./schema.sql",
-    "db:init:remote": "wrangler d1 execute DB --remote --file=./schema.sql",
+    "dev": "wrangler dev --config wrangler.local.toml",
+    "deploy": "wrangler d1 execute DB --remote --file=./schema.sql && wrangler deploy",
+    "deploy:local": "wrangler d1 execute DB --remote --file=./schema.sql --config wrangler.local.toml && wrangler deploy --config wrangler.local.toml",
+    "db:init": "wrangler d1 execute DB --local --file=./schema.sql --config wrangler.local.toml",
+    "db:init:remote": "wrangler d1 execute DB --remote --file=./schema.sql --config wrangler.local.toml",
     "build:web": "bash ./build-frontend.sh"
   },
   "devDependencies": {
@@ -19,5 +20,15 @@
     "@peculiar/x509": "^3.1.0",
     "hono": "^4.6.14",
     "reflect-metadata": "^0.2.2"
+  },
+  "cloudflare": {
+    "bindings": {
+      "ADMIN_PASS": {
+        "description": "面板管理员密码，首次部署后用它登录（用户名 admin）。设得强一点，这个面板管着你所有节点。"
+      },
+      "JWT_SECRET": {
+        "description": "登录会话的签名密钥。留空会自动生成并存进 D1；想自己控就填 `openssl rand -hex 32` 的输出。"
+      }
+    }
   }
 }

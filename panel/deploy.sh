@@ -12,22 +12,46 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
+# 真实配置放 wrangler.local.toml（已被 .gitignore 忽略）；
+# wrangler.toml 是给 Deploy 按钮用的占位版，不要直接改。
+CFG="wrangler.local.toml"
+if [ ! -f "$CFG" ]; then
+  [ -f wrangler.toml ] || {
+    echo "缺少 wrangler.toml，无法初始化配置" >&2
+    exit 1
+  }
+  cp wrangler.toml "$CFG"
+  echo "已从 wrangler.toml 生成 $CFG（占位值会在下面被填成真实值）"
+fi
+
 DOMAIN=""
 while [ $# -gt 0 ]; do
   case "$1" in
-    --domain) DOMAIN="$2"; shift 2 ;;
-    -h|--help) sed -n '2,12p' "$0"; exit 0 ;;
-    *) echo "unknown arg: $1" >&2; exit 2 ;;
+  --domain)
+    DOMAIN="$2"
+    shift 2
+    ;;
+  -h | --help)
+    sed -n '2,12p' "$0"
+    exit 0
+    ;;
+  *)
+    echo "unknown arg: $1" >&2
+    exit 2
+    ;;
   esac
 done
 
-say()  { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
+say() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 warn() { printf '\033[33m%s\033[0m\n' "$*"; }
-die()  { printf '\033[31m✗ %s\033[0m\n' "$*" >&2; exit 1; }
+die() {
+  printf '\033[31m✗ %s\033[0m\n' "$*" >&2
+  exit 1
+}
 
 # ---------------------------------------------------------------- 环境
 command -v node >/dev/null || die "没装 Node.js（需要 18+）"
-command -v npm  >/dev/null || die "没装 npm"
+command -v npm >/dev/null || die "没装 npm"
 NODE_MAJOR=$(node -p 'process.versions.node.split(".")[0]')
 [ "$NODE_MAJOR" -ge 18 ] || die "Node 版本太低（当前 $NODE_MAJOR，需要 18+）"
 
@@ -41,45 +65,45 @@ if [ ! -d node_modules ]; then
   npm install --no-audit --no-fund
 fi
 
-say "构建前端（产物写到 ../frontend-dist）"
+say "构建前端（产物写到 panel/frontend-dist，已随仓库提交）"
 npm run build:web
 
 # ---------------------------------------------------------------- 登录
 say "检查 Cloudflare 登录状态"
-if ! npx wrangler whoami >/dev/null 2>&1; then
+if ! npx wrangler --config "$CFG" whoami >/dev/null 2>&1; then
   warn "还没登录，接下来会打开浏览器授权"
   npx wrangler login
 fi
-ACCOUNT=$(npx wrangler whoami 2>/dev/null | grep -oE '[a-f0-9]{32}' | head -1 || true)
+ACCOUNT=$(npx wrangler --config "$CFG" whoami 2>/dev/null | grep -oE '[a-f0-9]{32}' | head -1 || true)
 [ -n "$ACCOUNT" ] && echo "账号 ID: $ACCOUNT"
 
 # ---------------------------------------------------------------- 建库（幂等）
-DB_NAME=$(grep -oE 'database_name *= *"[^"]+"' wrangler.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+DB_NAME=$(grep -oE 'database_name *= *"[^"]+"' "$CFG" | head -1 | sed 's/.*"\(.*\)"/\1/')
 DB_NAME=${DB_NAME:-sui-panel}
 
 say "检查 D1 数据库 $DB_NAME"
-EXISTING_ID=$(npx wrangler d1 list --json 2>/dev/null \
-  | tr -d '\n' \
-  | grep -oE "\{[^{}]*\"name\"[^{}]*\"$DB_NAME\"[^{}]*\}" \
-  | grep -oE '"uuid" *: *"[^"]+"' | head -1 | sed 's/.*"\(.*\)"/\1/' || true)
+EXISTING_ID=$(npx wrangler --config "$CFG" d1 list --json 2>/dev/null |
+  tr -d '\n' |
+  grep -oE "\{[^{}]*\"name\"[^{}]*\"$DB_NAME\"[^{}]*\}" |
+  grep -oE '"uuid" *: *"[^"]+"' | head -1 | sed 's/.*"\(.*\)"/\1/' || true)
 
 if [ -z "$EXISTING_ID" ]; then
   say "创建 D1 数据库 $DB_NAME"
-  npx wrangler d1 create "$DB_NAME"
-  EXISTING_ID=$(npx wrangler d1 list --json 2>/dev/null \
-    | tr -d '\n' \
-    | grep -oE "\{[^{}]*\"name\"[^{}]*\"$DB_NAME\"[^{}]*\}" \
-    | grep -oE '"uuid" *: *"[^"]+"' | head -1 | sed 's/.*"\(.*\)"/\1/' || true)
+  npx wrangler --config "$CFG" d1 create "$DB_NAME"
+  EXISTING_ID=$(npx wrangler --config "$CFG" d1 list --json 2>/dev/null |
+    tr -d '\n' |
+    grep -oE "\{[^{}]*\"name\"[^{}]*\"$DB_NAME\"[^{}]*\}" |
+    grep -oE '"uuid" *: *"[^"]+"' | head -1 | sed 's/.*"\(.*\)"/\1/' || true)
 fi
 [ -n "$EXISTING_ID" ] || die "拿不到 database_id，请到 Dashboard 确认 D1 是否创建成功"
 echo "database_id: $EXISTING_ID"
 
 # ---------------------------------------------------------------- 写配置
-say "写入 wrangler.toml"
+say "写入 wrangler.local.toml"
 python - "$EXISTING_ID" "$DOMAIN" <<'PY'
 import re, sys, pathlib
 db_id, domain = sys.argv[1], sys.argv[2]
-p = pathlib.Path('wrangler.toml')
+p = pathlib.Path('wrangler.local.toml')
 s = p.read_text(encoding='utf-8')
 s = re.sub(r'database_id *= *"[^"]*"', f'database_id = "{db_id}"', s)
 if domain:
@@ -95,23 +119,23 @@ PY
 
 # ---------------------------------------------------------------- 建表
 say "建表（schema.sql）"
-npx wrangler d1 execute DB --remote --file=./schema.sql
+npx wrangler --config "$CFG" d1 execute DB --remote --file=./schema.sql
 
 # ---------------------------------------------------------------- 部署
 say "部署 Worker"
-npx wrangler deploy
+npx wrangler --config "$CFG" deploy
 
 # ---------------------------------------------------------------- 密钥
 say "设置管理员密码"
 echo "（登录用；不设则默认 admin/admin 且强制首次改密）"
-if npx wrangler secret put ADMIN_PASS; then
+if npx wrangler --config "$CFG" secret put ADMIN_PASS; then
   echo "ADMIN_PASS 已设置"
 else
   warn "跳过 ADMIN_PASS"
 fi
 
 say "设置 JWT 签名密钥（可留空，面板会自动生成并存库）"
-npx wrangler secret put JWT_SECRET || warn "跳过 JWT_SECRET"
+npx wrangler --config "$CFG" secret put JWT_SECRET || warn "跳过 JWT_SECRET"
 
 # ---------------------------------------------------------------- 收尾
 say "部署完成"

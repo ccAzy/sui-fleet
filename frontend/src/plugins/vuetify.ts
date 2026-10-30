@@ -6,7 +6,9 @@
  *
  * 明暗由 localStorage 的 `theme` 决定：light | dark | system。
  */
-import '@mdi/font/css/materialdesignicons.css'
+// 图标：只打包用到的 122 个 MDI 图标（node scripts/subset-mdi.mjs 生成），
+// 全量 @mdi/font 是 7492 类 + 4 种字体格式 3.6MB，国内首屏不划算。
+import '@/styles/mdi-subset.css'
 import 'vuetify/styles/main.css'
 
 import { fa, en, vi, zhHans, zhHant, ru } from 'vuetify/locale'

@@ -2,6 +2,7 @@
   "ignore": [
     "node/**",
     "frontend/**",
+    "panel/frontend-dist/**",
     "**/node_modules/**",
     ".wrangler/**",
     "docs/**"

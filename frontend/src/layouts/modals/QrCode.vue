@@ -36,13 +36,13 @@
             <v-row>
               <v-col style="text-align: center;">
                 <v-chip>{{ $t('setting.jsonSub') }}</v-chip><br />
-                <QrcodeVue :value="clientSub + '?format=json'" :size="size" @click="copyToClipboard(clientSub + '?format=json')" :margin="1" style="border-radius: 1rem; cursor: copy;" />
+                <QrcodeVue :value="clientSub + '&format=json'" :size="size" @click="copyToClipboard(clientSub + '&format=json')" :margin="1" style="border-radius: 1rem; cursor: copy;" />
               </v-col>
             </v-row>
             <v-row>
               <v-col style="text-align: center;">
                 <v-chip>{{ $t('setting.clashSub') }}</v-chip><br />
-                <QrcodeVue :value="clientSub + '?format=clash'" :size="size" @click="copyToClipboard(clientSub + '?format=clash')" :margin="1" style="border-radius: 1rem; cursor: copy;" />
+                <QrcodeVue :value="clientSub + '&format=clash'" :size="size" @click="copyToClipboard(clientSub + '&format=clash')" :margin="1" style="border-radius: 1rem; cursor: copy;" />
               </v-col>
             </v-row>
             <v-row>
