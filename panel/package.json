@@ -9,11 +9,13 @@
     "deploy:local": "wrangler d1 execute DB --remote --file=./schema.sql --config wrangler.local.toml && wrangler deploy --config wrangler.local.toml",
     "db:init": "wrangler d1 execute DB --local --file=./schema.sql --config wrangler.local.toml",
     "db:init:remote": "wrangler d1 execute DB --remote --file=./schema.sql --config wrangler.local.toml",
-    "build:web": "bash ./build-frontend.sh"
+    "build:web": "bash ./build-frontend.sh",
+    "test:unit": "vitest run"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261023.1",
     "typescript": "^5.7.2",
+    "vitest": "^5.0.5",
     "wrangler": "^4.154.0"
   },
   "dependencies": {

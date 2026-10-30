@@ -38,7 +38,8 @@ export function registerSub(app: Hono<{ Bindings: Env }>) {
     }
     if (rawKey !== node.sub_key) {
       if (!rawKey.startsWith(node.sub_key)) return c.text("forbidden", 403);
-      if (!clientFilter) clientFilter = rawKey.slice(node.sub_key.length).trim();
+      if (!clientFilter)
+        clientFilter = rawKey.slice(node.sub_key.length).trim();
     }
 
     const embedded = new URLSearchParams(embeddedQuery);
@@ -103,14 +104,20 @@ export function registerSub(app: Hono<{ Bindings: Env }>) {
       });
     }
     if (subType === "singbox" || subType === "json") {
-      return c.body(JSON.stringify(buildSingboxOutbounds(links), null, 2), 200, {
-        ...subHeaders,
-        "Content-Type": "application/json; charset=utf-8",
-      });
+      return c.body(
+        JSON.stringify(buildSingboxOutbounds(links), null, 2),
+        200,
+        {
+          ...subHeaders,
+          "Content-Type": "application/json; charset=utf-8",
+        },
+      );
     }
 
     const text = links.join(String.fromCharCode(10));
-    const payload = btoa(String.fromCharCode(...new TextEncoder().encode(text)));
+    const payload = btoa(
+      String.fromCharCode(...new TextEncoder().encode(text)),
+    );
     return c.text(payload, 200, {
       ...subHeaders,
       "Content-Type": "text/plain; charset=utf-8",

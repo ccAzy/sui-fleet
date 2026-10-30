@@ -26,8 +26,14 @@ export function registerAgentApi(app: Hono<{ Bindings: Env }>) {
   app.post("/agent/pull", async (c) => {
     const node = await agentNode(c);
     if (!node) return c.json({ ok: false, error: "unauthorized" }, 401);
-    const body = (await c.req.json().catch(() => ({}))) as { revision?: number };
-    const payload = await pullPayload(c.env.DB, node, Number(body.revision ?? 0));
+    const body = (await c.req.json().catch(() => ({}))) as {
+      revision?: number;
+    };
+    const payload = await pullPayload(
+      c.env.DB,
+      node,
+      Number(body.revision ?? 0),
+    );
     if (!payload)
       return c.json({ ok: true, unchanged: true, revision: node.revision });
     return c.json({ ok: true, unchanged: false, ...payload });

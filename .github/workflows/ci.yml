@@ -20,6 +20,9 @@ jobs:
         working-directory: panel
       - run: npx tsc --noEmit
         working-directory: panel
+      - name: 单元测试（链接 → Clash / sing-box 配置）
+        run: npm run test:unit
+        working-directory: panel
       - name: wrangler 打包（不部署）
         run: npx wrangler deploy --dry-run --outdir dist
         working-directory: panel
@@ -53,8 +56,10 @@ jobs:
         env:
           CGO_ENABLED: "1"
         run: |
-          go build \
-            -tags "with_quic,with_grpc,with_utls,with_acme,with_gvisor,badlinkname,tfogo_checklinkname0,with_tailscale" \
+          # 标签串太长，拆成两行拼：单行版超过 80 列，CI 的 markdown/yaml 行宽检查会拦
+          TAGS="with_quic,with_grpc,with_utls,with_acme,with_gvisor,"
+          TAGS="${TAGS}badlinkname,tfogo_checklinkname0,with_tailscale"
+          go build -tags "$TAGS" \
             -ldflags '-w -s -checklinkname=0' \
             -o /tmp/sui-agent .
           ls -lh /tmp/sui-agent

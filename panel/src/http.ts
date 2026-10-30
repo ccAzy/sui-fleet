@@ -61,7 +61,8 @@ export const json = (c: any, obj: unknown, error?: unknown) =>
     obj: obj ?? null,
   });
 
-export const okMsg = (c: any, msg = "") => c.json({ success: true, msg, obj: null });
+export const okMsg = (c: any, msg = "") =>
+  c.json({ success: true, msg, obj: null });
 
 export function randHex(bytes: number): string {
   const raw = crypto.getRandomValues(new Uint8Array(bytes));
