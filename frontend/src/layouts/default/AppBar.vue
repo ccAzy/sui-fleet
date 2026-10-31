@@ -11,7 +11,7 @@
           {{ currentServerName || $t('server.local') }}
         </v-btn>
       </template>
-      <v-list density="compact" nav class="node-menu">
+      <div class="node-menu">
         <div class="node-sort" role="group" :aria-label="$t('server.sortBy')">
           <button
             v-for="k in sortKeys"
@@ -25,27 +25,29 @@
             {{ $t(k.label) }}<span v-if="sortBy.key === k.key" class="node-sort__dir" aria-hidden="true">{{ sortBy.dir === 1 ? '↑' : '↓' }}</span>
           </button>
         </div>
-        <v-list-item @click="selectServer('')" :active="currentServer === ''">
-          <template v-slot:prepend><v-icon icon="mdi-home"></v-icon></template>
-          <v-list-item-title>{{ $t('server.local') }}</v-list-item-title>
-        </v-list-item>
-        <v-divider></v-divider>
-        <v-list-item
-          v-for="s in sortedServers"
-          :key="s.id"
-          @click="selectServer(String(s.id))"
-          :active="currentServer === String(s.id)"
-          :class="{ 'is-down': s.enabled === false }"
-        >
-          <template v-slot:prepend>
-            <span class="node-dot" :class="{ 'is-on': s.core_state === 'running' }" aria-hidden="true"></span>
-          </template>
-          <v-list-item-title class="node-name">{{ s.name }}</v-list-item-title>
-          <v-list-item-subtitle class="node-meta">
-            {{ s.kernel_ver || '—' }}<span class="sep">·</span>{{ ago(s.last_seen) }}
-          </v-list-item-subtitle>
-        </v-list-item>
-      </v-list>
+        <v-list density="compact" nav>
+          <v-list-item @click="selectServer('')" :active="currentServer === ''">
+            <template v-slot:prepend><v-icon icon="mdi-home"></v-icon></template>
+            <v-list-item-title>{{ $t('server.local') }}</v-list-item-title>
+          </v-list-item>
+          <v-divider></v-divider>
+          <v-list-item
+            v-for="s in sortedServers"
+            :key="s.id"
+            @click="selectServer(String(s.id))"
+            :active="currentServer === String(s.id)"
+            :class="{ 'is-down': s.enabled === false }"
+          >
+            <template v-slot:prepend>
+              <span class="node-dot" :class="{ 'is-on': s.core_state === 'running' }" aria-hidden="true"></span>
+            </template>
+            <v-list-item-title class="node-name">{{ s.name }}</v-list-item-title>
+            <v-list-item-subtitle class="node-meta">
+              {{ s.kernel_ver || '—' }}<span class="sep">·</span>{{ ago(s.last_seen) }}
+            </v-list-item-subtitle>
+          </v-list-item>
+        </v-list>
+      </div>
     </v-menu>
     <v-menu>
       <template v-slot:activator="{ props }">
@@ -206,6 +208,7 @@ const changeTheme = (m: ThemeMode) => {
 /* ---- 节点下拉：排序条 + 两行条目（账簿风：细规则线，不靠色块）---- */
 .node-menu {
   min-width: 260px;
+  background: rgb(var(--v-theme-surface));
 }
 .node-sort {
   display: flex;
