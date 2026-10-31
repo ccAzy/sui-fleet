@@ -1,0 +1,1 @@
+import{$n as e,br as t,gr as n,vr as r}from"./index-CeJdBESr.js";function i(){let i=r(!1);return e(()=>{window.requestAnimationFrame(()=>{i.value=!0})}),{ssrBootStyles:t(()=>i.value?void 0:{transition:`none !important`}),isBooted:n(i)}}export{i as t};

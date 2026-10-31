@@ -11,15 +11,39 @@
           {{ currentServerName || $t('server.local') }}
         </v-btn>
       </template>
-      <v-list density="compact" nav>
+      <v-list density="compact" nav class="node-menu">
+        <div class="node-sort" role="group" :aria-label="$t('server.sortBy')">
+          <button
+            v-for="k in sortKeys"
+            :key="k.key"
+            type="button"
+            class="node-sort__btn"
+            :class="{ 'is-on': sortBy.key === k.key }"
+            :aria-pressed="sortBy.key === k.key"
+            @click="setSort(k.key)"
+          >
+            {{ $t(k.label) }}<span v-if="sortBy.key === k.key" class="node-sort__dir" aria-hidden="true">{{ sortBy.dir === 1 ? '↑' : '↓' }}</span>
+          </button>
+        </div>
         <v-list-item @click="selectServer('')" :active="currentServer === ''">
           <template v-slot:prepend><v-icon icon="mdi-home"></v-icon></template>
           <v-list-item-title>{{ $t('server.local') }}</v-list-item-title>
         </v-list-item>
         <v-divider></v-divider>
-        <v-list-item v-for="s in servers" :key="s.id" @click="selectServer(String(s.id))" :active="currentServer === String(s.id)">
-          <template v-slot:prepend><v-icon icon="mdi-server"></v-icon></template>
-          <v-list-item-title>{{ s.name }}</v-list-item-title>
+        <v-list-item
+          v-for="s in sortedServers"
+          :key="s.id"
+          @click="selectServer(String(s.id))"
+          :active="currentServer === String(s.id)"
+          :class="{ 'is-down': s.enabled === false }"
+        >
+          <template v-slot:prepend>
+            <span class="node-dot" :class="{ 'is-on': s.core_state === 'running' }" aria-hidden="true"></span>
+          </template>
+          <v-list-item-title class="node-name">{{ s.name }}</v-list-item-title>
+          <v-list-item-subtitle class="node-meta">
+            {{ s.kernel_ver || '—' }}<span class="sep">·</span>{{ ago(s.last_seen) }}
+          </v-list-item-subtitle>
         </v-list-item>
       </v-list>
     </v-menu>
@@ -75,6 +99,60 @@ import { applyThemeMode, savedThemeMode } from '@/plugins/vuetify'
 defineProps(['isMobile'])
 
 const servers = computed((): any[] => Data().servers ?? [])
+
+// 节点排序：机器多了以后，下拉里按名字/最近在线/运行状态排一遍比顺序扫省事。
+// 选择记在 localStorage，刷新后保持；同一个键再点一次反转方向。
+type SortKey = 'name' | 'seen' | 'state'
+const sortKeys: { key: SortKey; label: string }[] = [
+  { key: 'name', label: 'server.sortName' },
+  { key: 'seen', label: 'server.sortSeen' },
+  { key: 'state', label: 'server.sortState' },
+]
+const SORT_STORE = 'sui.nodeSort'
+const readSort = (): { key: SortKey; dir: 1 | -1 } => {
+  try {
+    const [k, d] = String(localStorage.getItem(SORT_STORE) || '').split(':')
+    if (sortKeys.some((x) => x.key === k)) return { key: k as SortKey, dir: d === '-1' ? -1 : 1 }
+  } catch {
+    /* localStorage 不可用时用默认 */
+  }
+  // 默认最近在线的排最前（seen 的自然方向是倒序）
+  return { key: 'seen', dir: -1 }
+}
+const sortBy = ref(readSort())
+const setSort = (key: SortKey) => {
+  // 换键时用该键的自然方向：名称 A→Z、最近在线新→旧、状态运行中在前
+  const naturalDir: 1 | -1 = key === 'seen' ? -1 : 1
+  sortBy.value = sortBy.value.key === key
+    ? { key, dir: (sortBy.value.dir === 1 ? -1 : 1) as 1 | -1 }
+    : { key, dir: naturalDir }
+  try {
+    localStorage.setItem(SORT_STORE, `${sortBy.value.key}:${sortBy.value.dir}`)
+  } catch {
+    /* 忽略 */
+  }
+}
+const ago = (ts?: number): string => {
+  if (!ts) return '—'
+  const s = Math.max(0, Math.floor(Date.now() / 1000) - Number(ts))
+  if (s < 60) return `${s}s`
+  if (s < 3600) return `${Math.floor(s / 60)}m`
+  if (s < 86400) return `${Math.floor(s / 3600)}h`
+  return `${Math.floor(s / 86400)}d`
+}
+const sortedServers = computed((): any[] => {
+  const list = [...servers.value]
+  const { key, dir } = sortBy.value
+  const cmp = (a: any, b: any): number => {
+    if (key === 'name') return String(a.name ?? '').localeCompare(String(b.name ?? ''), 'zh-Hans-CN')
+    if (key === 'seen') return Number(a.last_seen ?? 0) - Number(b.last_seen ?? 0)
+    // running 优先，未启用垫底（rank 小的在前面，配合 dir=1）
+    const rank = (x: any) => (x.enabled === false ? 2 : x.core_state === 'running' ? 0 : 1)
+    return rank(a) - rank(b)
+  }
+  list.sort((a, b) => cmp(a, b) * dir)
+  return list
+})
 const currentServer = computed((): string => Data().currentServer)
 const currentServerName = computed((): string => {
   const id = Data().currentServer
@@ -123,5 +201,75 @@ const changeTheme = (m: ThemeMode) => {
 .top-title :deep(.v-toolbar-title__placeholder) {
   font-size: var(--fs-xl);
   line-height: 1.2;
+}
+
+/* ---- 节点下拉：排序条 + 两行条目（账簿风：细规则线，不靠色块）---- */
+.node-menu {
+  min-width: 260px;
+}
+.node-sort {
+  display: flex;
+  gap: 2px;
+  padding: 4px 8px 0;
+  border-bottom: 1px solid rgba(var(--v-border-color), 0.12);
+  margin-bottom: 2px;
+}
+.node-sort__btn {
+  flex: 1 1 0;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: rgba(var(--v-theme-on-surface), 0.55);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  padding: 6px 4px 7px;
+  border-bottom: 1px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.node-sort__btn:hover {
+  color: rgba(var(--v-theme-on-surface), 0.8);
+}
+.node-sort__btn.is-on {
+  color: rgb(var(--v-theme-on-surface));
+  border-bottom-color: rgb(var(--v-theme-primary, 33, 33, 33));
+}
+.node-sort__btn:focus-visible {
+  outline: 1px dashed rgba(var(--v-theme-on-surface), 0.5);
+  outline-offset: 2px;
+}
+.node-sort__dir {
+  margin-left: 2px;
+  font-size: 11px;
+  opacity: 0.7;
+}
+.node-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-inline-end: 10px;
+  background: rgba(var(--v-theme-on-surface), 0.25);
+}
+.node-dot.is-on {
+  background: #2e7d32;
+}
+.node-name {
+  font-size: 14px;
+  line-height: 1.35;
+}
+.node-meta {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  opacity: 0.55;
+}
+.node-meta .sep {
+  margin: 0 5px;
+}
+.is-down .node-name,
+.is-down .node-meta {
+  opacity: 0.45;
 }
 </style>

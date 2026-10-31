@@ -16,6 +16,14 @@ const SS = "ss://YWVzLTI1Ni1nY206cGFzc3dvcmQ=@5.6.7.8:8388#ss-test";
 
 const HY2 = "hysteria2://pass@9.9.9.9:443?sni=www.bing.com#hy2-test";
 
+// 带 insecure=1 的真实形态（节点默认用自签证书，少了 insecure 客户端连不上）
+const HY2_INSECURE =
+  "hysteria2://sMjUfexWEa@67.215.233.13:23059?security=tls&insecure=1&sni=www.apple.com#hy2-insecure";
+
+const TUIC =
+  "tuic://11111111-2222-3333-4444-555555555555:pw@67.215.233.13:18211" +
+  "?security=tls&insecure=1&sni=www.apple.com&alpn=h3&congestion_control=bbr#tuic-test";
+
 describe("clash 转换", () => {
   it("vless+reality 保留端口、SNI 与公钥", () => {
     const p = linkToProxy(VLESS);
@@ -63,5 +71,24 @@ describe("sing-box 转换", () => {
     const list = buildSingboxOutbounds(["bad", VLESS]);
     expect(list.length).toBe(1);
     expect((list[0] as any).type).toBe("vless");
+  });
+
+  // 回归：clash.ts 不给 hy2/tuic 设 `tls` 标记，singbox 这边如果照传就会丢 TLS ——
+  // outbound 缺 tls/insecure 时客户端加载整份配置失败，用户看到的是「订阅只有几个节点」。
+  it("hysteria2 必须带上 tls.insecure 与 sni", () => {
+    const o = linkToOutbound(HY2_INSECURE) as any;
+    expect(o.type).toBe("hysteria2");
+    expect(o.tls?.enabled).toBe(true);
+    expect(o.tls?.insecure).toBe(true);
+    expect(o.tls?.server_name).toBe("www.apple.com");
+  });
+
+  it("tuic 必须带 tls + alpn + bbr", () => {
+    const o = linkToOutbound(TUIC) as any;
+    expect(o.type).toBe("tuic");
+    expect(o.tls?.enabled).toBe(true);
+    expect(o.tls?.insecure).toBe(true);
+    expect(o.tls?.alpn).toEqual(["h3"]);
+    expect(o.congestion_control).toBe("bbr");
   });
 });

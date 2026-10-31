@@ -27,3 +27,6 @@ panel/.dev.vars
 
 # 本地验证截图
 shots/
+
+# 新建节点时的一次性凭据清单，含 agent token，不入库
+panel/newnodes.json

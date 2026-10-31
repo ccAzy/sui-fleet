@@ -59,7 +59,14 @@ export function linkToOutbound(uri: string): J | null {
 
   const base: J = { tag: str(p.name), server: str(p.server), server_port: num(p.port) }
   const transport = transportOf(p)
-  const tls = tlsOf(p)
+  // hysteria2 / tuic / anytls 是「TLS 原生」协议：clash.ts 为了 Clash 的语义没有给它们设 `tls`
+  // 标记（Clash 里这两种类型本身就走 TLS），但 sing-box 的 outbound 必须显式带 tls ——
+  // 漏了之后 share link 里的 `insecure=1` / `sni` 全部丢失，生成的 outbound 证书校验必然失败；
+  // 更严重的是整份配置会因这两个 outbound 不合法而加载失败，表现出来就是「订阅里只有几个节点」。
+  const TLS_NATIVE = new Set(['hysteria2', 'tuic', 'anytls', 'trojan'])
+  const tls = tlsOf(
+    TLS_NATIVE.has(str(p.type)) && !p.tls ? { ...p, tls: true } : p,
+  )
 
   switch (str(p.type)) {
     case 'vless':
@@ -86,7 +93,7 @@ export function linkToOutbound(uri: string): J | null {
         type: 'trojan',
         ...base,
         password: str(p.password),
-        ...(tls ?? { tls: { enabled: true } } ? { tls: tls ?? { enabled: true } } : {}),
+        ...(tls ? { tls } : {}),
         ...(transport ? { transport } : {}),
       }
     case 'ss':
