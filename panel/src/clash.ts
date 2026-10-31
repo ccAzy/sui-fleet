@@ -188,12 +188,29 @@ function applyTransport(proxy: Proxy, type: string, host?: string | null, path?:
   }
 }
 
+// YAML 会把「数字样子」的字符串自动转型（"50e9" → 5e10 浮点、"0123" → 八进制、"true" → 布尔），
+// 而 Clash/Karing 这些客户端拿到 double 会直接报错把整条节点丢掉：
+//   type 'double' is not a subtype of type 'String?'  … short-id: 50000000000.0
+// 实测就是 REALITY 的 short-id 恰好是 `50e9`（50×10⁹）惹的祸。所以凡是被 YAML 认成非字符串的都要加引号。
+const YAML_SPECIAL = /[:#{}[\],&*?|<>=!%@`"']/
+const YAML_BOOL_NULL = /^(true|false|null|yes|no|on|off|y|n|~)$/i
+// 整数 / 浮点 / 科学计数，例如 1e5、50e9、1.2e-3 —— 这些都会被 YAML 当数字
+const YAML_NUMBER = /^[+-]?(?:\d[\d_]*\.?[\d_]*|\.\d+)(?:[eE][+-]?\d+)?$/
+// 八进制 / 十六进制 / 二进制 / .inf / .nan
+const YAML_OTHER_NUM = /^(?:0[xX][0-9a-fA-F]+|0[oO][0-7]+|0[bB][01]+|[+-]?\.(?:inf|nan))$/i
+
 function yamlScalar(v: unknown): string {
   if (v === null || v === undefined) return 'null'
   if (typeof v === 'number' || typeof v === 'boolean') return String(v)
   const s = String(v)
   // 需要引号的场景：含 YAML 特殊字符、以特殊符号开头、可被误判为数字/布尔
-  const needsQuote = /[:#{}[\],&*?|<>=!%@`"']/.test(s) || /^(true|false|null|yes|no|on|off|~)$/i.test(s) || s.trim() !== s || s === ''
+  const needsQuote =
+    YAML_SPECIAL.test(s) ||
+    YAML_BOOL_NULL.test(s) ||
+    YAML_NUMBER.test(s) ||
+    YAML_OTHER_NUM.test(s) ||
+    s.trim() !== s ||
+    s === ''
   return needsQuote ? JSON.stringify(s) : s
 }
 

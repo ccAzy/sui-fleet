@@ -12,6 +12,13 @@ const VLESS =
   "?type=tcp&security=reality&pbk=TrsKws6hJseeVGwMIqUtY9z_uZLwUpmBC_nX9DgRrBc" +
   "&fp=chrome&sni=www.apple.com&sid=84223ca3&flow=xtls-rprx-vision#vless-test";
 
+// 回归用例：short-id 恰好是 `50e9`（= 50×10⁹），不引引号会被 YAML 当浮点，
+// Karing 报 “type 'double' is not a subtype of type 'String?'” 并把整条 vless 丢掉
+const VLESS_SID_SCI =
+  "vless://11111111-2222-3333-4444-555555555555@1.2.3.4:18417" +
+  "?type=tcp&security=reality&pbk=TrsKws6hJseeVGwMIqUtY9z_uZLwUpmBC_nX9DgRrBc" +
+  "&fp=chrome&sni=www.apple.com&sid=50e9&flow=xtls-rprx-vision#vless-sid-sci";
+
 const SS = "ss://YWVzLTI1Ni1nY206cGFzc3dvcmQ=@5.6.7.8:8388#ss-test";
 
 const HY2 = "hysteria2://pass@9.9.9.9:443?sni=www.bing.com#hy2-test";
@@ -47,6 +54,14 @@ describe("clash 转换", () => {
   it("坏链接返回 null，不抛异常", () => {
     expect(linkToProxy("not-a-link")).toBeNull();
     expect(linkToProxy("")).toBeNull();
+  });
+
+  // 回归：YAML 会把 50e9 解析成浮点，short-id 必须是带引号的字符串
+  it("short-id 像科学计数法时要加引号", () => {
+    const yml = buildClashConfig([VLESS_SID_SCI], "us");
+    expect(yml).toContain('short-id: "50e9"');
+    // 正常 hex 不该被无谓地引引号（保持可读）
+    expect(buildClashConfig([VLESS], "hk")).toContain("short-id: 84223ca3");
   });
 });
 
