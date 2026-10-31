@@ -30,3 +30,6 @@ shots/
 
 # 新建节点时的一次性凭据清单，含 agent token，不入库
 panel/newnodes.json
+
+# 临时分发目录（大二进制分片，装完即删，不入库）
+panel/frontend-dist/dl/

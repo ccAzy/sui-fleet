@@ -238,6 +238,7 @@ export default {
     sortBy: "Sort nodes by",
     sortName: "Name",
     sortSeen: "Last seen",
+    sortCustom: "Custom",
     sortState: "State",
     deployTo: "Deploy to",
     manage: "Manage",

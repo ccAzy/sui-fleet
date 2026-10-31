@@ -24,6 +24,14 @@
           >
             {{ $t(k.label) }}<span v-if="sortBy.key === k.key" class="node-sort__dir" aria-hidden="true">{{ sortBy.dir === 1 ? '↑' : '↓' }}</span>
           </button>
+          <button
+            v-if="customOrder.length"
+            type="button"
+            class="node-sort__btn"
+            :class="{ 'is-on': sortBy.key === 'custom' }"
+            :aria-pressed="sortBy.key === 'custom'"
+            @click="useCustom"
+          >{{ $t('server.sortCustom') }}</button>
         </div>
         <v-list density="compact" nav>
           <v-list-item @click="selectServer('')" :active="currentServer === ''">
@@ -36,7 +44,21 @@
             :key="s.id"
             @click="selectServer(String(s.id))"
             :active="currentServer === String(s.id)"
-            :class="{ 'is-down': s.enabled === false }"
+            class="node-row"
+            :class="{
+              'is-down': s.enabled === false,
+              'is-drag': dragId === String(s.id),
+              'is-drop-before': dropHint && dropHint.id === String(s.id) && dropHint.before,
+              'is-drop-after': dropHint && dropHint.id === String(s.id) && !dropHint.before,
+            }"
+            draggable="true"
+            tabindex="0"
+            @dragstart="onDragStart($event, s)"
+            @dragover="onDragOver($event, s)"
+            @drop="onDrop($event, s)"
+            @dragend="onDragEnd"
+            @keydown.alt.up.prevent="moveBy(String(s.id), -1)"
+            @keydown.alt.down.prevent="moveBy(String(s.id), 1)"
           >
             <template v-slot:prepend>
               <span class="node-dot" :class="{ 'is-on': s.core_state === 'running' }" aria-hidden="true"></span>
@@ -45,6 +67,9 @@
             <v-list-item-subtitle class="node-meta">
               {{ s.kernel_ver || '—' }}<span class="sep">·</span>{{ ago(s.last_seen) }}
             </v-list-item-subtitle>
+            <template v-slot:append>
+              <v-icon class="node-grip" size="14" aria-hidden="true">mdi-drag-vertical</v-icon>
+            </template>
           </v-list-item>
         </v-list>
       </div>
@@ -102,18 +127,38 @@ defineProps(['isMobile'])
 
 const servers = computed((): any[] => Data().servers ?? [])
 
-// 节点排序：机器多了以后，下拉里按名字/最近在线/运行状态排一遍比顺序扫省事。
+// 节点排序：可以按三个键自动排，也可以直接拖动行自定义顺序（拖一下就切到自定义）。
 // 选择记在 localStorage，刷新后保持；同一个键再点一次反转方向。
-type SortKey = 'name' | 'seen' | 'state'
-const sortKeys: { key: SortKey; label: string }[] = [
+type SortKey = 'name' | 'seen' | 'state' | 'custom'
+const sortKeys: { key: Exclude<SortKey, 'custom'>; label: string }[] = [
   { key: 'name', label: 'server.sortName' },
   { key: 'seen', label: 'server.sortSeen' },
   { key: 'state', label: 'server.sortState' },
 ]
 const SORT_STORE = 'sui.nodeSort'
+const ORDER_STORE = 'sui.nodeOrder'
+const sortBy = ref<{ key: SortKey; dir: 1 | -1 }>({ key: 'seen', dir: -1 })
+const readOrder = (): string[] => {
+  try {
+    const v = JSON.parse(localStorage.getItem(ORDER_STORE) || '[]')
+    return Array.isArray(v) ? v.map(String) : []
+  } catch {
+    return []
+  }
+}
+const customOrder = ref<string[]>(readOrder())
+const persistSort = (v: { key: SortKey; dir: 1 | -1 }) => {
+  sortBy.value = v
+  try {
+    localStorage.setItem(SORT_STORE, `${v.key}:${v.dir}`)
+  } catch {
+    /* 忽略 */
+  }
+}
 const readSort = (): { key: SortKey; dir: 1 | -1 } => {
   try {
     const [k, d] = String(localStorage.getItem(SORT_STORE) || '').split(':')
+    if (k === 'custom' && customOrder.value.length) return { key: 'custom', dir: 1 }
     if (sortKeys.some((x) => x.key === k)) return { key: k as SortKey, dir: d === '-1' ? -1 : 1 }
   } catch {
     /* localStorage 不可用时用默认 */
@@ -121,18 +166,74 @@ const readSort = (): { key: SortKey; dir: 1 | -1 } => {
   // 默认最近在线的排最前（seen 的自然方向是倒序）
   return { key: 'seen', dir: -1 }
 }
-const sortBy = ref(readSort())
-const setSort = (key: SortKey) => {
+sortBy.value = readSort()
+const setSort = (key: Exclude<SortKey, 'custom'>) => {
   // 换键时用该键的自然方向：名称 A→Z、最近在线新→旧、状态运行中在前
   const naturalDir: 1 | -1 = key === 'seen' ? -1 : 1
-  sortBy.value = sortBy.value.key === key
+  persistSort(sortBy.value.key === key
     ? { key, dir: (sortBy.value.dir === 1 ? -1 : 1) as 1 | -1 }
-    : { key, dir: naturalDir }
+    : { key, dir: naturalDir })
+}
+const useCustom = () => persistSort({ key: 'custom', dir: 1 })
+
+// ---- 拖动自定义顺序 ----
+const dragId = ref('')
+const dropHint = ref<{ id: string; before: boolean } | null>(null)
+const onDragStart = (ev: DragEvent, s: any) => {
+  dragId.value = String(s.id)
+  if (ev.dataTransfer) {
+    ev.dataTransfer.effectAllowed = 'move'
+    ev.dataTransfer.setData('text/plain', String(s.id))
+  }
+}
+const onDragOver = (ev: DragEvent, s: any) => {
+  if (!dragId.value || dragId.value === String(s.id)) return
+  ev.preventDefault()
+  if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'move'
+  const box = (ev.currentTarget as HTMLElement).getBoundingClientRect()
+  dropHint.value = { id: String(s.id), before: ev.clientY < box.top + box.height / 2 }
+}
+const onDrop = (ev: DragEvent, s: any) => {
+  ev.preventDefault()
+  const from = dragId.value
+  const hint = dropHint.value
+  dragId.value = ''
+  dropHint.value = null
+  if (!from || !hint || hint.id !== String(s.id)) return
+  moveNode(from, hint.id, hint.before)
+}
+const onDragEnd = () => {
+  dragId.value = ''
+  dropHint.value = null
+}
+const saveOrder = (ids: string[]) => {
+  customOrder.value = ids
   try {
-    localStorage.setItem(SORT_STORE, `${sortBy.value.key}:${sortBy.value.dir}`)
+    localStorage.setItem(ORDER_STORE, JSON.stringify(ids))
   } catch {
     /* 忽略 */
   }
+  persistSort({ key: 'custom', dir: 1 })
+}
+const moveNode = (from: string, target: string, before: boolean) => {
+  const ids = sortedServers.value.map((x) => String(x.id))
+  const i = ids.indexOf(from)
+  if (i < 0) return
+  ids.splice(i, 1)
+  const j = ids.indexOf(target)
+  if (j < 0) return
+  ids.splice(before ? j : j + 1, 0, from)
+  saveOrder(ids)
+}
+// 键盘等价物：行获得焦点后 Alt+↑/↓ 也能挪（拖拽对键盘用户不可用）
+const moveBy = (id: string, delta: number) => {
+  const ids = sortedServers.value.map((x) => String(x.id))
+  const i = ids.indexOf(id)
+  const j = i + delta
+  if (i < 0 || j < 0 || j >= ids.length) return
+  const [m] = ids.splice(i, 1)
+  ids.splice(j, 0, m)
+  saveOrder(ids)
 }
 const ago = (ts?: number): string => {
   if (!ts) return '—'
@@ -145,6 +246,11 @@ const ago = (ts?: number): string => {
 const sortedServers = computed((): any[] => {
   const list = [...servers.value]
   const { key, dir } = sortBy.value
+  if (key === 'custom') {
+    const idx = new Map(customOrder.value.map((id, i) => [id, i]))
+    // 没被排过的节点（新加的）排到最后，内部保持后端顺序
+    return list.sort((a, b) => (idx.get(String(a.id)) ?? 9999) - (idx.get(String(b.id)) ?? 9999))
+  }
   const cmp = (a: any, b: any): number => {
     if (key === 'name') return String(a.name ?? '').localeCompare(String(b.name ?? ''), 'zh-Hans-CN')
     if (key === 'seen') return Number(a.last_seen ?? 0) - Number(b.last_seen ?? 0)
@@ -273,6 +379,35 @@ const changeTheme = (m: ThemeMode) => {
 }
 .is-down .node-name,
 .is-down .node-meta {
+  opacity: 0.45;
+}
+
+/* 拖动排序：行可拖，落点用 1px 墨线提示，不用色块 */
+.node-row {
+  cursor: grab;
+}
+.node-row:active {
+  cursor: grabbing;
+}
+.node-row.is-drag {
+  opacity: 0.4;
+}
+.node-row:focus-visible {
+  outline: 1px dashed rgba(var(--v-theme-on-surface), 0.45);
+  outline-offset: -2px;
+}
+.node-row.is-drop-before {
+  box-shadow: inset 0 2px 0 currentColor;
+}
+.node-row.is-drop-after {
+  box-shadow: inset 0 -2px 0 currentColor;
+}
+.node-grip {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.node-row:hover .node-grip,
+.node-row:focus-visible .node-grip {
   opacity: 0.45;
 }
 </style>

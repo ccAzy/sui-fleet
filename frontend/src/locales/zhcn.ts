@@ -238,6 +238,7 @@ export default {
     sortBy: "节点排序方式",
     sortName: "名称",
     sortSeen: "最近在线",
+    sortCustom: "自定义",
     sortState: "状态",
     deployTo: "部署到",
     manage: "管理",

@@ -91,6 +91,12 @@ type agent struct {
 	started time.Time
 	mu      sync.Mutex
 
+	// 内核是否已经成功拉起过。首轮 pull 失败（开机瞬间 DNS/网络没就绪）时，
+	// force 只生效一次，之后每轮都是 force=false，于是「revision 没变」→ 内核永远不启动，
+	// 节点看.着在线却完全不可用，只能靠人工改一次面板或重启进程才能恢复。
+	// 所以把「还没拉起过」本身当成持续为真的 force 条件。
+	coreStarted bool
+
 	// 收到 update_agent 并成功替换二进制后，上报完回执就重启自己
 	restartSelf bool
 }
@@ -193,6 +199,10 @@ func initAgentLog() {
 }
 
 func (a *agent) cycle(withCore bool, force bool) {
+	// 只要内核还没成功跑起来过，每一轮都当首轮（force）重试，直到成功。
+	if withCore && !a.coreStarted {
+		force = true
+	}
 	applied, cmds, err := a.pullOnce()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "agent: pull:", err)
@@ -216,6 +226,9 @@ func (a *agent) restartCore() error {
 	if err := a.coreSvc.RestartCore(); err != nil {
 		return err
 	}
+	a.mu.Lock()
+	a.coreStarted = true
+	a.mu.Unlock()
 	fmt.Println("agent: sing-box restarted with new config")
 	return nil
 }
