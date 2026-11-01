@@ -300,7 +300,7 @@ async function recomputeLinks(
       const ib = inboundById.get(id);
       if (!ib) continue;
       const tls = tlsById.get(num(ib.tls_id)) ?? null;
-      for (const uri of genLinks(o(c.config), ib, tls, fallbackHost)) {
+      for (const uri of genLinks(o(c.config), ib, tls, fallbackHost, s(c.name))) {
         local.push({ remark: s(ib.tag), type: "local", uri });
       }
     }

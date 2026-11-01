@@ -80,6 +80,13 @@ function tlsParams(tls: J, insecureKey: string): Array<[string, string]> {
   return p
 }
 
+/** 在入站的 users 里按名字找到这个客户端对应的那条，兼容 users 为对象/字符串两种存法。 */
+function findUser(inbound: J, name: string): J | null {
+  if (!name) return null
+  const list = Array.isArray(inbound.users) ? inbound.users.map(o) : []
+  return list.find((u) => s(u.name) === name) ?? null
+}
+
 function transportParams(transport: unknown): Array<[string, string]> {
   const t = o(transport)
   const type = s(t.type) || 'tcp'
@@ -133,8 +140,15 @@ function mport(inbound: J): string {
 /**
  * 生成某客户端在某入站上的全部分享链接。
  * @param userConfig client.config，形如 {"vless":{"uuid":"..."}}
+ * @param clientName 客户端名。入站里每个用户自带 flow，优先级高于 client.config 的 flow。
  */
-export function genLinks(userConfig: J, inbound: J, tls: J | null, fallbackHost: string): string[] {
+export function genLinks(
+  userConfig: J,
+  inbound: J,
+  tls: J | null,
+  fallbackHost: string,
+  clientName = '',
+): string[] {
   const addrs = buildAddrs(inbound, tls, fallbackHost)
   const type = s(inbound.type)
   const links: string[] = []
@@ -147,7 +161,13 @@ export function genLinks(userConfig: J, inbound: J, tls: J | null, fallbackHost:
         const params = transportParams(inbound.transport)
         if (a.tls && bool(a.tls.enabled)) {
           params.push(...tlsParams(a.tls, 'allowInsecure'))
-          const flow = path(userConfig, 'vless', 'flow')
+          // flow 是「入站 × 用户」的属性，不是客户端的属性：
+          // 同一个客户端可能同时挂在 reality（要 xtls-rprx-vision）和 ws（必须留空）上，
+          // 拿 client.config 的 flow 会让 ws 链接带上 vision —— 客户端按 vision 握手必然失败。
+          // 入站里登记了这个用户 → 一律用入站上的 flow（可能为空，空就是不加 flow）；
+          // 只有入站没登记（老数据）才退回到 client.config，避免把 reality 的 vision 带到 ws 上。
+          const ue = findUser(inbound, clientName)
+          const flow = ue ? path(ue, 'flow') : path(userConfig, 'vless', 'flow')
           if (flow) params.push(['flow', flow])
         }
         links.push(withParams(`vless://${uuid}@${hostPort}`, params, a.remark, ['alpn']))

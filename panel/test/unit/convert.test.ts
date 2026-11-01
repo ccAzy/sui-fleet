@@ -107,3 +107,51 @@ describe("sing-box 转换", () => {
     expect(o.congestion_control).toBe("bbr");
   });
 });
+
+// ---------------------------------------------------------------------------
+// 回归用例：vless 的 flow 是「入站 × 用户」的属性，不是客户端的属性。
+//
+// 同一个客户端常常同时挂在两个入站上：reality（要 xtls-rprx-vision）和
+// ws（必须留空）。早期实现只看 client.config.vless.flow，于是 ws 链接也带上
+// vision —— 客户端按 vision 握手、服务端走纯 WS，必然连不上，而且现象是
+// 「节点在旁边、就是不通」，很难定位。
+// ---------------------------------------------------------------------------
+describe("genLinks 的 flow 选取", () => {
+  const client = { name: "user-x", config: { vless: { uuid: "u-1", flow: "xtls-rprx-vision" } } };
+  const tls = { server: { enabled: true, server_name: "a.example.com" }, client: { enabled: true, insecure: true, server_name: "a.example.com" } };
+
+  const realityInbound = {
+    type: "vless", tag: "vless-reality", listen: "::", listen_port: 443,
+    transport: {}, tls_id: 1,
+    users: [{ name: "user-x", uuid: "u-1", flow: "xtls-rprx-vision" }],
+  };
+  const wsInbound = {
+    type: "vless", tag: "vless-argo", listen: "127.0.0.1", listen_port: 2087,
+    transport: { type: "ws", path: "/argo", headers: { Host: "a.example.com" } }, tls_id: 1,
+    addrs: [{ server: "a.example.com", server_port: 443 }],
+    users: [{ name: "user-x", uuid: "u-1", flow: "" }],
+  };
+
+  it("reality 入站保留 flow", async () => {
+    const { genLinks } = await import("../../src/links");
+    const [uri] = genLinks(client.config, realityInbound, tls, "1.2.3.4", "user-x");
+    expect(uri).toContain("flow=xtls-rprx-vision");
+  });
+
+  it("ws 入站不继承 reality 的 flow，且地址取 addrs", async () => {
+    const { genLinks } = await import("../../src/links");
+    const [uri] = genLinks(client.config, wsInbound, tls, "1.2.3.4", "user-x");
+    expect(uri).toBeDefined();
+    expect(uri).not.toContain("flow=");
+    expect(uri).toContain("@a.example.com:443");
+    expect(uri).toContain("type=ws");
+    expect(uri).toContain("security=tls");
+  });
+
+  it("入站没登记该用户时退回 client.config 的 flow（老数据兼容）", async () => {
+    const { genLinks } = await import("../../src/links");
+    const legacy = { ...wsInbound, users: [] };
+    const [uri] = genLinks(client.config, legacy, tls, "1.2.3.4", "user-x");
+    expect(uri).toContain("flow=xtls-rprx-vision");
+  });
+});
