@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# 在控制面主机上恢复一份 SQLite 快照（迁移回滚 / 灾难恢复 / 演练都用它）。
+#
+#   sudo ARCHIVE_DIR=/opt/sui-panel/archive bash scripts/restore.sh /opt/sui-panel/data/standby-20261101-1200.db
+#
+# 安全策略：
+#   1. 先停服务，避免半写状态被读到；
+#   2. 当前库连同 -wal/-shm 一起改名归档（不删除），文件名带时间戳；
+#   3. 恢复后启动服务并做健康检查（/api/servers 返回 200 且 JSON success）；
+#   4. 健康检查失败 → 自动回滚到刚归档的那一份并再次起服务。
+set -euo pipefail
+
+SNAPSHOT="${1:?用法: restore.sh <备份.db>}"
+DATA_DIR="${DATA_DIR:-/opt/sui-panel/data}"
+DB="${DB:-$DATA_DIR/sui.db}"
+ARCHIVE_DIR="${ARCHIVE_DIR:-$DATA_DIR/archive}"
+SERVICE="${SERVICE:-sui-panel}"
+HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:8788/api/servers}"
+
+if [ ! -f "$SNAPSHOT" ]; then
+  echo "找不到快照：$SNAPSHOT" >&2
+  exit 1
+fi
+
+mkdir -p "$ARCHIVE_DIR"
+stamp="$(date +%Y%m%d-%H%M%S)"
+archived="$ARCHIVE_DIR/sui-$stamp.db"
+
+echo "[$(date -Is)] 停止服务 $SERVICE"
+systemctl stop "$SERVICE" || true
+
+if [ -f "$DB" ]; then
+  echo "[$(date -Is)] 归档当前库 → $archived"
+  mv "$DB" "$archived"
+  for suffix in -wal -shm; do
+    [ -f "$DB$suffix" ] && mv "$DB$suffix" "$archived$suffix" || true
+  done
+fi
+
+echo "[$(date -Is)] 复制快照"
+cp "$SNAPSHOT" "$DB"
+
+echo "[$(date -Is)] 启动服务"
+systemctl start "$SERVICE"
+
+healthy=0
+for i in $(seq 1 15); do
+  sleep 1
+  if body=$(curl -fsS --max-time 5 "$HEALTH_URL" 2>/dev/null); then
+    case "$body" in
+      *'"success":true'*) healthy=1; break ;;
+    esac
+  fi
+  echo "  等待就绪… ($i/15)"
+done
+
+if [ "$healthy" = "1" ]; then
+  echo "[$(date -Is)] 恢复成功；旧库保留在 $archived"
+  exit 0
+fi
+
+echo "[$(date -Is)] 健康检查失败，回滚到 $archived" >&2
+systemctl stop "$SERVICE" || true
+rm -f "$DB" "$DB-wal" "$DB-shm"
+if [ -f "$archived" ]; then
+  mv "$archived" "$DB"
+  for suffix in -wal -shm; do
+    [ -f "$archived$suffix" ] && mv "$archived$suffix" "$DB$suffix" || true
+  done
+fi
+systemctl start "$SERVICE" || true
+echo "已回滚，请检查 $DATA_DIR 与 $SERVICE 日志" >&2
+exit 2

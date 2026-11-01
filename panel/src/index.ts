@@ -8,6 +8,7 @@ import {
   ensureAdmin,
   login as doLogin,
   signJWT,
+  verifyBackupToken,
   verifyJWT,
 } from "./auth";
 import { ensureOtpSchema, first, now, run, type Env, type UserRow } from "./db";
@@ -247,6 +248,23 @@ app.use("/api/*", async (c, next) => {
   const p = c.req.path;
   if (p.endsWith("/login") || p.endsWith("/login/otp") || p.endsWith("/logout"))
     return await next();
+  // 备份令牌：只放行 getdb 一个端点，供备用机无人值守拉快照（见 auth.verifyBackupToken）
+  if (p === "/api/getdb") {
+    const tk = c.req.query("token") ?? "";
+    if (tk && (await verifyBackupToken(c.env.DB, tk))) {
+      await run(
+        c.env.DB,
+        "INSERT INTO changes (node_id, ts, actor, kind, action, obj) VALUES (?, ?, ?, ?, ?, ?)",
+        "",
+        now(),
+        "backup-token",
+        "backup",
+        "download",
+        JSON.stringify({ ip: c.req.header("CF-Connecting-IP") ?? "" }),
+      );
+      return await next();
+    }
+  }
   const session = await currentUser(c);
   if (!session) return json(c, null, new Error("Invalid login"));
   const action = c.req.path.split("/").pop() ?? "";

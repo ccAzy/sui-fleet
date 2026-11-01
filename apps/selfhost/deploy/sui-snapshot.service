@@ -1,0 +1,10 @@
+# 待机机（顺位 2）的定时快照：从当前主控拉一份全量备份
+[Unit]
+Description=s-ui 待机快照拉取
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/sui-snapshot.env
+ExecStart=/usr/bin/bash /opt/sui-panel/apps/selfhost/scripts/snapshot-pull.sh

@@ -8,7 +8,8 @@
     "start": "tsx src/server.ts",
     "import": "tsx src/import-sql.ts",
     "dev": "tsx watch src/server.ts",
-    "verify": "tsx src/verify-sql.ts"
+    "verify": "tsx src/verify-sql.ts",
+    "import-bundle": "tsx src/import-bundle.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.14.0",

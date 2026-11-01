@@ -117,3 +117,27 @@ export async function newAgentToken(): Promise<{ token: string; hash: string }> 
 }
 
 export const COOKIE = 'sui_session'
+
+/**
+ * 备份令牌：给"顺位 2 的定时快照"用——无人值守地拉一次全量备份。
+ *
+ * 为什么需要：`/api/getdb` 原本只认登录会话，备用机没有密码（也不该有），
+ * 于是备份只能靠人工点。令牌存在 meta.backup_token_hash（只存 sha256），
+ * 48 位 hex、常数时间比较、每次使用落一条 changes 审计。
+ *
+ * 这个令牌能读到整库（含密码哈希与 TOTP 密钥），因此只在"备用机定时拉"这一
+ * 个场景使用，且必须与面板同域不同路径地暴露在 HTTPS 后面。
+ */
+export async function verifyBackupToken(db: D1Database, token: string): Promise<boolean> {
+  if (!/^[0-9a-f]{48}$/.test(token)) return false
+  const row = await first<{ value: string }>(
+    db,
+    "SELECT value FROM meta WHERE key = 'backup_token_hash'",
+  )
+  if (!row?.value) return false
+  const got = await sha256(token)
+  if (got.length !== row.value.length) return false
+  let diff = 0
+  for (let i = 0; i < got.length; i++) diff |= got.charCodeAt(i) ^ row.value.charCodeAt(i)
+  return diff === 0
+}

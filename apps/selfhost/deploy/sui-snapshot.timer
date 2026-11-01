@@ -1,0 +1,10 @@
+[Unit]
+Description=每小时拉一次 s-ui 快照（保持待机库尽量新）
+
+[Timer]
+OnCalendar=hourly
+AccuracySec=2min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -7,7 +7,13 @@ CREATE TABLE IF NOT EXISTS users (
   username      TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,          -- pbkdf2$<iter>$<salt_b64>$<hash_b64>
   must_change   INTEGER NOT NULL DEFAULT 0, -- 首次用默认密码建号时为 1，强制改密
-  created_at    INTEGER NOT NULL
+  created_at    INTEGER NOT NULL,
+  -- 2FA（2026-10-31 加入）。老库由 db.ts 的 ensureOtpSchema 自动 ALTER 补齐；
+  -- 这里必须写明，否则用 schema.sql 新建的库装不下备份里的 users 行。
+  otp_secret    TEXT NOT NULL DEFAULT '',
+  otp_on        INTEGER NOT NULL DEFAULT 0,
+  otp_last_step INTEGER NOT NULL DEFAULT 0,
+  otp_recovery  TEXT NOT NULL DEFAULT '[]'
 );
 
 -- 面板登录令牌(与 s-ui 的 tokens 语义一致,给 apiv2 / 第三方调用)

@@ -44,8 +44,8 @@
 <div class="sheet">
 
   <h1>控制面可移植化 · 顺位接管 · 一键接入</h1>
-  <p class="sub">s-ui Cloud · 方案 v5 · 2026-11-01 · P0/P1/P2 已完成（仅剩真实登录待你配合一次）</p>
-  <span class="draft">PLAN v5 — P3 可开工</span>
+  <p class="sub">s-ui Cloud · 方案 v6 · 2026-11-01 · P0–P3 已完成（仅剩真实登录待你配合一次）</p>
+  <span class="draft">PLAN v6 — P4 可开工</span>
 
   <h2>零、已确认的前提</h2>
   <table>
@@ -299,9 +299,33 @@
   <p>登录是“密码 + TOTP 二次验证”，密码在你手里。P2 结尾需要你在影子实例上真实登录一次（我提供地址，你输一次密码和验证码），
   确认 <code>verifyPassword</code>（PBKDF2 10k 轮）与两步登录在 Node 上同样正常。其余全链路已用自签会话验证完毕。</p>
 
-  <h2>十一、下一步（P3）</h2>
-  <p>P3 是迁移与备份工具：表级导出、事务导入、行数校验、回滚脚本；每日把快照推到顺位 2（jp）。
-  这一步完全不需要你参与，做完后你就可以在任何时候把控制面搬到 hk / jp。</p>
+  <h2>十一、P3 完成：迁移与备份工具齐了</h2>
+  <p class="decided">已完成 · 面板侧仅新增一个只读端点，未改任何既有行为</p>
+
+  <table>
+    <thead><tr><th>工具</th><th>作用</th><th>验证</th></tr></thead>
+    <tbody>
+      <tr><td><code>snapshot-pull.sh</code></td><td>待机机每小时拉一次全量快照，重建 <code>standby.db</code>，保留最近 7 份</td><td>行数校验通过才替换，失败保留旧快照</td></tr>
+      <tr><td><code>restore.sh</code></td><td>停服务 → 归档当前库 → 恢复 → 起服务 → 健康检查</td><td>健康检查失败自动回滚到归档那份</td></tr>
+      <tr><td><code>import-bundle.ts</code></td><td>把 <code>/api/getdb</code> 的 JSON 备份重建成 SQLite</td><td>10 表 7351 行导入成功</td></tr>
+      <tr><td><code>verify-sql.ts</code></td><td>表集合 + 逐表行数 + 内容哈希比对</td><td>备份恢复后判定"一致"</td></tr>
+      <tr><td>备份令牌</td><td><code>/api/getdb?token=</code> 免登录拉备份，48 位 hex、常数时间比较、落审计</td><td>正确令牌 200/1.5MB；错误与缺失令牌均被拒；<code>changes</code> 里留下 <code>actor=backup-token</code></td></tr>
+    </tbody>
+  </table>
+
+  <div class="note">
+    <b>顺手修掉一个部署级隐患</b>：<code>schema.sql</code> 的 <code>users</code> 表一直缺 <code>otp_*</code> 四列
+    （线上是靠运行时 <code>ALTER</code> 补的），这意味着"用 schema.sql 新建的库"装不下备份里的用户行——导入会直接报错。
+    已把四列写进 <code>schema.sql</code>，并在导入器里补一次 <code>ensureOtpSchema</code> 兜底。
+  </div>
+
+  <h3>备份里故意不含的东西</h3>
+  <p><code>meta</code>（<code>jwt_secret</code> / 备份令牌 / 内核缓存）与 <code>login_attempts</code> 不随备份走：
+  恢复后旧会话自然失效、备份令牌需要重新配置，这是设计而非遗漏。</p>
+
+  <h2>十二、下一步（P4）</h2>
+  <p>P4 是顺位接管与仲裁者：CF Worker 每分钟探测主控 <code>/health</code>，按顺位表切 DNS 并推进 epoch；
+  面板里出「当前主控 / 手动切回」。默认人工确认，不做自动回切。</p>
 
   <footer>
     方案 v3 · 基于 2026-11-01 的代码与线上状态 · 相关：<code>docs/quota-audit-2026-11-01.html</code>、<code>MIGRATION-ALL-2026-10-29.md</code>。
