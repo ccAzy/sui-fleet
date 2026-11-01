@@ -216,15 +216,23 @@ export async function verifyBackupToken(
  * 运维令牌：一个令牌同时用于「拉备份」和「仲裁者读写」两类无人值守调用。
  * 优先看 meta.ops_token_hash，其次兼容早期的 backup_token_hash（已部署过的机器不用改）。
  */
-export async function verifyOpsToken(db: D1Database, token: string): Promise<boolean> {
-  if (!/^[0-9a-f]{48}$/.test(token)) return false
-  const got = await sha256(token)
-  for (const key of ['ops_token_hash', 'backup_token_hash']) {
-    const row = await first<{ value: string }>(db, 'SELECT value FROM meta WHERE key = ?', key)
-    if (!row?.value || row.value.length !== got.length) continue
-    let diff = 0
-    for (let i = 0; i < got.length; i++) diff |= got.charCodeAt(i) ^ row.value.charCodeAt(i)
-    if (diff === 0) return true
+export async function verifyOpsToken(
+  db: D1Database,
+  token: string,
+): Promise<boolean> {
+  if (!/^[0-9a-f]{48}$/.test(token)) return false;
+  const got = await sha256(token);
+  for (const key of ["ops_token_hash", "backup_token_hash"]) {
+    const row = await first<{ value: string }>(
+      db,
+      "SELECT value FROM meta WHERE key = ?",
+      key,
+    );
+    if (!row?.value || row.value.length !== got.length) continue;
+    let diff = 0;
+    for (let i = 0; i < got.length; i++)
+      diff |= got.charCodeAt(i) ^ row.value.charCodeAt(i);
+    if (diff === 0) return true;
   }
-  return false
+  return false;
 }

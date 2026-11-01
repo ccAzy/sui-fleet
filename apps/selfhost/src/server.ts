@@ -15,6 +15,7 @@ import { resolve } from "node:path";
 import panel from "../../../panel/src/index.ts";
 import { SqliteD1 } from "./d1.ts";
 import { createAssets } from "./assets.ts";
+import { epochGate } from "./epoch.ts";
 
 const log = (line: string) => process.stdout.write(`${line}\n`);
 
@@ -46,6 +47,47 @@ const env = {
   ADMIN_USER: process.env.ADMIN_USER,
   ADMIN_PASS: process.env.ADMIN_PASS,
 };
+
+// ---- 防脑裂：启动前对一次代次（epoch） ----
+// 被仲裁者降级的实例，本地 meta.control_epoch 一定落后于面板记录的代次；
+// 这种情况必须以只读身份启动（这里直接拒绝启动），否则两台同时写就是脑裂。
+// 只有显式 SUI_FORCE=1 才允许强行以主控身份启动（演练/灾难恢复用）。
+async function assertEpochCurrent(): Promise<void> {
+  const token = process.env.SUI_OPS_TOKEN
+  const localRow = db.prepare('SELECT value FROM meta WHERE key = ?').bind('control_epoch')
+  const local = Number(((await localRow.first<{ value: string }>())?.value ?? '0') || 0)
+
+  let remote: number | undefined
+  if (token) {
+    try {
+      const res = await fetch(`${panelBase}/api/arbiter?token=${token}`, {
+        signal: AbortSignal.timeout(5000),
+      })
+      const body = (await res.json()) as { obj?: { epoch?: number } }
+      remote = Number(body.obj?.epoch ?? 0)
+    } catch {
+      remote = undefined // 仲裁不可达：按本地继续，避免网络抖动把主控锁死
+    }
+  }
+
+  const gate = epochGate({ local, remote, force: process.env.SUI_FORCE === '1', hasToken: !!token })
+  if (gate.allow) {
+    const why = {
+      'no-token': '未配置 SUI_OPS_TOKEN，跳过',
+      fresh: `本地 ${local} = 仲裁 ${remote}`,
+      forced: `⚠ 代次落后（本地 ${local} < 仲裁 ${remote}）但 SUI_FORCE=1，强行启动`,
+      'unknown-remote': '仲裁不可达，按本地继续',
+    }[gate.reason]
+    log(`  代次校验：${why}`)
+    return
+  }
+  log(`  拒绝启动：本地 epoch=${gate.local} 落后于仲裁记录的 ${gate.remote}`)
+  log('  这是防脑裂保护——该实例已被降级为备机。')
+  log('  要用它当主控：先确认原主控已停止，再设 SUI_FORCE=1 启动。')
+  process.exit(3)
+}
+
+await assertEpochCurrent();
 
 log(`s-ui selfhost 启动：port=${port} db=${dbPath}`);
 log(`  panel_base=${panelBase}`);

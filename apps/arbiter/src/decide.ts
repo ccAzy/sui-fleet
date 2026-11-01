@@ -7,64 +7,64 @@
 //   - 跳过当前主控自己（顺位表可能把当前主控列在里面）。
 
 export interface ArbiterState {
-  epoch: number
-  failures: number
-  lastSwitchAt: number
+  epoch: number;
+  failures: number;
+  lastSwitchAt: number;
 }
 
 export interface DecideInput {
-  probeOk: boolean
-  currentPrimary: string
-  order: string[]
-  now: number
-  threshold: number
-  cooldownMs: number
+  probeOk: boolean;
+  currentPrimary: string;
+  order: string[];
+  now: number;
+  threshold: number;
+  cooldownMs: number;
 }
 
 export type Decision =
-  | { action: 'reset'; state: ArbiterState }
-  | { action: 'wait'; state: ArbiterState }
-  | { action: 'switch'; state: ArbiterState; to: string; reason: string }
-  | { action: 'exhausted'; state: ArbiterState }
+  | { action: "reset"; state: ArbiterState }
+  | { action: "wait"; state: ArbiterState }
+  | { action: "switch"; state: ArbiterState; to: string; reason: string }
+  | { action: "exhausted"; state: ArbiterState };
 
 export function decide(state: ArbiterState, input: DecideInput): Decision {
   if (input.probeOk) {
-    return { action: 'reset', state: { ...state, failures: 0 } }
+    return { action: "reset", state: { ...state, failures: 0 } };
   }
 
-  const failures = state.failures + 1
-  const next: ArbiterState = { ...state, failures }
+  const failures = state.failures + 1;
+  const next: ArbiterState = { ...state, failures };
 
   if (failures < input.threshold) {
-    return { action: 'wait', state: next }
+    return { action: "wait", state: next };
   }
   if (input.now - state.lastSwitchAt < input.cooldownMs) {
-    return { action: 'wait', state: next }
+    return { action: "wait", state: next };
   }
 
-  const candidates = input.order.filter((x) => x && x !== input.currentPrimary)
+  const candidates = input.order.filter((x) => x && x !== input.currentPrimary);
   if (candidates.length === 0) {
-    return { action: 'exhausted', state: next }
+    return { action: "exhausted", state: next };
   }
 
   return {
-    action: 'switch',
+    action: "switch",
     state: { epoch: state.epoch + 1, failures: 0, lastSwitchAt: input.now },
     to: candidates[0],
-    reason: `primary ${input.currentPrimary || '(未设置)'} 连续 ${failures} 次探活失败`,
-  }
+    reason: `primary ${input.currentPrimary || "(未设置)"} 连续 ${failures} 次探活失败`,
+  };
 }
 
 /** 顺位表规范化：去空、去重、保持顺序。 */
 export function normalizeOrder(input: unknown): string[] {
-  if (!Array.isArray(input)) return []
-  const seen = new Set<string>()
-  const out: string[] = []
+  if (!Array.isArray(input)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
   for (const raw of input) {
-    const v = String(raw ?? '').trim()
-    if (!v || seen.has(v)) continue
-    seen.add(v)
-    out.push(v)
+    const v = String(raw ?? "").trim();
+    if (!v || seen.has(v)) continue;
+    seen.add(v);
+    out.push(v);
   }
-  return out
+  return out;
 }

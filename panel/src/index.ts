@@ -12,7 +12,16 @@ import {
   verifyJWT,
   verifyOpsToken,
 } from "./auth";
-import { all, batch, ensureOtpSchema, first, now, run, type Env, type UserRow } from "./db";
+import {
+  all,
+  batch,
+  ensureOtpSchema,
+  first,
+  now,
+  run,
+  type Env,
+  type UserRow,
+} from "./db";
 import {
   MARKER_COOKIE,
   currentUser,
@@ -283,13 +292,15 @@ app.get("/health", async (c) => {
 // 仲裁者读写：令牌走 ops token（与备份同一个），GET 看状态，POST 推进代次
 app.get("/api/arbiter", async (c) => {
   const tk = c.req.query("token") ?? "";
-  if (!(await verifyOpsToken(c.env.DB, tk))) return json(c, null, new Error("unauthorized"));
+  if (!(await verifyOpsToken(c.env.DB, tk)))
+    return json(c, null, new Error("unauthorized"));
   return json(c, await readControlState(c.env.DB));
 });
 
 app.post("/api/arbiter", async (c) => {
   const tk = c.req.query("token") ?? "";
-  if (!(await verifyOpsToken(c.env.DB, tk))) return json(c, null, new Error("unauthorized"));
+  if (!(await verifyOpsToken(c.env.DB, tk)))
+    return json(c, null, new Error("unauthorized"));
   const body = (await readBody(c)) as {
     epoch?: number;
     primary?: string;
@@ -299,15 +310,21 @@ app.post("/api/arbiter", async (c) => {
   const cur = await readControlState(c.env.DB);
   const nextEpoch = Math.max(Number(body.epoch ?? cur.epoch), cur.epoch);
   const stmts = [
-    c.env.DB.prepare("INSERT INTO meta (key,value) VALUES ('control_epoch',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(String(nextEpoch)),
-    c.env.DB.prepare("INSERT INTO meta (key,value) VALUES ('control_primary',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(String(body.primary ?? cur.primary)),
-    c.env.DB.prepare("INSERT INTO meta (key,value) VALUES ('control_switched_at',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(String(now())),
+    c.env.DB.prepare(
+      "INSERT INTO meta (key,value) VALUES ('control_epoch',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+    ).bind(String(nextEpoch)),
+    c.env.DB.prepare(
+      "INSERT INTO meta (key,value) VALUES ('control_primary',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+    ).bind(String(body.primary ?? cur.primary)),
+    c.env.DB.prepare(
+      "INSERT INTO meta (key,value) VALUES ('control_switched_at',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+    ).bind(String(now())),
   ];
   if (Array.isArray(body.order)) {
     stmts.push(
-      c.env.DB.prepare("INSERT INTO meta (key,value) VALUES ('control_order',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(
-        JSON.stringify(body.order),
-      ),
+      c.env.DB.prepare(
+        "INSERT INTO meta (key,value) VALUES ('control_order',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+      ).bind(JSON.stringify(body.order)),
     );
   }
   await batch(c.env.DB, stmts);
@@ -319,7 +336,12 @@ app.post("/api/arbiter", async (c) => {
     "arbiter",
     "control",
     "switch",
-    JSON.stringify({ from: cur.epoch, to: nextEpoch, primary: body.primary ?? cur.primary, reason: body.reason ?? "" }),
+    JSON.stringify({
+      from: cur.epoch,
+      to: nextEpoch,
+      primary: body.primary ?? cur.primary,
+      reason: body.reason ?? "",
+    }),
   );
   return json(c, await readControlState(c.env.DB));
 });

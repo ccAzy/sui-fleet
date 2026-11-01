@@ -44,8 +44,8 @@
 <div class="sheet">
 
   <h1>控制面可移植化 · 顺位接管 · 一键接入</h1>
-  <p class="sub">s-ui Cloud · 方案 v6 · 2026-11-01 · P0–P3 已完成（仅剩真实登录待你配合一次）</p>
-  <span class="draft">PLAN v6 — P4 可开工</span>
+  <p class="sub">s-ui Cloud · 方案 v7 · 2026-11-01 · P0–P4 已完成（P4 处于 dry-run，需你提供 CF API 令牌才能真接管）</p>
+  <span class="draft">PLAN v7 — P4 dry-run 已在线</span>
 
   <h2>零、已确认的前提</h2>
   <table>
@@ -323,9 +323,37 @@
   <p><code>meta</code>（<code>jwt_secret</code> / 备份令牌 / 内核缓存）与 <code>login_attempts</code> 不随备份走：
   恢复后旧会话自然失效、备份令牌需要重新配置，这是设计而非遗漏。</p>
 
-  <h2>十二、下一步（P4）</h2>
-  <p>P4 是顺位接管与仲裁者：CF Worker 每分钟探测主控 <code>/health</code>，按顺位表切 DNS 并推进 epoch；
-  面板里出「当前主控 / 手动切回」。默认人工确认，不做自动回切。</p>
+  <h2>十二、P4 完成：仲裁者已在线（dry-run）</h2>
+  <p class="decided">已完成 · 生产可观测 · 尚未接管 DNS</p>
+
+  <table>
+    <thead><tr><th>组件</th><th>状态</th><th>验证</th></tr></thead>
+    <tbody>
+      <tr><td><code>/health</code>（面板）</td><td>已上线</td><td>返回 <code>{ok:true, epoch, primary, ts}</code>，不含任何节点/用户信息</td></tr>
+      <tr><td><code>/api/arbiter</code>（面板）</td><td>已上线，运维令牌鉴权</td><td>正确令牌返回代次/顺位；错误令牌 <code>unauthorized</code>；每次切主落 <code>changes</code> 审计</td></tr>
+      <tr><td>仲裁 Worker</td><td>已部署，cron 每分钟</td><td>日志里有连续 <code>reset / 探活正常</code>，说明探测链路通</td></tr>
+      <tr><td>决策函数</td><td><code>src/decide.ts</code></td><td>6 个单测：探活成功归零、未到阈值只累计、到阈值切下一台并 epoch+1、冷却窗不重切、无备选 exhausted、顺位规范化</td></tr>
+      <tr><td>代次闸门</td><td><code>apps/selfhost/src/epoch.ts</code></td><td>5 个单测：落后即拒绝、<code>SUI_FORCE=1</code> 可强启、仲裁不可达不锁死</td></tr>
+      <tr><td>顺位 IP 映射</td><td>KV <code>ips</code></td><td><code>{"hk":"192.0.2.10","jp":"85.121.122.96"}</code> 已写入并读回一致</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note">
+    <b>现在是 dry-run</b>：仲裁者每分钟判断一次、把判定写进日志，但<b>不改 DNS、不推进 epoch</b>。
+    这样先跑几天看判定是否稳定，不会因为一次抖动动到线上。
+  </div>
+
+  <h3>真接管只差你给一样东西：Cloudflare API 令牌</h3>
+  <p>需要 <b>Zone → DNS → Edit</b> 权限、作用域限定 <code>example.org</code>。拿到后三条命令即可切换：</p>
+  <pre>cd apps/arbiter
+printf '%s' '&lt;令牌&gt;' | npx wrangler secret put CF_API_TOKEN --config wrangler.toml
+npx wrangler secret put ZONE_ID     --config wrangler.toml
+npx wrangler secret put RECORD_NAME --config wrangler.toml
+sed -i 's/^DRY_RUN = "1"/DRY_RUN = "0"/' wrangler.toml &amp;&amp; npx wrangler deploy --config wrangler.toml</pre>
+
+  <h2>十三、下一步（P5）</h2>
+  <p>P5 是一键接入与聚合订阅：面板里点「添加服务器」直接给出一条可粘贴命令；
+  聚合订阅让客户端只保存一个地址，加/退节点都不用重发链接。</p>
 
   <footer>
     方案 v3 · 基于 2026-11-01 的代码与线上状态 · 相关：<code>docs/quota-audit-2026-11-01.html</code>、<code>MIGRATION-ALL-2026-10-29.md</code>。
