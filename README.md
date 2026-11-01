@@ -148,7 +148,7 @@ panel/            Cloudflare Worker（Hono + D1 + 静态前端托管）
   wrangler.toml   ★ 占位配置（入库，供 Deploy 按钮读取）
   wrangler.local.toml  你的真实配置（gitignore）
   .dev.vars.example    本地 secret 模板（ADMIN_PASS / JWT_SECRET）
-  test/e2e.py     52 项端到端自检（需先起一个可登录实例；跑法见下）
+  test/e2e.py     端到端自检（53 处断言；实测 52 通过，1 处是全新库才走的分支）
 
 apps/
   arbiter/        仲裁者 Worker（探活、切 DNS、代次防脑裂）
