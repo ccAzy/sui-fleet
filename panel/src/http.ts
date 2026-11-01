@@ -28,7 +28,14 @@ export async function secretOf(env: Env): Promise<string> {
     "INSERT INTO meta (key, value) VALUES ('jwt_secret', ?) ON CONFLICT(key) DO NOTHING",
     secret,
   );
-  return secret;
+  // 并发首启时两个 isolate 会各生成一把，DO NOTHING 保证只有一把进库。
+  // 输掉竞争的那个如果直接返回自己生成的值，它签出的会话在别的请求里永远验不过
+  // （表现为「密码对了、页面一跳就被踢回登录」）。所以回读一次，以库中值为准。
+  const won = await first<{ value: string }>(
+    env.DB,
+    "SELECT value FROM meta WHERE key = 'jwt_secret'",
+  );
+  return won?.value ?? secret;
 }
 
 export async function currentUser(c: any): Promise<Session | null> {

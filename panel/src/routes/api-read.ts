@@ -281,14 +281,25 @@ export function registerApiRead(app: Hono<{ Bindings: Env }>) {
   }
 
   app.get("/api/logs", async (c) => {
+    // 前端传 c（class/级别）与 l（行数），原来两个参数都不读。
+    const cls = (c.req.query("c") ?? "").trim();
+    const lim = Math.min(Math.max(parseInt(c.req.query("l") ?? "50", 10) || 50, 1), 500);
     const node = await resolveNode(c.env.DB, c.req.header("X-Remote-Server"));
     if (!node) return json(c, []);
+    let st: Record<string, unknown> = {};
     try {
-      const st = JSON.parse(node.status_json) as Record<string, unknown>;
-      return json(c, st.logs ?? []);
+      st = JSON.parse(node.status_json) as Record<string, unknown>;
     } catch {
-      return json(c, []);
+      st = {};
     }
+    // 新键 status.logs（数组）优先；老数据只有 last_log（单条）
+    const raw = Array.isArray(st.logs)
+      ? (st.logs as unknown[]).map(String)
+      : typeof st.last_log === "string" && st.last_log
+        ? [st.last_log]
+        : [];
+    const filtered = cls ? raw.filter((l) => l.toLowerCase().includes(cls.toLowerCase())) : raw;
+    return json(c, filtered.slice(-lim));
   });
 
   app.get("/api/changes", async (c) => {

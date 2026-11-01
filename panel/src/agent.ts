@@ -178,7 +178,12 @@ export async function handleReport(
 ): Promise<void> {
   const ts = now();
   const status = body.status ?? {};
-  if (body.last_log) status.last_log = body.last_log;
+  // 节点上报的日志统一落到 status.logs（数组）；last_log 是旧键，继续写一份兼容老前端。
+  if (body.last_log) {
+    const prev = Array.isArray(status.logs) ? (status.logs as unknown[]) : [];
+    status.logs = [...prev, body.last_log].slice(-200);
+    status.last_log = body.last_log;
+  }
 
   const stmts = [
     db
@@ -300,10 +305,14 @@ export async function pendingCommands(
   db: D1Database,
   nodeId: string,
 ): Promise<number> {
+  // 只统计 pending 与「还在重投窗口内的 sent」。
+  // 原来把全部 sent 都算在途，而重投 3 次用尽后状态会永久停在 sent，
+  // 结果是面板永远显示「有未完成指令」，操作员只能删节点才能清掉。
   const row = await first<{ c: number }>(
     db,
-    "SELECT COUNT(*) as c FROM commands WHERE node_id = ? AND status IN ('pending','sent')",
+    "SELECT COUNT(*) as c FROM commands WHERE node_id = ? AND (status = 'pending' OR (status = 'sent' AND sent_at > ?))",
     nodeId,
+    now() - COMMAND_RETRY_AFTER * 3,
   );
   return row?.c ?? 0;
 }

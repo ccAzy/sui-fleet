@@ -104,13 +104,14 @@ func (s *Server) initRouter() (*gin.Engine, error) {
 		}
 	})
 
-	// Serve the assets folder
-	assetsFS, err := fs.Sub(content, "html/assets")
-	if err != nil {
-		panic(err)
+	// Serve the assets folder.
+	// 注意：这里不能 panic。仓库里只放了 html/index.html 占位页（说明「这是 agent 二进制」），
+	// html/assets 不存在是正常情况；panic 会让默认启动直接崩，排查信息还不如一条日志清楚。
+	if assetsFS, err := fs.Sub(content, "html/assets"); err != nil {
+		logger.Warningf("未内置前端静态资源（web/html/assets）: %v —— 只提供占位页", err)
+	} else {
+		engine.StaticFS(assetsBasePath, http.FS(assetsFS))
 	}
-
-	engine.StaticFS(assetsBasePath, http.FS(assetsFS))
 
 	group_apiv2 := engine.Group(base_url + "apiv2")
 	apiv2 := api.NewAPIv2Handler(group_apiv2)

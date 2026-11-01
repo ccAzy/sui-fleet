@@ -14,8 +14,10 @@ BIN="./sui-agent"
 DIR="/opt/sui-agent"
 SERVICE="sui-agent"
 
+FORCE=0
 while [ $# -gt 0 ]; do
   case "$1" in
+    --force) FORCE=1; shift ;;
     --panel) PANEL="$2"; shift 2 ;;
     --token) TOKEN="$2"; shift 2 ;;
     --bin)   BIN="$2";   shift 2 ;;
@@ -31,12 +33,13 @@ done
 [ -f "$BIN" ] || { echo "找不到二进制: $BIN" >&2; exit 1; }
 
 echo "==> 检查已有 s-ui 面板"
-if systemctl is-active --quiet s-ui 2>/dev/null; then
+if systemctl is-active --quiet s-ui 2>/dev/null && [ "$FORCE" != "1" ]; then
   echo "检测到本机已有 s-ui 面板在运行。agent 会启动 sing-box 内核，同时跑两者会抢端口。" >&2
   echo "如果这台机器本来就是节点，请先停掉旧面板：systemctl disable --now s-ui" >&2
-  echo "确认要继续，重跑并加 --force 之前请先自行处理。" >&2
+  echo "确认要继续，就重跑并加 --force。" >&2
   exit 1
 fi
+[ "$FORCE" = "1" ] && echo "  --force：跳过端口冲突检查（请自行确认旧面板已停）"
 
 echo "==> 安装到 $DIR"
 mkdir -p "$DIR/bin" "$DIR/db"

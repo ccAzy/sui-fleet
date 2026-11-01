@@ -124,8 +124,15 @@ export async function listObjects(
   return rows.map((r) => {
     try {
       return JSON.parse(r.data) as J;
-    } catch {
-      return {} as J;
+    } catch (e) {
+      // 坏数据不能静默变成 {}：那样它在列表里显示为空、被编辑保存时又用 {} 覆盖回去，
+      // 原始内容就永久丢了，而且全程没有任何信号。这里至少留一条带定位的告警。
+      console.warn(
+        `[objects] 数据损坏 node=${nodeId} kind=${kind} id=${r.obj_id}：${
+          e instanceof Error ? e.message : String(e)
+        }`,
+      );
+      return { __corrupt: true, id: Number(r.obj_id), tag: r.tag } as J;
     }
   });
 }
