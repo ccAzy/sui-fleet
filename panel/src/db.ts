@@ -265,6 +265,7 @@ export async function bumpSessionEpoch(
 let perfIndexesReady = false;
 export async function ensurePerfIndexes(db: D1Database): Promise<void> {
   if (perfIndexesReady) return;
+  let allOk = true;
   for (const sql of [
     "CREATE INDEX IF NOT EXISTS idx_login_ts ON login_attempts(ts)",
     "CREATE INDEX IF NOT EXISTS idx_commands_created ON commands(created_at)",
@@ -272,10 +273,12 @@ export async function ensurePerfIndexes(db: D1Database): Promise<void> {
     try {
       await db.prepare(sql).run();
     } catch {
-      // 建不上不影响功能，最多是全表扫
+      // 建不上不影响功能，最多是全表扫；但**不要**置 ready，
+      // 否则本进程再也不会重试，一次瞬时失败会退化成长期全表扫。
+      allOk = false;
     }
   }
-  perfIndexesReady = true;
+  if (allOk) perfIndexesReady = true;
 }
 
 /** 节点配置版本 +1，让 agent 下次 pull 时拿到新快照。 */

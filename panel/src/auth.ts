@@ -303,7 +303,10 @@ export function isSessionPayload(
   payload: Record<string, unknown> | null,
 ): payload is { u: string; uid?: number; mc?: boolean; se?: number } {
   if (!payload || typeof payload.u !== "string") return false;
-  return payload.otp !== 1;
+  if (payload.otp === 1) return false;
+  // uid 必须存在：currentUser 只在 uid > 0 时比对会话代次，
+  // 允许无 uid 的载荷等于放行一批「永远无法吊销」的会话。
+  return typeof payload.uid === "number" && payload.uid > 0;
 }
 
 export async function verifyBackupToken(

@@ -463,7 +463,7 @@ check("2fa 正确码启用", r["success"] is True, r)
 codes = (r.get("obj") or {}).get("recovery") or []
 check("2fa 发放 10 个恢复码", len(codes) == 10, str(len(codes)))
 
-get("/api/logout")
+post("/api/logout")
 cj.clear()
 r = j(post("/api/login", form={"user": "admin", "pass": PASS}))
 obj = r.get("obj") or {}
@@ -478,7 +478,7 @@ r = j(post("/api/login/otp", form={"ticket": ticket, "code": code}))
 check("2fa 登录放行", r["success"] is True, r)
 
 # 防重放：同一 30 秒窗口内同一个码不能再用
-get("/api/logout")
+post("/api/logout")
 cj.clear()
 t2 = j(post("/api/login", form={"user": "admin", "pass": PASS}))["obj"]["ticket"]
 r = j(post("/api/login/otp", form={"ticket": t2, "code": code}))
@@ -559,7 +559,12 @@ ss_in = {
     "password": "E2E-INBOUND-PASSWORD-LEAK",
     "users": [],
 }
-j(post("/api/save", form={"object": "inbounds", "action": "new", "data": json.dumps(ss_in)}))
+j(
+    post(
+        "/api/save",
+        form={"object": "inbounds", "action": "new", "data": json.dumps(ss_in)},
+    )
+)
 raw_in = json.dumps(j(get("/api/inbounds", token=mon)), ensure_ascii=False)
 check(
     "只读令牌读 inbounds 不含明文密码（独立 handler 也要脱敏）",

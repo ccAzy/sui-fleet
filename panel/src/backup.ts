@@ -94,6 +94,10 @@ export async function importBundle(
   const nUsers = Array.isArray(t.users) ? t.users.length : 0;
   if (nNodes === 0 && nUsers === 0)
     throw new Error("备份里既没有 nodes 也没有 users，拒绝导入（会清空整库）");
+  // 只有 nodes、没有 users 的包会把账号表清空，随后 ensureAdmin 用 ADMIN_PASS
+  // 或默认 admin/admin 重建 —— 表现为「导入后管理员口令变成默认值」。
+  if (nUsers === 0)
+    throw new Error("备份里没有 users，拒绝导入（会把管理员重置成默认口令）");
 
   const order: Table[] = [
     "nodes",
@@ -148,10 +152,15 @@ export async function importBundle(
     db,
     "SELECT value FROM meta WHERE key = 'control_epoch'",
   );
-  const localEpoch = Math.max(0, Math.floor(Number(localEpochRow[0]?.value ?? 0) || 0));
+  const localEpoch = Math.max(
+    0,
+    Math.floor(Number(localEpochRow[0]?.value ?? 0) || 0),
+  );
   if (metaMap.has("control_epoch")) {
     const incomingRaw = Number(metaMap.get("control_epoch"));
-    const incoming = Number.isFinite(incomingRaw) ? Math.floor(incomingRaw) : -1;
+    const incoming = Number.isFinite(incomingRaw)
+      ? Math.floor(incomingRaw)
+      : -1;
     // 只取 max：既挡住倒退，也挡住 0/负数/NaN
     if (incoming < localEpoch) metaMap.set("control_epoch", String(localEpoch));
   } else if (localEpoch > 0) {
@@ -252,7 +261,9 @@ export async function importBundle(
   // 恢复快照 = 恢复旧世界：此前被改密/登出吊销的会话必须继续失效。
   // 表里若还没有这一列（极老的库）就跳过，登录路径的 ensureSessionEpoch 会补。
   if ((validCols.get("users") ?? new Set()).has("session_epoch")) {
-    stmts.push(db.prepare("UPDATE users SET session_epoch = session_epoch + 1"));
+    stmts.push(
+      db.prepare("UPDATE users SET session_epoch = session_epoch + 1"),
+    );
   }
   // 导入本身要留痕：changes 表上面已被整表替换，所以这条写在最后。
   stmts.push(
@@ -260,10 +271,7 @@ export async function importBundle(
       .prepare(
         "INSERT INTO changes (node_id, ts, actor, kind, action, obj) VALUES ('', ?, 'system', 'panel', 'import', ?)",
       )
-      .bind(
-        now(),
-        JSON.stringify({ imported: Object.keys(imported).length }),
-      ),
+      .bind(now(), JSON.stringify({ imported: Object.keys(imported).length })),
   );
 
   // 本地秘密必须紧跟在删除语句之后回填（见下方执行段：这两类语句同属一个原子批）。
@@ -279,7 +287,9 @@ export async function importBundle(
   await batch(db, [
     ...stmts.slice(0, headCount),
     db
-      .prepare("INSERT OR REPLACE INTO meta (key, value) VALUES ('import_in_progress', ?)")
+      .prepare(
+        "INSERT OR REPLACE INTO meta (key, value) VALUES ('import_in_progress', ?)",
+      )
       .bind(String(now())),
   ]);
   const rest = stmts.slice(headCount);

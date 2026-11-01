@@ -43,7 +43,7 @@ describe("configHashOf", () => {
     expect(await configHashOf(changed)).not.toBe(await configHashOf(base()));
   });
 
-  it("客户端变化也改变指纹（up/down 之类不应进指纹，这里只验证结构变化）", async () => {
+  it("客户端结构变化会改变指纹（up/down 是否进指纹见 fingerprint.test.ts）", async () => {
     const changed = base();
     changed.clients[0].name = "bob";
     expect(await configHashOf(changed)).not.toBe(await configHashOf(base()));

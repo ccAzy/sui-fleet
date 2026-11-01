@@ -627,19 +627,6 @@ export async function loadPartial(
   return out;
 }
 
-/** 删除节点时清空其所有数据。 */
-export async function purgeNodeData(
-  db: D1Database,
-  nodeId: string,
-): Promise<void> {
-  await batch(db, [
-    db.prepare("DELETE FROM objects WHERE node_id = ?").bind(nodeId),
-    db.prepare("DELETE FROM settings WHERE node_id = ?").bind(nodeId),
-    db.prepare("DELETE FROM changes WHERE node_id = ?").bind(nodeId),
-    db.prepare("DELETE FROM usage WHERE node_id = ?").bind(nodeId),
-    db.prepare("DELETE FROM commands WHERE node_id = ?").bind(nodeId),
-  ]);
-}
 
 /**
  * 删除节点：清数据 + 删行 + 留一条审计，**同一次 batch**。

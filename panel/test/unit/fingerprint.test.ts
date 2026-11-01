@@ -21,7 +21,9 @@ describe("configFingerprintView", () => {
   };
 
   it("剔掉四个流量计数与 sub_token", () => {
-    const [v] = configFingerprintView([client]) as Array<Record<string, unknown>>;
+    const [v] = configFingerprintView([client]) as Array<
+      Record<string, unknown>
+    >;
     for (const k of ["up", "down", "totalUp", "totalDown", "sub_token"]) {
       expect(v).not.toHaveProperty(k);
     }
@@ -41,8 +43,12 @@ describe("configFingerprintView", () => {
   });
 
   it("回填 sub_token 不改变指纹视图", () => {
-    const before = JSON.stringify(configFingerprintView([{ ...client, sub_token: "" }]));
-    const after = JSON.stringify(configFingerprintView([{ ...client, sub_token: "a" }]));
+    const before = JSON.stringify(
+      configFingerprintView([{ ...client, sub_token: "" }]),
+    );
+    const after = JSON.stringify(
+      configFingerprintView([{ ...client, sub_token: "a" }]),
+    );
     expect(after).toBe(before);
   });
 

@@ -48,9 +48,17 @@ export function redactForToken<T>(value: T): T {
   if (value && typeof value === "object") {
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      if (HEADER_MAP_KEYS.has(k) && v && typeof v === "object" && !Array.isArray(v)) {
+      if (
+        HEADER_MAP_KEYS.has(k) &&
+        v &&
+        typeof v === "object" &&
+        !Array.isArray(v)
+      ) {
         out[k] = Object.fromEntries(
-          Object.keys(v as Record<string, unknown>).map((h) => [h, "[redacted]"]),
+          Object.keys(v as Record<string, unknown>).map((h) => [
+            h,
+            "[redacted]",
+          ]),
         );
         continue;
       }

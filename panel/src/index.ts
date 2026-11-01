@@ -369,7 +369,7 @@ app.post("/api/arbiter", async (c) => {
   // 而所有读取方都用 `Number(x) || 0` 兜底，NaN 会被读成 0 —— 比任何历史代次都低，
   // 防脑裂的单调围栏当场失效。非法输入必须拒绝，不能写进控制面状态。
   const asked = Number(body.epoch ?? cur.epoch);
-  if (!Number.isFinite(asked) || asked < 0)
+  if (!Number.isInteger(asked) || asked < 0)
     return json(c, null, new Error("epoch 必须是有限的非负整数"));
   const nextEpoch = Math.max(asked, cur.epoch);
   const stmts = [

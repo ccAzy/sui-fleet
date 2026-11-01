@@ -344,7 +344,7 @@ export default {
     action: "操作",
     api: {
       title: "API 令牌",
-      msg: "只读令牌：用于脚本/监控读取状态与配置。用法 Authorization: Bearer <令牌>，仅放行 /api/load、/api/status、/api/servers 等 GET 接口，不能改任何配置。过期时间到点即失效。",
+      msg: "只读令牌：用于脚本/监控读取运行状态。用法 Authorization: Bearer <令牌>，仅放行 /api/status、/api/servers、/api/inbounds、/api/outbounds、/api/endpoints、/api/services 六个 GET 接口，且响应中的私钥/密码/令牌等字段一律脱敏；不能读取 /api/load、/api/clients、/api/tls，也不能改任何配置。过期时间到点即失效（填 0 表示永不过期）。",
       token: "令牌",
     },
   },

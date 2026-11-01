@@ -241,6 +241,10 @@ export function registerApiWrite(app: Hono<{ Bindings: Env }>) {
     // 空密码 / 极短密码原先照收：一次手滑就能把面板改成空密码，
     // 而"首次登录必须改密"这道闸设置的初衷正是防止弱口令。
     if (newPass.length < 8) return json(c, null, new Error("新密码至少 8 位"));
+    // 用户名会流进 /api/otp/help 的可复制 SQL、审计行和日志：限制字符集，
+    // 避免引号/换行/控制字符到下游（配合 otp/help 的转义形成两道）。
+    if (!/^[A-Za-z0-9._@-]{3,32}$/.test(newName))
+      return json(c, null, new Error("用户名 3-32 位，只能含字母数字 . _ @ -"));
     if (newPass === oldPass)
       return json(c, null, new Error("新密码不能与旧密码相同"));
     const { hashPassword } = await import("../auth");

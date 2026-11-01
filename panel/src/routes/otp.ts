@@ -194,8 +194,12 @@ export function registerOtpAdmin(app: Hono<{ Bindings: Env }>) {
   app.get("/api/otp/help", async (c) => {
     const user = await me(c);
     if (!user) return json(c, null, new Error("Invalid login"));
+    // 这段 SQL 是给运维**直接复制去执行**的：用户名必须转义单引号，
+    // 否则一个形如 `a'; DROP TABLE users; --` 的账号名会让照着做的人生成一条危险语句。
+    // （用户名本身现在也被 changePass 的字符集校验挡住了，这是第二道。）
+    const quoted = String(user.username).replace(/'/g, "''");
     return json(c, {
-      sql: `UPDATE users SET otp_on = 0, otp_secret = '', otp_recovery = '[]' WHERE username = '${user.username}'`,
+      sql: `UPDATE users SET otp_on = 0, otp_secret = '', otp_recovery = '[]' WHERE username = '${quoted}'`,
       at: now(),
     });
   });

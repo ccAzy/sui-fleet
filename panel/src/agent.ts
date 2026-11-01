@@ -99,7 +99,6 @@ export async function configHashOf(payload: {
 /** 指纹过期多久后强制重算一次（秒）。 */
 const HASH_RECHECK_SECONDS = 3600;
 
-
 /**
  * 指纹只覆盖「配置」。
  *

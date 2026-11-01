@@ -22,8 +22,17 @@ describe("isSessionPayload", () => {
   });
 
   it("otp:0 或缺失时不影响正常会话", () => {
-    expect(isSessionPayload({ u: "admin", otp: 0 })).toBe(true);
-    expect(isSessionPayload({ u: "admin" })).toBe(true);
+    expect(isSessionPayload({ u: "admin", uid: 1, otp: 0 })).toBe(true);
+    expect(isSessionPayload({ u: "admin", uid: 1 })).toBe(true);
+  });
+
+  it("缺 uid 的载荷一律拒绝（否则这批会话永远无法吊销）", () => {
+    // 曾经把 isSessionPayload({u:"admin"}) === true 写成断言 —— 等于把
+    // 「升级前签发的令牌永远跳过会话代次检查」固化成预期行为。currentUser
+    // 只在 uid > 0 时比对 se，所以没有 uid 的会话是不可吊销的。
+    expect(isSessionPayload({ u: "admin" })).toBe(false);
+    expect(isSessionPayload({ u: "admin", uid: 0 })).toBe(false);
+    expect(isSessionPayload({ u: "admin", uid: "1" })).toBe(false);
   });
 
   it("缺少 u 或载荷为空时拒绝", () => {

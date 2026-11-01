@@ -38,6 +38,13 @@ let metaCache: {
 } | null = null;
 
 export function registerApiRead(app: Hono<{ Bindings: Env }>) {
+  // 返回整份配置/凭据的 GET 一律不许被缓存。原来只有 getdb 加了 no-store，
+  // /api/load、/api/clients、/api/tls、/api/changes、/api/tokens 都没有。
+  app.use("*", async (c, next) => {
+    await next();
+    if (c.req.method === "GET") c.header("Cache-Control", "no-store");
+  });
+
   app.get("/api/load", async (c) => {
     const node = await resolveNode(c.env.DB, c.req.header("X-Remote-Server"));
     if (!node)
