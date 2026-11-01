@@ -55,3 +55,68 @@ test("顺位表规范化：去空、去重、保序", () => {
   ]);
   assert.deepEqual(normalizeOrder("hk,jp"), []);
 });
+
+test("切换后记住目标：下一次跳到再下一台，不会原地打转", () => {
+  const after = (state: ArbiterState) => state;
+  // 第一次：hk 挂了 → 切 jp，并记住 target=jp
+  const d1 = decide(
+    { ...base, failures: 2 },
+    { ...input, order: ["hk", "jp", "vn"], now: 2_000_000 },
+  );
+  assert.equal(d1.action, "switch");
+  if (d1.action !== "switch") return;
+  assert.equal(d1.to, "jp");
+  assert.equal(d1.state.target, "jp");
+
+  // 第二次：jp 也挂了 → 应该推进到 vn，而不是又切 jp
+  // 切换后 failures 会归零，要再累计到阈值才会再切
+  const d2 = decide(
+    { ...after(d1.state), failures: 2 },
+    {
+      ...input,
+      order: ["hk", "jp", "vn"],
+      now: 3_000_000,
+    },
+  );
+  assert.equal(d2.action, "switch");
+  if (d2.action !== "switch") return;
+  assert.equal(d2.to, "vn");
+});
+
+test("已知探活失败的备选会被跳过", () => {
+  const d = decide(
+    { ...base, failures: 2 },
+    {
+      ...input,
+      order: ["hk", "jp", "vn"],
+      now: 2_000_000,
+      candidateOk: { jp: false, vn: true },
+    },
+  );
+  assert.equal(d.action, "switch");
+  if (d.action !== "switch") return;
+  assert.equal(d.to, "vn");
+});
+
+test("备选全部探活失败 → exhausted（不切到死机器上）", () => {
+  const d = decide(
+    { ...base, failures: 2 },
+    {
+      ...input,
+      order: ["hk", "jp", "vn"],
+      now: 2_000_000,
+      candidateOk: { jp: false, vn: false },
+    },
+  );
+  assert.equal(d.action, "exhausted");
+});
+
+test("恢复健康后清掉切换指针", () => {
+  const d = decide(
+    { ...base, failures: 5, target: "vn" },
+    { ...input, probeOk: true, now: 2_000_000 },
+  );
+  assert.equal(d.action, "reset");
+  if (d.action !== "reset") return;
+  assert.equal(d.state.target, "");
+});

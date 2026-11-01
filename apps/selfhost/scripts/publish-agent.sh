@@ -33,7 +33,20 @@ publish() { # publish <源二进制> <文件名>
 }
 
 echo "==> 发布 agent"
-publish "$AGENT_BIN" "sui-agent-linux-amd64"
+# 名字必须跟着源文件走：原来写死 amd64，传 arm64 会把 amd64 的分片覆盖成 arm64 的，
+# 结果 x86 机器装到 aarch64 二进制（装完起不来，且看不出原因）。
+case "$AGENT_BIN" in
+  *sui-agent-linux-arm64*) publish "$AGENT_BIN" "sui-agent-linux-arm64" ;;
+  *) publish "$AGENT_BIN" "sui-agent-linux-amd64" ;;
+esac
+
+# 同时存在两种架构时一次性都发出去，避免「只发了 amd64、arm 机器 404」。
+for arch in arm64; do
+  alt="$REPO/dist/sui-agent-linux-$arch"
+  if [ "$AGENT_BIN" != "$alt" ] && [ -f "$alt" ]; then
+    publish "$alt" "sui-agent-linux-$arch"
+  fi
+done
 
 if [ -f "$REPO/dist/komari-agent-linux-amd64" ]; then
   echo "==> 发布 komari 探针"

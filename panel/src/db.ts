@@ -4,6 +4,7 @@ import type {
   D1PreparedStatement,
   D1Result,
 } from "@cloudflare/workers-types";
+import { redactForToken } from "./redact";
 
 /** 静态资源绑定：只声明我们要用到的 fetch，签名按 DOM 类型写。 */
 export type AssetsBinding = {
@@ -303,11 +304,23 @@ export function logChange(
   action: string,
   obj: unknown,
 ): D1PreparedStatement {
-  return db
-    .prepare(
-      "INSERT INTO changes (node_id, ts, actor, kind, action, obj) VALUES (?, ?, ?, ?, ?, ?)",
-    )
-    .bind(nodeId, now(), actor, kind, action, JSON.stringify(obj ?? {}));
+  return (
+    db
+      .prepare(
+        "INSERT INTO changes (node_id, ts, actor, kind, action, obj) VALUES (?, ?, ?, ?, ?, ?)",
+      )
+      // changes 是**长期留存**的审计日志（14 天），而 obj 里可能是完整对象：
+      // 客户端 UUID/密码、Reality 私钥、SS 服务端密码。审计只需要"哪类对象、什么动作"，
+      // 不需要密钥本身 —— 存之前统一脱敏。
+      .bind(
+        nodeId,
+        now(),
+        actor,
+        kind,
+        action,
+        JSON.stringify(redactForToken(obj ?? {})),
+      )
+  );
 }
 
 export async function getNode(

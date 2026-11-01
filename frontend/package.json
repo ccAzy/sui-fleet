@@ -6,7 +6,8 @@
     "dev": "vite --host",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
-    "lint": "eslint . --fix --ignore-path .gitignore"
+    "lint": "eslint . --fix --ignore-path .gitignore",
+    "i18n:missing": "npx tsx scripts/i18n-missing.mts"
   },
   "dependencies": {
     "axios": "^1.16.1",

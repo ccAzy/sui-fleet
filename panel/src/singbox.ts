@@ -165,6 +165,40 @@ export function linkToOutbound(uri: string): J | null {
 }
 
 /** 生成可以直接喂给 sing-box 客户端的 outbound 数组。 */
+/**
+ * 生成一份**完整**的 sing-box 配置，而不是裸 outbounds 数组。
+ *
+ * 裸数组只有自己做后处理的客户端能用；标准 remote profile 期望的是一份可加载的
+ * 配置对象。这里给出最小可用形态：本地 mixed 入站 + 一个 selector 指向全部节点
+ * + direct 兜底。用户导入后即可用，也可以只取其中的 outbounds。
+ */
+export function buildSingboxConfig(uris: string[], title: string): J {
+  const outbounds = buildSingboxOutbounds(uris);
+  const tags = outbounds.map((o) => String(o.tag)).filter(Boolean);
+  outbounds.push({
+    type: "selector",
+    tag: "proxy",
+    outbounds: tags.length ? tags : ["direct"],
+    default: tags[0] ?? "direct",
+  } as J);
+  outbounds.push({ type: "direct", tag: "direct" } as J);
+  return {
+    log: { level: "info" },
+    inbounds: [
+      {
+        type: "mixed",
+        tag: "mixed-in",
+        listen: "127.0.0.1",
+        listen_port: 2080,
+      },
+    ],
+    outbounds,
+    route: { rules: [], final: "proxy" },
+    experimental: { cache_file: { enabled: true, path: "cache.db" } },
+    remarks: title,
+  } as J;
+}
+
 export function buildSingboxOutbounds(uris: string[]): J[] {
   const out: J[] = [];
   const seen = new Set<string>();

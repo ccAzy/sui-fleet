@@ -184,10 +184,15 @@ export function randHex(bytes: number): string {
 }
 
 export function baseUrl(c: any): string {
+  // 优先用配置里的公开基址：请求自身的 origin 在内网反代后面是 http://127.0.0.1:8788，
+  // 而且它来自 Host 头（可被伪造）。生成 install.sh / 订阅链接时用错了会让节点
+  // 去拉一个不存在的地址。没配 PANEL_BASE 才退回到请求 origin（本地开发）。
+  const configured = String(c.env?.PANEL_BASE ?? "").replace(/\/+$/, "");
+  if (configured) return configured;
   try {
     return new URL(c.req.url).origin;
   } catch {
-    return c.env.PANEL_BASE ?? "";
+    return "";
   }
 }
 

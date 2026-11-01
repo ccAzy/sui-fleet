@@ -489,7 +489,15 @@ export function registerApiRead(app: Hono<{ Bindings: Env }>) {
     if (!session) return json(c, null, new Error("Invalid login"));
     const body = await c.req.parseBody();
     const desc = String(body.desc ?? "");
-    const expiry = parseInt(String(body.expiry ?? "0"), 10) || 0;
+    // expiry 是"当前时间 + 秒"的绝对时间戳（前端把天数换算好再传）。
+    // 原来 0 = 永不过期，等于允许签出一把永久 bearer —— 在只读端点能读脱敏数据后
+    // 危害小了，但仍然不该存在"永久凭据"。未指定或 0 一律按 365 天处理，且不得超过。
+    const MAX_TTL = 365 * 86400;
+    const asked = parseInt(String(body.expiry ?? "0"), 10) || 0;
+    const nowTs = now();
+    let expiry = asked;
+    if (!expiry) expiry = nowTs + MAX_TTL;
+    if (expiry - nowTs > MAX_TTL) expiry = nowTs + MAX_TTL;
     const token = randHex(24);
     await run(
       c.env.DB,

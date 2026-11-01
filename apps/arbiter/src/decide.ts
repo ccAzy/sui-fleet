@@ -10,6 +10,11 @@ export interface ArbiterState {
   epoch: number;
   failures: number;
   lastSwitchAt: number;
+  /**
+   * 上次切换到的目标。没有它时 `candidates[0]` 永远是同一个节点 ——
+   * 顺位表第 2 台挂了就一直往一台死机器上切，而且每次冷却结束都会再切一次。
+   */
+  target?: string;
 }
 
 export interface DecideInput {
@@ -19,6 +24,8 @@ export interface DecideInput {
   now: number;
   threshold: number;
   cooldownMs: number;
+  /** 各备选的探活结果（缺省视为未知=可用）。 */
+  candidateOk?: Record<string, boolean>;
 }
 
 export type Decision =
@@ -29,7 +36,8 @@ export type Decision =
 
 export function decide(state: ArbiterState, input: DecideInput): Decision {
   if (input.probeOk) {
-    return { action: "reset", state: { ...state, failures: 0 } };
+    // 回到健康就清掉切换指针，下次故障重新从顺位表头开始。
+    return { action: "reset", state: { ...state, failures: 0, target: "" } };
   }
 
   const failures = state.failures + 1;
@@ -47,10 +55,26 @@ export function decide(state: ArbiterState, input: DecideInput): Decision {
     return { action: "exhausted", state: next };
   }
 
+  // 从「上次切到的那个」往后继续，形成环形推进；没探活信息时也至少不会原地打转。
+  const after = state.target ? candidates.indexOf(state.target) + 1 : 0;
+  const rotated = [...candidates.slice(after), ...candidates.slice(0, after)];
+  // 已知探活失败的备选要跳过，否则会切到另一台死机器上。
+  const healthy = rotated.filter((x) => input.candidateOk?.[x] !== false);
+
+  if (healthy.length === 0) {
+    return { action: "exhausted", state: next };
+  }
+
+  const to = healthy[0];
   return {
     action: "switch",
-    state: { epoch: state.epoch + 1, failures: 0, lastSwitchAt: input.now },
-    to: candidates[0],
+    state: {
+      epoch: state.epoch + 1,
+      failures: 0,
+      lastSwitchAt: input.now,
+      target: to,
+    },
+    to,
     reason: `primary ${input.currentPrimary || "(未设置)"} 连续 ${failures} 次探活失败`,
   };
 }

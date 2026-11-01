@@ -17,6 +17,8 @@ export interface Env {
   PANEL_URL: string;
   /** 运维令牌（与备份同源，见 panel/src/auth.verifyOpsToken） */
   OPS_TOKEN: string;
+  /** 备选节点的探活地址（JSON: {"jp":"https://.../health"}）；缺省则按顺位走 */
+  CANDIDATE_URLS?: string;
   /** Cloudflare API 令牌（需要 Zone.DNS 编辑权限）；DRY_RUN=1 时不需要 */
   CF_API_TOKEN?: string;
   ZONE_ID?: string;
@@ -156,6 +158,28 @@ async function tick(env: Env): Promise<void> {
   const ok = await probeOk(env.PROBE_URL);
   const currentPrimary = order[0] ?? "";
 
+  // 主控探活失败时，才需要判断备选是否活着 —— 否则会「切到另一台死机器上」。
+  // 备选地址来自 CANDIDATE_URLS（JSON: {"jp":"https://jp.example/health"}）；
+  // 没配就只能按顺位走（decide 里把未知当成可用）。
+  let candidateOk: Record<string, boolean> | undefined;
+  if (!ok) {
+    let urls: Record<string, string> = {};
+    try {
+      urls = env.CANDIDATE_URLS ? JSON.parse(env.CANDIDATE_URLS) : {};
+    } catch {
+      urls = {};
+    }
+    const names = order.filter((x) => x && x !== currentPrimary);
+    if (names.length) {
+      candidateOk = {};
+      // 只探前 3 个，避免一轮里打太多外网请求
+      for (const name of names.slice(0, 3)) {
+        const url = urls[name];
+        candidateOk[name] = url ? await probeOk(url) : true;
+      }
+    }
+  }
+
   const decision = decide(state, {
     probeOk: ok,
     currentPrimary,
@@ -163,6 +187,7 @@ async function tick(env: Env): Promise<void> {
     now: Date.now(),
     threshold: Number(env.THRESHOLD ?? 3),
     cooldownMs: Number(env.COOLDOWN_MS ?? 600000),
+    candidateOk,
   });
 
   if (decision.action === "switch") {

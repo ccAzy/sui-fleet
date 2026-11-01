@@ -235,9 +235,17 @@ check("sub uri has key", "?k=" in sub_url, sub_url)
 # 只取 path+query，拼回本机 BASE——这样本地/线上都能测。
 _sp = urllib.parse.urlsplit(sub_url)
 SUB_PATH = _sp.path + (("?" + _sp.query) if _sp.query else "")
-# 节点级 key 必须带作用域才放行（审计 run-1：去掉 client= 会拿到同节点全部租户凭据），
-# 所以这里显式带上 client=，模拟面板下发的“每人一条”链接。
-SUB_SCOPED = SUB_PATH + "&client=alice"
+# 订阅必须是「每客户端一条令牌」：cron 已回填 sub_token，所以这里用 ?t=。
+# legacy 的 &client= 对被回填过的客户端一律 403（见下方专门的回归断言）。
+_alice_tok = ""
+for _c in (j(get("/api/clients")).get("obj") or {}).get("clients") or []:
+    if _c.get("name") == "alice":
+        _alice_tok = str(_c.get("sub_token") or "")
+SUB_SCOPED = (
+    SUB_PATH.split("?")[0] + "?t=" + _alice_tok
+    if _alice_tok
+    else SUB_PATH + "&client=alice"
+)
 sub = get(SUB_SCOPED)
 decoded = base64.b64decode(sub).decode()
 check("subscription", decoded.startswith("vless://"), decoded[:80])
@@ -410,13 +418,22 @@ check(
 
 # ---- sing-box JSON 订阅 ----
 sb = j(get(SUB_SCOPED + "&type=singbox"))
+_obs = sb.get("outbounds") if isinstance(sb, dict) else sb
 check(
-    "sing-box 订阅",
-    isinstance(sb, list)
-    and len(sb) >= 1
-    and sb[0].get("type") == "vless"
-    and sb[0].get("server_port") == 443,
-    str(sb[:1]),
+    "sing-box 订阅返回完整配置（不是裸数组）",
+    isinstance(sb, dict)
+    and isinstance(sb.get("outbounds"), list)
+    and isinstance(sb.get("inbounds"), list)
+    and sb.get("route", {}).get("final") == "proxy",
+    str(list(sb.keys()) if isinstance(sb, dict) else type(sb)),
+)
+check(
+    "sing-box 首个 outbound 是 vless 且端口正确",
+    isinstance(_obs, list)
+    and len(_obs) >= 1
+    and _obs[0].get("type") == "vless"
+    and _obs[0].get("server_port") == 443,
+    str((_obs or [])[:1]),
 )
 
 # ---- 备份 / 恢复 ----
@@ -594,8 +611,10 @@ check(
     "不带作用域的订阅链接被拒（403）",
     status_of("/sub/" + node_id + "?k=" + sub_key) == 403,
 )
-n_filtered = link_count(get("/sub/" + node_id + "?k=" + sub_key + "&client=alice"))
-check("带 client= 只返回该客户端", n_filtered == 1, str(n_filtered))
+check(
+    "已回填令牌的客户端不再接受 legacy &client= 链接",
+    status_of("/sub/" + node_id + "?k=" + sub_key + "&client=alice") == 403,
+)
 tok = str(alice.get("sub_token") or "")
 check("客户端已分配 sub_token", bool(tok), str(list(alice.keys())[:8]))
 n_token = link_count(get("/sub/" + node_id + "?t=" + tok))

@@ -47,12 +47,12 @@ export function registerAgentApi(app: Hono<{ Bindings: Env }>) {
     // 单次上报的流量条目数必须封顶：handleReport 对每条 traffic 追加 INSERT，
     // 并对每个命中 tag 再 UPDATE 一次，写放大约 2N。agent token 属于低权主体，
     // 不能让一次请求就能推动任意多的 D1 写（免费档 10 万/天是全库共享的）。
-    const MAX_TRAFFIC = 2000;
-    if (Array.isArray(body.traffic) && body.traffic.length > MAX_TRAFFIC)
-      return c.json(
-        { ok: false, error: `traffic 条目超上限（${MAX_TRAFFIC}）` },
-        413,
-      );
+    // 不再用 413 拒收：agent 的计数器是 swap 后发送的，任何非 200 都会让那批增量
+    // 永久丢失。超量时接收并截断到绝对上限（现实规模是"本轮有流量的客户端数"，
+    // 单节点个位数到十位数；10000 是防滥用的天花板，不是正常路径）。
+    const MAX_TRAFFIC_TOTAL = 10_000;
+    if (Array.isArray(body.traffic) && body.traffic.length > MAX_TRAFFIC_TOTAL)
+      body.traffic = body.traffic.slice(0, MAX_TRAFFIC_TOTAL);
     await handleReport(
       c.env.DB,
       node,

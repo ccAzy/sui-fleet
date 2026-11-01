@@ -7,7 +7,7 @@
 import type { Hono } from "hono";
 import { all, getNode, listNodes, type Env } from "../db";
 import { buildClashConfig, linkToProxy } from "../clash";
-import { buildSingboxOutbounds, linkToOutbound } from "../singbox";
+import { buildSingboxConfig, linkToOutbound } from "../singbox";
 
 type SubFormat = "" | "clash" | "singbox";
 
@@ -91,7 +91,8 @@ function renderSubscription(
     });
   }
   if (subType === "singbox") {
-    return new Response(JSON.stringify(buildSingboxOutbounds(links), null, 2), {
+    // 返回完整配置对象（不是裸数组）：标准 remote profile 期望可加载的配置。
+    return new Response(JSON.stringify(buildSingboxConfig(links, title), null, 2), {
       status: 200,
       headers: {
         ...headers,
@@ -276,12 +277,30 @@ export function registerSub(app: Hono<{ Bindings: Env }>) {
       clientFilter = matched;
     }
 
-    // sub_key 是**节点级**的，client 只是过滤参数、不是凭据 —— 所以这里必须要求
-    // 调用方带上作用域，否则「去掉一个查询参数」就能拿到同节点全部租户的 UUID/密码
-    // （审计 run-1 实测）。三种带作用域的形式都接受：
-    //   ?t=<sub_token>            新格式，令牌即作用域
-    //   ?k=<sub_key>&client=<名>  旧格式，名字仍是过滤参数，但调用方已经限定了范围
-    //   ?k=<sub_key><名字>        更老的拼接格式
+    // 作用域要求 + legacy 收口：
+    //   ?t=<sub_token>            正式格式，令牌即作用域
+    //   ?k=<sub_key>&client=<名>  兼容格式，**仅当该客户端还没有 sub_token 时**才放行
+    //   ?k=<sub_key><名字>        同上（更老的拼接形式）
+    // cron 已把所有客户端补上 sub_token，所以 legacy 实际处于关闭状态；保留分支只是
+    // 为了不给「刚建好、还没被回填」的客户端留空白窗口。
+    if (clientFilter && !subToken) {
+      let target: Record<string, unknown> | null = null;
+      for (const r of clients) {
+        try {
+          const cl = JSON.parse(r.data) as Record<string, unknown>;
+          if (String(cl.name ?? "") === clientFilter) target = cl;
+        } catch {
+          /* 坏行跳过 */
+        }
+      }
+      if (target && String(target.sub_token ?? ""))
+        return c.text(
+          "forbidden: this client has its own subscription token, use ?t=<token>",
+          403,
+          { "Cache-Control": "no-store" },
+        );
+    }
+
     if (!clientFilter && !subToken) {
       return c.text(
         "forbidden: subscription URL must be scoped to one client " +
