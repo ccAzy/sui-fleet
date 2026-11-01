@@ -10,8 +10,10 @@ PAYLOAD_SRC="$REPO/panel/test/pull-payload-wsl.json"
 MOCK="$REPO/panel/test/mock-panel.py"
 W="$HOME/agent-update-test"
 
-rm -rf "$W"; mkdir -p "$W/db"
-cp "$BIN" "$W/sui-agent"; chmod +x "$W/sui-agent"
+rm -rf "$W"
+mkdir -p "$W/db"
+cp "$BIN" "$W/sui-agent"
+chmod +x "$W/sui-agent"
 cp "$PAYLOAD_SRC" "$W/base.json"
 cp "$MOCK" "$W/mock-panel.py"
 cd "$W"
@@ -38,8 +40,8 @@ PY
 pkill -f "http.server 8898" 2>/dev/null || true
 pkill -f mock-panel.py 2>/dev/null || true
 sleep 1
-nohup python3 -m http.server 8898 --bind 127.0.0.1 > http.log 2>&1 &
-nohup python3 mock-panel.py payload.json 8899 > mock.log 2>&1 &
+nohup python3 -m http.server 8898 --bind 127.0.0.1 >http.log 2>&1 &
+nohup python3 mock-panel.py payload.json 8899 >mock.log 2>&1 &
 sleep 1
 
 echo "==> 启动 agent（观察到自更新与重启）"

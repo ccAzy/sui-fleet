@@ -32,8 +32,9 @@ need() { command -v "$1" >/dev/null 2>&1 || { echo "缺少依赖: $1" >&2; exit 
 need curl; need systemctl; need gunzip
 
 # Cloudflare 静态资源单文件上限 25MiB，agent 的 gz 有 33MB，因此按分片发布：
-#   <name>.gz.part-00 / .part-01 / ...   +   <name>.gz.parts（分片数）
-# 这里把分片拼回整包再解压，sha256 校验的是"拼接后的 .gz"。
+#   <name>.part-00 / .part-01 / ...  +  <name>.parts（分片数）  +  <name>.sha256
+# 这里把分片拼回整包再解压，sha256 校验的是“拼接后的 gz”。
+# 注意：基名不带 .gz —— publish-agent.sh 产出的是 sui-agent-linux-amd64.parts。
 fetch_parts() { # fetch_parts <name> <dest>
   local name="$1" dest="$2"
   local count
@@ -61,12 +62,12 @@ fetch_parts() { # fetch_parts <name> <dest>
 echo "==> 下载 agent ($ARCH)"
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
-fetch_parts "sui-agent-linux-$ARCH.gz" "$TMP/agent.gz"
+fetch_parts "sui-agent-linux-$ARCH" "$TMP/agent.gz"
 gunzip -c "$TMP/agent.gz" > "$TMP/agent"
 install -D -m755 "$TMP/agent" /opt/sui-agent/bin/sui-agent
 
 if [ -n "$KOMARI" ]; then
-  if fetch_parts "komari-agent-linux-$ARCH.gz" "$TMP/komari.gz" 2>/dev/null; then
+  if fetch_parts "komari-agent-linux-$ARCH" "$TMP/komari.gz" 2>/dev/null; then
     gunzip -c "$TMP/komari.gz" > "$TMP/komari"
     install -D -m755 "$TMP/komari" /opt/komari/agent
     cat > /etc/systemd/system/komari-agent.service <<UNIT
@@ -90,7 +91,7 @@ fi
 
 echo "==> 写入配置与单元"
 cat > /etc/sui-agent.env <<ENV
-SUI_AGENT_PANEL=$PANEL
+SUI_PANEL=$PANEL
 SUI_AGENT_TOKEN=$TOKEN
 ENV
 chmod 600 /etc/sui-agent.env
@@ -105,7 +106,7 @@ Wants=network-online.target
 WorkingDirectory=/opt/sui-agent
 EnvironmentFile=/etc/sui-agent.env
 Environment=SUI_DB_FOLDER=/opt/sui-agent/db
-ExecStart=/opt/sui-agent/bin/sui-agent agent --panel $SUI_AGENT_PANEL --token $SUI_AGENT_TOKEN --interval 60
+ExecStart=/opt/sui-agent/bin/sui-agent agent --panel $PANEL --token $TOKEN --interval 60
 Restart=always
 RestartSec=5
 LimitNOFILE=1048576

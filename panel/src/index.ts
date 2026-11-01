@@ -10,6 +10,7 @@ import {
   signJWT,
   verifyJWT,
   verifyOpsToken,
+  verifyPullToken,
 } from "./auth";
 import {
   all,
@@ -368,10 +369,23 @@ app.use("/api/*", async (c, next) => {
   const p = c.req.path;
   if (p.endsWith("/login") || p.endsWith("/login/otp") || p.endsWith("/logout"))
     return await next();
-  // 备份令牌：只放行 getdb 一个端点，供备用机无人值守拉快照（见 auth.verifyBackupToken）
+  // 拉备份令牌：只放行 getdb 一个端点，供备用机无人值守拉快照。
+  // 用 verifyPullToken（backup 或 ops 均可），而不是 ops —— 两个令牌各管各的。
   if (p === "/api/getdb") {
     const tk = c.req.query("token") ?? "";
-    if (tk && (await verifyOpsToken(c.env.DB, tk))) {
+    if (tk && (await verifyPullToken(c.env.DB, tk))) {
+      // 还没完成首次改密的实例，连备份都不给拉：此时库里是默认口令凭据，
+      // 导出一份等于把“能用默认口令登录”的完整证据交给对方。
+      const pending = await first<{ c: number }>(
+        c.env.DB,
+        "SELECT COUNT(*) c FROM users WHERE must_change = 1",
+      );
+      if ((pending?.c ?? 0) > 0)
+        return json(
+          c,
+          null,
+          new Error("panel not initialized: change the default password first"),
+        );
       await run(
         c.env.DB,
         "INSERT INTO changes (node_id, ts, actor, kind, action, obj) VALUES (?, ?, ?, ?, ?, ?)",
@@ -417,7 +431,14 @@ registerOps(app);
 registerApiWrite(app);
 registerOtpAdmin(app);
 
+// 手动触发一次巡检。必须在 Cloudflare 定时事件之外提供，但它是一条**无人值守的写操作**
+// （配额判定、到期停用、流量重置、数据清理），所以必须鉴权：
+// Cloudflare 定时走 scheduled()，根本不需要这个路由；只有排障/测试才手动打。
+// 没配 CRON_SECRET 时默认拒绝（fail closed），而不是默认放行。
 app.all("/__cron", async (c) => {
+  const want = (c.env as Env & { CRON_SECRET?: string }).CRON_SECRET ?? "";
+  const got = c.req.header("x-cron-secret") ?? "";
+  if (!want || got !== want) return c.text("forbidden", 403);
   await cronTick(c.env.DB);
   return c.text("ok");
 });

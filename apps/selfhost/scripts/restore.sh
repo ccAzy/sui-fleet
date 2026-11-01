@@ -6,16 +6,18 @@
 # 安全策略：
 #   1. 先停服务，避免半写状态被读到；
 #   2. 当前库连同 -wal/-shm 一起改名归档（不删除），文件名带时间戳；
-#   3. 恢复后启动服务并做健康检查（/api/servers 返回 200 且 JSON success）；
+#   3. 恢复后启动服务并做健康检查（公开的 /health 返回 ok:true —— 不能用 /api/servers：
+#      它在登录守卫之后，未登录永远返回 success:false，会让每次恢复都误判失败并回滚）；
 #   4. 健康检查失败 → 自动回滚到刚归档的那一份并再次起服务。
 set -euo pipefail
 
 SNAPSHOT="${1:?用法: restore.sh <备份.db>}"
 DATA_DIR="${DATA_DIR:-/opt/sui-panel/data}"
-DB="${DB:-$DATA_DIR/sui.db}"
+# 默认跟随 snapshot-pull.sh 的产物名（standby.db）；老机器上手工恢复可传 DB=...
+DB="${DB:-$DATA_DIR/standby.db}"
 ARCHIVE_DIR="${ARCHIVE_DIR:-$DATA_DIR/archive}"
 SERVICE="${SERVICE:-sui-panel}"
-HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:8788/api/servers}"
+HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:8788/health}"
 
 if [ ! -f "$SNAPSHOT" ]; then
   echo "找不到快照：$SNAPSHOT" >&2
@@ -48,7 +50,7 @@ for i in $(seq 1 15); do
   sleep 1
   if body=$(curl -fsS --max-time 5 "$HEALTH_URL" 2>/dev/null); then
     case "$body" in
-    *'"success":true'*)
+    *'"ok":true'*)
       healthy=1
       break
       ;;

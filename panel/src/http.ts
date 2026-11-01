@@ -1,7 +1,7 @@
 // 面板各处共用的 HTTP 基础设施：会话、统一响应格式、地址与密钥。
 // 从 index.ts 抽出来，避免路由模块反向 import 入口（那会成环）。
 import { getCookie } from "hono/cookie";
-import { COOKIE, signJWT, verifyJWT } from "./auth";
+import { COOKIE, isSessionPayload, signJWT, verifyJWT } from "./auth";
 import { first, getNode, listNodes, run, type Env, type NodeRow } from "./db";
 
 export interface Session {
@@ -35,7 +35,8 @@ export async function currentUser(c: any): Promise<Session | null> {
   const token = getCookie(c, COOKIE);
   if (!token) return null;
   const payload = await verifyJWT(token, await secretOf(c.env));
-  if (!payload || typeof payload.u !== "string") return null;
+  // isSessionPayload 会拒掉二次验证票据（otp:1）——那张票只是“密码正确”，不是登录成功。
+  if (!isSessionPayload(payload)) return null;
   return {
     username: payload.u,
     uid: Number(payload.uid ?? 0),

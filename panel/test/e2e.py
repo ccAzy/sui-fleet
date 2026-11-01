@@ -41,12 +41,15 @@ def post(path, form=None, js=None, headers=None, token=None):
         return r.read().decode()
 
 
-def get(path, token=None):
+def get(path, token=None, headers=None):
     url = BASE + path
     if not url.startswith(("http://", "https://")):
         raise ValueError("only http(s) is allowed: " + url)
+    hdrs = dict(headers or {})
+    if token:
+        hdrs["Authorization"] = "Bearer " + token
     req = urllib.request.Request(  # noqa: S310  # nosec B310
-        url, headers={"Authorization": "Bearer " + token} if token else {}
+        url, headers=hdrs
     )
     with opener.open(req, timeout=15) as r:
         return r.read().decode()
@@ -270,7 +273,9 @@ r = new_client(
 )
 check("auto-reset client created", r["success"], r)
 
-get("/__cron")  # 触发一次巡检
+# /__cron 现在需要 X-Cron-Secret（fail closed）；测试里用环境变量给的值
+CRON = os.environ.get("CRON_SECRET", "test-cron-secret")
+get("/__cron", headers={"X-Cron-Secret": CRON})  # 触发一次巡检
 
 clients_now = {c["name"]: c for c in j(get("/api/clients"))["obj"]["clients"]}
 bob = clients_now.get("bob", {})

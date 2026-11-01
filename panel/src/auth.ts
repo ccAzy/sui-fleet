@@ -194,14 +194,17 @@ export const COOKIE = "sui_session";
  * 这个令牌能读到整库（含密码哈希与 TOTP 密钥），因此只在"备用机定时拉"这一
  * 个场景使用，且必须与面板同域不同路径地暴露在 HTTPS 后面。
  */
-export async function verifyBackupToken(
+/** 常量时间比较：把库里的 sha256 与候选令牌的 sha256 逐字节异或累加。 */
+async function hashEquals(
   db: D1Database,
+  metaKey: string,
   token: string,
 ): Promise<boolean> {
   if (!/^[0-9a-f]{48}$/.test(token)) return false;
   const row = await first<{ value: string }>(
     db,
-    "SELECT value FROM meta WHERE key = 'backup_token_hash'",
+    "SELECT value FROM meta WHERE key = ?",
+    metaKey,
   );
   if (!row?.value) return false;
   const got = await sha256(token);
@@ -213,26 +216,44 @@ export async function verifyBackupToken(
 }
 
 /**
- * 运维令牌：一个令牌同时用于「拉备份」和「仲裁者读写」两类无人值守调用。
- * 优先看 meta.ops_token_hash，其次兼容早期的 backup_token_hash（已部署过的机器不用改）。
+ * 会话载荷校验（纯函数，便于单测）。
+ * 关键约束：二次验证票据（otp:1）是「密码正确」的临时凭证，不能当会话。
+ */
+export function isSessionPayload(
+  payload: Record<string, unknown> | null,
+): payload is { u: string; uid?: number; mc?: boolean } {
+  if (!payload || typeof payload.u !== "string") return false;
+  return payload.otp !== 1;
+}
+
+export async function verifyBackupToken(
+  db: D1Database,
+  token: string,
+): Promise<boolean> {
+  // 只认 backup_token_hash：两个令牌各管各的，混用等于把「拉备份」的权限
+  // 升级成「改仲裁代次」的权限。
+  return hashEquals(db, "backup_token_hash", token);
+}
+
+/**
+ * 运维令牌：只用于仲裁者读写等运维动作。
+ * 不再回退到 backup_token_hash —— 两个令牌必须能独立轮换、独立收紧。
  */
 export async function verifyOpsToken(
   db: D1Database,
   token: string,
 ): Promise<boolean> {
-  if (!/^[0-9a-f]{48}$/.test(token)) return false;
-  const got = await sha256(token);
-  for (const key of ["ops_token_hash", "backup_token_hash"]) {
-    const row = await first<{ value: string }>(
-      db,
-      "SELECT value FROM meta WHERE key = ?",
-      key,
-    );
-    if (!row?.value || row.value.length !== got.length) continue;
-    let diff = 0;
-    for (let i = 0; i < got.length; i++)
-      diff |= got.charCodeAt(i) ^ row.value.charCodeAt(i);
-    if (diff === 0) return true;
-  }
-  return false;
+  return hashEquals(db, "ops_token_hash", token);
+}
+
+/**
+ * 拉备份专用的令牌校验：backup 或 ops 均可（已部署机只需一个令牌就能拉快照）。
+ * 仅 /api/getdb 使用；不得用于任何写接口。
+ */
+export async function verifyPullToken(
+  db: D1Database,
+  token: string,
+): Promise<boolean> {
+  if (await verifyBackupToken(db, token)) return true;
+  return await verifyOpsToken(db, token);
 }

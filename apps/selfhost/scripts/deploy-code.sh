@@ -13,7 +13,9 @@ HOST="${HOST:?需要 HOST，例如 HOST=203.0.113.11}"
 SSH_PORT="${SSH_PORT:-6688}"
 SSH_KEY="${SSH_KEY:-$HOME/.ssh/id_ed25519}"
 REMOTE="${REMOTE:-/opt/sui-panel}"
-DOMAIN="${DOMAIN:-panel.example.com}"
+# 外网自检用的域名：默认从远端 panel 单元的 PANEL_BASE 自动取，取不到才跳过。
+# （不要在这里写死域名——仓库里的默认值必须是示例域名，写死成示例域名会让自检失效）
+DOMAIN="${DOMAIN:-}"
 REPO="$(cd "$(dirname "$0")/../../.." && pwd)"
 
 tmp=$(mktemp -d)
@@ -81,8 +83,15 @@ scp -q -P "$SSH_PORT" -i "$SSH_KEY" -o StrictHostKeyChecking=no -o UserKnownHost
 ssh -p "$SSH_PORT" -i "$SSH_KEY" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
   "root@$HOST" "bash /tmp/deploy-remote.sh"
 
+if [ -z "$DOMAIN" ]; then
+  DOMAIN=$(ssh -n -p "$SSH_PORT" -i "$SSH_KEY" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null     "root@$HOST" "sed -n 's/^Environment=PANEL_BASE=//p' /etc/systemd/system/sui-panel.service" 2>/dev/null | tr -d '')
+  case "$DOMAIN" in https://*) DOMAIN="${DOMAIN#https://}" ;; esac
+fi
+
 echo "==> 对外自检"
-if curl -fsS --max-time 8 "https://$DOMAIN/health" >/dev/null; then
+if [ -z "$DOMAIN" ]; then
+  echo "  （跳过外网自检：未指定 DOMAIN，且远端单元里没有 PANEL_BASE）"
+elif curl -fsS --max-time 8 "https://$DOMAIN/health" >/dev/null; then
   echo "  https://$DOMAIN/health OK"
 else
   echo "  （外网探测失败；本机 health 已通过，多半是本地网络/代理问题）"

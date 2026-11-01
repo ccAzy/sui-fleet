@@ -19,12 +19,15 @@ SSH_PORT="${SSH_PORT:-22}"
 SSH_KEY="${SSH_KEY:-$HOME/.ssh/id_ed25519}"
 SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=15"
 
-[ -f "$HERE/cf-check.sh" ] || { echo "缺 $HERE/cf-check.sh"; exit 1; }
+[ -f "$HERE/cf-check.sh" ] || {
+   echo "缺 $HERE/cf-check.sh"
+   exit 1
+}
 
 install_local() { # $1=host
-  local host="$1"
-  install -m755 "$HERE/cf-check.sh" /usr/local/bin/cf-check.sh
-  cat >/etc/systemd/system/cf-check.service <<UNIT
+   local host="$1"
+   install -m755 "$HERE/cf-check.sh" /usr/local/bin/cf-check.sh
+   cat >/etc/systemd/system/cf-check.service <<UNIT
 [Unit]
 Description=Check Cloudflare Tunnel end-to-end health
 After=network-online.target cloudflared.service
@@ -35,7 +38,7 @@ Environment=CF_HOST=$host
 ExecStart=/usr/local/bin/cf-check.sh
 UNIT
 
-  cat >/etc/systemd/system/cf-check.timer <<'UNIT'
+   cat >/etc/systemd/system/cf-check.timer <<'UNIT'
 [Unit]
 Description=Run cf-check every 5 minutes
 
@@ -48,17 +51,18 @@ AccuracySec=30s
 WantedBy=timers.target
 UNIT
 
-  systemctl daemon-reload
-  systemctl enable --now cf-check.timer >/dev/null 2>&1
-  printf '  timer: '; systemctl is-active cf-check.timer
+   systemctl daemon-reload
+   systemctl enable --now cf-check.timer >/dev/null 2>&1
+   printf '  timer: '
+   systemctl is-active cf-check.timer
 }
 
 install_remote() { # $1=ip $2=host
-  local ip="$1" host="$2"
-  scp -q -P "$SSH_PORT" -i "$SSH_KEY" $SSH_OPTS "$HERE/cf-check.sh" "root@$ip:/usr/local/bin/cf-check.sh" || return 1
-  # ssh 一定要加 -n：在 while read 循环里它会吃掉循环的 stdin，导致只处理第一台
-  ssh -n -p "$SSH_PORT" -i "$SSH_KEY" $SSH_OPTS "root@$ip" \
-    "chmod +x /usr/local/bin/cf-check.sh
+   local ip="$1" host="$2"
+   scp -q -P "$SSH_PORT" -i "$SSH_KEY" $SSH_OPTS "$HERE/cf-check.sh" "root@$ip:/usr/local/bin/cf-check.sh" || return 1
+   # ssh 一定要加 -n：在 while read 循环里它会吃掉循环的 stdin，导致只处理第一台
+   ssh -n -p "$SSH_PORT" -i "$SSH_KEY" $SSH_OPTS "root@$ip" \
+      "chmod +x /usr/local/bin/cf-check.sh
      cat >/etc/systemd/system/cf-check.service <<'UNIT'
 [Unit]
 Description=Check Cloudflare Tunnel end-to-end health
@@ -87,12 +91,12 @@ UNIT
 }
 
 while read -r name ip host; do
-  [ -z "${name:-}" ] && continue
-  case "$name" in \#*) continue ;; esac
-  printf '== %s (%s) %s\n' "$name" "$ip" "$host"
-  if [ "$ip" = "127.0.0.1" ]; then
-    install_local "$host"
-  else
-    install_remote "$ip" "$host" || echo "  失败（SSH 不通或权限不足）"
-  fi
-done < "$LIST"
+   [ -z "${name:-}" ] && continue
+   case "$name" in \#*) continue ;; esac
+   printf '== %s (%s) %s\n' "$name" "$ip" "$host"
+   if [ "$ip" = "127.0.0.1" ]; then
+      install_local "$host"
+   else
+      install_remote "$ip" "$host" || echo "  失败（SSH 不通或权限不足）"
+   fi
+done <"$LIST"

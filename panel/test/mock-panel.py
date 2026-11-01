@@ -40,7 +40,14 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/agent/pull":
             state["pulled"] += 1
             if state["pulled"] > 1 and req.get("revision") == PAYLOAD.get("revision"):
-                return self._json(200, {"ok": True, "unchanged": True, "revision": PAYLOAD.get("revision")})
+                return self._json(
+                    200,
+                    {
+                        "ok": True,
+                        "unchanged": True,
+                        "revision": PAYLOAD.get("revision"),
+                    },
+                )
             return self._json(200, PAYLOAD)
 
         if self.path == "/agent/report":
@@ -58,5 +65,8 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    print(f"mock panel on http://127.0.0.1:{PORT}  payload revision={PAYLOAD.get('revision')}", flush=True)
+    print(
+        f"mock panel on http://127.0.0.1:{PORT}  payload revision={PAYLOAD.get('revision')}",
+        flush=True,
+    )
     HTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
