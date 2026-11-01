@@ -34,8 +34,8 @@ print("fresh db ok")
 PY
 
 SUI_DB="$DB" SUI_DIST="$DIST" PORT="$PORT" \
-JWT_SECRET=e2e-secret-0123456789 CRON_SECRET=test-cron-secret \
-npx tsx "$ROOT/apps/selfhost/src/server.ts" > /tmp/e2e-srv.log 2>&1 &
+  JWT_SECRET=e2e-secret-0123456789 CRON_SECRET=test-cron-secret \
+  npx tsx "$ROOT/apps/selfhost/src/server.ts" >/tmp/e2e-srv.log 2>&1 &
 SRV=$!
 
 for _ in $(seq 1 20); do
@@ -44,7 +44,9 @@ for _ in $(seq 1 20); do
   [ "$code" = "200" ] && break
 done
 if [ "${code:-}" != "200" ]; then
-  echo "server did not come up; log:"; tail -20 /tmp/e2e-srv.log; exit 1
+  echo "server did not come up; log:"
+  tail -20 /tmp/e2e-srv.log
+  exit 1
 fi
 
 set +e

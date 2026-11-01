@@ -272,9 +272,16 @@ export async function handleReport(
   const status = body.status ?? {};
   // 节点上报的日志统一落到 status.logs（数组）；last_log 是旧键，继续写一份兼容老前端。
   if (body.last_log) {
+    // 单条也要截断：status_json 是 nodes 表的一个 TEXT 列，一条超大日志就能把它撑到
+    // 写不进去，之后该节点所有 UPDATE nodes 全部失败 —— 表现为"永远 offline 且删不掉"。
+    const LOG_ITEM_MAX = 2000;
+    const LOG_KEEP = 200;
+    const one = String(body.last_log).slice(0, LOG_ITEM_MAX);
     const prev = Array.isArray(status.logs) ? (status.logs as unknown[]) : [];
-    status.logs = [...prev, body.last_log].slice(-200);
-    status.last_log = body.last_log;
+    status.logs = [...prev, one]
+      .map((x) => String(x).slice(0, LOG_ITEM_MAX))
+      .slice(-LOG_KEEP);
+    status.last_log = one;
   }
 
   const stmts = [

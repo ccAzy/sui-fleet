@@ -544,7 +544,11 @@ export async function saveObject(
         // 同节点全部租户的 UUID/密码（审计 run-1 实测：1 条变 2 条）。凭据必须自带作用域。
         const payload =
           kind === "clients"
-            ? { ...item, id, sub_token: String((item as any).sub_token ?? "") || randHex(16) }
+            ? {
+                ...item,
+                id,
+                sub_token: String((item as any).sub_token ?? "") || randHex(16),
+              }
             : { ...item, id };
         stmts.push(
           db
@@ -634,6 +638,36 @@ export async function purgeNodeData(
     db.prepare("DELETE FROM changes WHERE node_id = ?").bind(nodeId),
     db.prepare("DELETE FROM usage WHERE node_id = ?").bind(nodeId),
     db.prepare("DELETE FROM commands WHERE node_id = ?").bind(nodeId),
+  ]);
+}
+
+/**
+ * 删除节点：清数据 + 删行 + 留一条审计，**同一次 batch**。
+ *
+ * 原来拆成两次调用（purgeNodeData 一个 batch、DELETE FROM nodes 一条语句）：
+ * 中间失败就是「节点还在、配置已被清空」，而且 purge 会把该节点的 changes 一起删掉
+ * —— 删除动作本身因此不留任何痕迹。
+ */
+export async function deleteNode(
+  db: D1Database,
+  nodeId: string,
+  actor: string,
+): Promise<void> {
+  const ts = now();
+  await batch(db, [
+    db.prepare("DELETE FROM objects WHERE node_id = ?").bind(nodeId),
+    db.prepare("DELETE FROM settings WHERE node_id = ?").bind(nodeId),
+    db.prepare("DELETE FROM changes WHERE node_id = ?").bind(nodeId),
+    db.prepare("DELETE FROM usage WHERE node_id = ?").bind(nodeId),
+    db.prepare("DELETE FROM commands WHERE node_id = ?").bind(nodeId),
+    db.prepare("DELETE FROM nodes WHERE id = ?").bind(nodeId),
+    // 审计行放在最后：batch 顺序执行，前面那条 DELETE FROM changes 已经把该节点的
+    // 历史清掉，这一行必须活下来，否则「谁在什么时候删了哪台」永远查不到。
+    db
+      .prepare(
+        "INSERT INTO changes (node_id, ts, actor, kind, action, obj) VALUES (?, ?, ?, 'node', 'delete', ?)",
+      )
+      .bind(nodeId, ts, actor || "system", JSON.stringify({ id: nodeId })),
   ]);
 }
 

@@ -266,7 +266,8 @@ export function registerSub(app: Hono<{ Bindings: Env }>) {
       for (const r of clients) {
         try {
           const cl = JSON.parse(r.data) as Record<string, unknown>;
-          if (String(cl.sub_token ?? "") === subToken) matched = String(cl.name ?? "");
+          if (String(cl.sub_token ?? "") === subToken)
+            matched = String(cl.name ?? "");
         } catch {
           /* 坏行跳过 */
         }

@@ -189,7 +189,9 @@ export async function ensureSessionEpoch(db: D1Database): Promise<void> {
   if (sessionEpochReady) return;
   try {
     await db
-      .prepare("ALTER TABLE users ADD COLUMN session_epoch INTEGER NOT NULL DEFAULT 0")
+      .prepare(
+        "ALTER TABLE users ADD COLUMN session_epoch INTEGER NOT NULL DEFAULT 0",
+      )
       .run();
   } catch {
     // 已存在就是正常情况
@@ -243,6 +245,28 @@ export async function bumpSessionEpoch(
     uid,
   );
   epochCache.delete(uid);
+}
+
+/**
+ * 补两个纯性能索引（老库靠这条迁移，新库由 schema.sql 直接建）。
+ *
+ * 为什么值得单独一个函数：登录限流的全局计数查询是**未认证请求**触发的，
+ * 没有 ts 单列索引时每次尝试都全表扫 login_attempts，这张表又会按 7 天留存持续增长。
+ */
+let perfIndexesReady = false;
+export async function ensurePerfIndexes(db: D1Database): Promise<void> {
+  if (perfIndexesReady) return;
+  for (const sql of [
+    "CREATE INDEX IF NOT EXISTS idx_login_ts ON login_attempts(ts)",
+    "CREATE INDEX IF NOT EXISTS idx_commands_created ON commands(created_at)",
+  ]) {
+    try {
+      await db.prepare(sql).run();
+    } catch {
+      // 建不上不影响功能，最多是全表扫
+    }
+  }
+  perfIndexesReady = true;
 }
 
 /** 节点配置版本 +1，让 agent 下次 pull 时拿到新快照。 */

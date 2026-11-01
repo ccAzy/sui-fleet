@@ -526,7 +526,12 @@ ep = {
     "private_key": "E2E-PRIVATE-KEY-SHOULD-NOT-LEAK",
     "address": ["10.9.9.2/32"],
 }
-j(post("/api/save", form={"object": "endpoints", "action": "new", "data": json.dumps(ep)}))
+j(
+    post(
+        "/api/save",
+        form={"object": "endpoints", "action": "new", "data": json.dumps(ep)},
+    )
+)
 mon = j(post("/api/addToken", form={"desc": "e2e-monitor", "expiry": "0"}))["obj"]
 raw = get("/api/endpoints", token=mon)
 d = j(raw)
@@ -573,7 +578,11 @@ op2 = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj2))
 
 def op_call(op, path, form=None):
     data = urllib.parse.urlencode(form).encode() if form is not None else None
-    hdrs = {"Content-Type": "application/x-www-form-urlencoded"} if form is not None else {}
+    hdrs = (
+        {"Content-Type": "application/x-www-form-urlencoded"}
+        if form is not None
+        else {}
+    )
     # noqa: S310  # nosec B310 -- BASE 是本地常量，只做 http(s) 端到端测试
     req = urllib.request.Request(BASE + path, data=data, headers=hdrs)  # noqa: S310  # nosec B310
     try:
@@ -598,6 +607,30 @@ check("改密后旧会话立即失效", not _stale_ok, _b[:160])
 
 r = j(get("/api/servers"))
 check("当前会话改密后仍可用（已补签新代次）", r.get("success") is True, str(r)[:120])
+
+# E) 登出必须真的吊销，而不是只删 cookie
+r = j(post("/api/changePass", form={"oldPass": NEWPASS, "newPass": "abc"}))
+check("弱密码（<8 位）被拒", r.get("success") is False, str(r)[:120])
+
+# getdb 的响应体是整库凭据，不能被任何中间层缓存
+req = urllib.request.Request(BASE + "/api/getdb")  # noqa: S310  # nosec B310
+with opener.open(req, timeout=20) as resp:
+    cc = resp.headers.get("Cache-Control", "")
+    resp.read()
+check("getdb 带 no-store", "no-store" in cc.lower(), cc)
+
+cj3 = http.cookiejar.CookieJar()
+op3 = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj3))
+_s, _b = op_call(op3, "/api/login", {"user": "admin", "pass": NEWPASS})
+check("第三会话登录成功", '"success":true' in _b.replace(" ", ""), _b[:120])
+op_call(op3, "/api/logout")
+_s, _b = op_call(op3, "/api/servers")
+check("登出后旧 cookie 失效（不只是删客户端 cookie）", '"success":true' not in _b.replace(" ", ""), _b[:160])
+
+# 登出提升了会话代次，主会话也一起失效 —— 重新登录继续后面的用例
+cj.clear()
+r = j(post("/api/login", form={"user": "admin", "pass": NEWPASS}))
+check("登出后重新登录可用", r.get("success") is True, str(r)[:120])
 
 # C) 导入通道不能绕过在线校验：meta 重复键必须被整个拒绝
 dup = {

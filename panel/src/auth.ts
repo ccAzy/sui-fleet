@@ -48,7 +48,6 @@ export async function hashPassword(password: string): Promise<string> {
   return `pbkdf2$${ITER}$${b64(salt.buffer)}$${b64(bits)}`;
 }
 
-
 /** PBKDF2 迭代上限。超过它一定是异常输入（正常的 ITER 是 1 万~60 万）。 */
 export const PBKDF2_MAX_ITER = 2_000_000;
 
@@ -129,6 +128,20 @@ export async function signJWT(
   return `${data}.${b64(sig).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")}`;
 }
 
+
+/**
+ * 恒定时间字符串比较。
+ *
+ * 用在两处：JWT 签名比对、/__cron 的密钥比对。用 `!==` 时提前返回的时机取决于第几个
+ * 字符不匹配，理论上可被逐字节猜（网络抖动下噪声很大，但不该留这个形状）。
+ */
+export function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
 export async function verifyJWT(
   token: string,
   secret: string,
@@ -145,13 +158,15 @@ export async function verifyJWT(
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
     .replace(/=+$/, "");
-  if (expect !== parts[2]) return null;
+  if (!timingSafeEqual(expect, parts[2])) return null;
   try {
     const payload = JSON.parse(
       atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")),
     ) as Record<string, unknown>;
-    const exp = typeof payload.exp === "number" ? payload.exp : 0;
-    if (exp && exp < now()) return null;
+    // exp 必须是数字且存在。原实现把"没有 exp"当成"永不过期"——
+    // 签发方只要漏写一个字段，那张令牌就是永久会话，且没有任何地方会报警。
+    if (typeof payload.exp !== "number") return null;
+    if (payload.exp < now()) return null;
     return payload;
   } catch {
     return null;

@@ -38,7 +38,10 @@ describe("redactForToken", () => {
 
   it("处理数组与 clients[].config.vless.uuid", () => {
     const out = redactForToken([
-      { name: "alice", config: { vless: { uuid: "11111111-2222-3333-4444-555555555555" } } },
+      {
+        name: "alice",
+        config: { vless: { uuid: "11111111-2222-3333-4444-555555555555" } },
+      },
     ]) as any[];
     expect(out[0].name).toBe("alice");
     expect(out[0].config.vless.uuid).toBe("[redacted]");
@@ -59,7 +62,10 @@ describe("redactForToken", () => {
   it("字段名大小写不敏感的场景不应误判（当前只按精确键名）", () => {
     // Private_Key 这类变体不会出现在本项目的对象模型里；万一出现，说明模型变了，
     // 那时应当同步改 SECRET_KEYS，而不是在这里放宽成模糊匹配（会误伤普通字段）。
-    const out = redactForToken({ Private_Key: "SECRET" }) as Record<string, unknown>;
+    const out = redactForToken({ Private_Key: "SECRET" }) as Record<
+      string,
+      unknown
+    >;
     expect(out.Private_Key).toBe("SECRET");
   });
 });

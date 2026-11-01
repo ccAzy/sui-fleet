@@ -20,13 +20,18 @@ import {
 import {
   getConfig,
   loadPartial,
-  purgeNodeData,
+  deleteNode,
   saveObject,
   seedNode,
 } from "../objects";
 import { enqueueCommand } from "../agent";
 import { metaGet, metaSet } from "../kernel";
 import { exportBundle, importBundle, type Bundle } from "../backup";
+
+/** 当前操作者，写审计行用。未登录路径（不该有）统一记 system。 */
+function actorOf(c: any): string {
+  return (c.get("user" as never) as string) || "system";
+}
 
 export function registerApiWrite(app: Hono<{ Bindings: Env }>) {
   async function saveServers(
@@ -44,8 +49,9 @@ export function registerApiWrite(app: Hono<{ Bindings: Env }>) {
     if (action === "del") {
       const id = idOf(d);
       if (id) {
-        await purgeNodeData(c.env.DB, id);
-        await run(c.env.DB, "DELETE FROM nodes WHERE id = ?", id);
+        await deleteNode(c.env.DB, id, actorOf(c));
+        // 删的正好是默认节点时，60 秒缓存里还留着它 —— 期间写操作会落到已删 node_id。
+        invalidateDefaultNode();
       }
     } else if (action === "new" || action === "edit") {
       const name = str(d.name).trim();
@@ -223,6 +229,12 @@ export function registerApiWrite(app: Hono<{ Bindings: Env }>) {
     const newName = String(body.newUsername ?? "") || username;
     const user = await doLogin(c.env.DB, username, oldPass);
     if (!user) return json(c, null, new Error("Invalid login"));
+    // 空密码 / 极短密码原先照收：一次手滑就能把面板改成空密码，
+    // 而"首次登录必须改密"这道闸设置的初衷正是防止弱口令。
+    if (newPass.length < 8)
+      return json(c, null, new Error("新密码至少 8 位"));
+    if (newPass === oldPass)
+      return json(c, null, new Error("新密码不能与旧密码相同"));
     const { hashPassword } = await import("../auth");
     await run(
       c.env.DB,
@@ -252,6 +264,8 @@ export function registerApiWrite(app: Hono<{ Bindings: Env }>) {
     return c.body(JSON.stringify(bundle, null, 2), 200, {
       "Content-Type": "application/json; charset=utf-8",
       "Content-Disposition": `attachment; filename="sui-backup-${stamp}.json"`,
+      // 响应体是整库凭据：不能被任何中间层缓存，也不能留在磁盘缓存里。
+      "Cache-Control": "no-store",
     });
   });
 
@@ -429,8 +443,7 @@ export function registerApiWrite(app: Hono<{ Bindings: Env }>) {
 
   app.post("/api/nodes/:id/delete", async (c) => {
     const id = c.req.param("id");
-    await purgeNodeData(c.env.DB, id);
-    await run(c.env.DB, "DELETE FROM nodes WHERE id = ?", id);
+    await deleteNode(c.env.DB, id, actorOf(c));
     // 删掉的正好是「默认节点」时，缓存里还留着它 —— 60 秒内 GET /api/load 会继续
     // 返回已删节点的数据，期间任何写操作都会落到不存在的 node_id 上；
     // 而 schema 没有外键 + purgeNodeData 已经跑过 ⇒ 产生永远不会被清理的孤儿行。

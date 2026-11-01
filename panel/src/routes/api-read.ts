@@ -171,10 +171,7 @@ export function registerApiRead(app: Hono<{ Bindings: Env }>) {
       // 这四个（以及 tls/clients）返回的是对象 JSON 原文：endpoints/outbounds 里
       // 有 WireGuard/Reality 私钥，services 里有 mesh/DERP token，inbounds 里有密码。
       // 「把这个端点移出白名单」修不干净 —— 授权粒度必须是字段。
-      return json(
-        c,
-        c.get("tokenOnly" as never) ? redactForToken(data) : data,
-      );
+      return json(c, c.get("tokenOnly" as never) ? redactForToken(data) : data);
     });
   }
 

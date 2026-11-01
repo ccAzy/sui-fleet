@@ -191,31 +191,6 @@ export function baseUrl(c: any): string {
   }
 }
 
-/** 重签登录 cookie（改密后用，避免必须重新登录）。 */
-export async function refreshSessionCookie(
-  c: any,
-  user: { username: string; id: number },
-) {
-  let https = true;
-  try {
-    https = new URL(c.req.url).protocol === "https:";
-  } catch {
-    https = true;
-  }
-  const token = await signJWT(
-    { u: user.username, uid: user.id, mc: false },
-    await secretOf(c.env),
-  );
-  const { setCookie } = await import("hono/cookie");
-  setCookie(c, COOKIE, token, {
-    httpOnly: true,
-    sameSite: "Lax",
-    path: "/",
-    maxAge: 86400,
-    secure: https,
-  });
-}
-
 /**
  * 读请求体：同时支持 JSON 与 form-urlencoded。
  *

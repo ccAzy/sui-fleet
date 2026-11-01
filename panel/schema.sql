@@ -120,6 +120,8 @@ CREATE TABLE IF NOT EXISTS commands (
   attempts   INTEGER NOT NULL DEFAULT 0      -- 已重投次数（上限 3）
 );
 CREATE INDEX IF NOT EXISTS idx_commands_pending ON commands(node_id, status);
+-- cronTick 按 created_at 清理（30 天），没有这个单列索引就是每 6 小时一次全表扫。
+CREATE INDEX IF NOT EXISTS idx_commands_created ON commands(created_at);
 
 -- 登录失败计数(Worker 无状态,只能落库做简单限流)
 CREATE TABLE IF NOT EXISTS login_attempts (
@@ -129,6 +131,9 @@ CREATE TABLE IF NOT EXISTS login_attempts (
   ok   INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_login_ip_ts ON login_attempts(ip, ts);
+-- 全局失败计数（不区分 IP）走的是 WHERE ts > ? AND ok = 0，(ip,ts) 复合索引用不上，
+-- 每次登录尝试都会全表扫。这张表按 7 天留存、又会被爆破写满，必须补单列 ts 索引。
+CREATE INDEX IF NOT EXISTS idx_login_ts ON login_attempts(ts);
 
 -- 面板自身的元信息(如 schema 版本、是否需要初始化)
 CREATE TABLE IF NOT EXISTS meta (

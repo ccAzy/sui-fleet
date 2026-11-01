@@ -8,6 +8,7 @@ import {
   ensureAdmin,
   login as doLogin,
   signJWT,
+  timingSafeEqual,
   verifyJWT,
   verifyOpsToken,
   tokenIsValid,
@@ -16,7 +17,9 @@ import {
 import {
   all,
   batch,
+  bumpSessionEpoch,
   ensureOtpSchema,
+  ensurePerfIndexes,
   ensureSessionEpoch,
   first,
   now,
@@ -162,6 +165,7 @@ app.post("/api/login", async (c) => {
   // 老库没有 session_epoch 列时，currentUser 的查询会直接报错（面板全体 500）。
   // 与 ensureOtpSchema 一样走「用到才补」：登录路径先补列，之后每次请求才敢查。
   await ensureSessionEpoch(c.env.DB);
+  await ensurePerfIndexes(c.env.DB);
   const user = await doLogin(
     c.env.DB,
     String(body.user ?? ""),
@@ -190,6 +194,7 @@ app.post("/api/login", async (c) => {
   // 老库没有 session_epoch 列时，currentUser 的查询会直接报错（面板全体 500）。
   // 与 ensureOtpSchema 一样走「用到才补」：登录路径先补列，之后每次请求才敢查。
   await ensureSessionEpoch(c.env.DB);
+  await ensurePerfIndexes(c.env.DB);
   return await issueSession(c, user);
 });
 
@@ -277,6 +282,11 @@ app.post("/api/login/otp", async (c) => {
 });
 
 app.get("/api/logout", async (c) => {
+  // 光删 cookie 不算登出：JWT 还在有效期内，谁复制过这枚 cookie 就还照样能用。
+  // 面板没有会话表，最接近「只登出这个人」的做法是把该用户的会话代次 +1
+  // —— 代价是同一账号在其他设备上的会话也一起失效（单管理员场景下这是想要的效果）。
+  const session = await currentUser(c);
+  if (session?.uid) await bumpSessionEpoch(c.env.DB, session.uid);
   deleteCookie(c, COOKIE, { path: "/" });
   deleteCookie(c, MARKER_COOKIE, { path: "/" });
   return okMsg(c);
@@ -507,7 +517,8 @@ registerOtpAdmin(app);
 app.all("/__cron", async (c) => {
   const want = (c.env as Env & { CRON_SECRET?: string }).CRON_SECRET ?? "";
   const got = c.req.header("x-cron-secret") ?? "";
-  if (!want || got !== want) return c.text("forbidden", 403);
+  // 恒定时间比较：`!==` 的提前返回时机与内容相关。
+  if (!want || !timingSafeEqual(got, want)) return c.text("forbidden", 403);
   await cronTick(c.env.DB);
   return c.text("ok");
 });
