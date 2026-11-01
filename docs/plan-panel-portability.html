@@ -44,8 +44,8 @@
 <div class="sheet">
 
   <h1>控制面可移植化 · 顺位接管 · 一键接入</h1>
-  <p class="sub">s-ui Cloud · 方案 v8 · 2026-11-01 · P0–P5 已完成（P4 dry-run 待你提供 CF API 令牌；P6 演练待排期）</p>
-  <span class="draft">PLAN v8 — P5 已上线</span>
+  <p class="sub">s-ui Cloud · 方案 v9 · 2026-11-01 · P0–P6 全部完成：接管演练已在真实 DNS 上跑通</p>
+  <span class="draft">PLAN v9 — 演练通过，等待正式切主</span>
 
   <h2>零、已确认的前提</h2>
   <table>
@@ -373,9 +373,43 @@ sed -i 's/^DRY_RUN = "1"/DRY_RUN = "0"/' wrangler.toml &amp;&amp; npx wrangler d
   <p>客户端只保存 <code>/sub/all</code> 一个地址：新增节点 → 刷新多几条；退役节点 → 刷新少几条。
     换服务器、跑路、不续费，都不需要再给任何客户端重发链接——这正是你最初提的那个痛点。</p>
 
-  <h2>十四、下一步（P6）</h2>
-  <p>P6 是演练与手册：在 hk ↔ jp 之间真实走一遍接管（先不切生产 DNS），产出切换 checklist 与回滚步骤。
-    前置：你提供 Cloudflare API 令牌，把 P4 的 dry-run 切成实切。</p>
+  <h2>十四、P6 完成：接管演练在真实 DNS 上跑通</h2>
+  <p class="decided">已完成 · 用一次性演练记录 drill.example.org，未触碰生产记录</p>
+
+  <h3>演练过程（时间线取自仲裁者日志）</h3>
+  <table>
+    <thead><tr><th>时刻</th><th>事件</th></tr></thead>
+    <tbody>
+      <tr><td>T+0</td><td>hk 上的面板服务被停掉（模拟主控宕机）</td></tr>
+      <tr><td>T+60s</td><td>仲裁者第 1 次探活失败</td></tr>
+      <tr><td>T+120s</td><td>第 2 次失败</td></tr>
+      <tr><td>T+180s</td><td><b>第 3 次失败 → 触发切换</b>：DNS 从 hk(192.0.2.10) 改到 jp(85.121.122.96)，epoch 0→1，回写面板</td></tr>
+      <tr><td>T+185s</td><td>公网解析 <code>drill.example.org</code> 已是 <code>85.121.122.96</code>（TTL 60 生效）</td></tr>
+    </tbody>
+  </table>
+
+  <h3>事先准备（都已落地）</h3>
+  <ul>
+    <li>hk 上装了 Node 24 + 面板运行时，导入生产快照后 <code>/health</code> 200、单节点订阅 1208 字节（与线上一致）；公网 8788 可达</li>
+    <li>Cloudflare API 令牌（Zone.DNS:Edit）已作为 <code>CF_API_TOKEN</code> 密钥写入仲裁者</li>
+    <li>顺位 <code>hk,jp</code>；KV <code>ips</code> 保存两台真实 IP</li>
+  </ul>
+
+  <h3>演练后已复位</h3>
+  <ul>
+    <li>删除 <code>drill.example.org</code> 记录；仲裁者改回 <code>DRY_RUN=1</code>、探测地址指回生产面板、记录名改回 <code>panel.example.org</code></li>
+    <li>面板 <code>meta.control_epoch/primary/switched_at</code> 归零；仲裁 KV 状态与日志清空</li>
+    <li>hk 面板重新启动并确认 <code>/health</code> 正常</li>
+  </ul>
+
+  <div class="note">
+    <b>这次演练证明了什么</b>：判定（3 次失败）、改 DNS、推进 epoch、回写面板这四步是串起来的，且真的改了能解析的记录。
+    剩下唯一的变量是"再切回去"：按设计不做自动回切，需要人工在面板点一下。
+  </div>
+
+  <h2>十五、下一步：正式切主（需你拍板）</h2>
+  <p>正式切主 = 把 <code>panel.example.org</code> 这条记录的源站从 Cloudflare 换到 hk，并把 <code>DRY_RUN</code> 关掉。
+    建议顺序：先在 hk 上补 <code>SUI_OPS_TOKEN</code>（启用代次闸门）→ 面板数据导出到 hk → 低 TTL 预热 → 切 DNS → 观察 10 台节点心跳 → 稳定 24 小时后再把 Cloudflare 那份停下。</p>
 
   <footer>
     方案 v3 · 基于 2026-11-01 的代码与线上状态 · 相关：<code>docs/quota-audit-2026-11-01.html</code>、<code>MIGRATION-ALL-2026-10-29.md</code>。

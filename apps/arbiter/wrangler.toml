@@ -9,6 +9,7 @@ crons = ["* * * * *"]
 
 # 顺位表（第一项视为当前主控）。改这里之后要重新 deploy。
 [vars]
+# 顺位：真实迁移后是 hk → jp；当前主控仍在 Cloudflare
 ORDER = "hk,jp"
 PROBE_URL = "https://panel.example.org/health"
 PANEL_URL = "https://panel.example.org"
