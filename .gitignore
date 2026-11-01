@@ -36,3 +36,7 @@ panel/frontend-dist/dl/
 
 # 真实部署配置（含真实域名与 KV id）
 apps/*/wrangler.local.toml
+
+# e2e 生成的临时产物
+panel/test/pull-payload.json
+.data/e2e.db*
