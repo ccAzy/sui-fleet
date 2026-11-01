@@ -33,3 +33,6 @@ panel/newnodes.json
 
 # 临时分发目录（大二进制分片，装完即删，不入库）
 panel/frontend-dist/dl/
+
+# 真实部署配置（含真实域名与 KV id）
+apps/*/wrangler.local.toml

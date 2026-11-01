@@ -19,7 +19,7 @@ COOLDOWN_MS = "600000"
 
 [[kv_namespaces]]
 binding = "STATE"
-id = "0f108298edda42099b9c1575965177e5"
+id = "0000000000000000000000000000000000"  # 占位：wrangler kv namespace create 后回填
 
 # 真正切 DNS 时才需要（Dashboard 里用 `wrangler secret put` 配）：
 #   CF_API_TOKEN  —— Zone.DNS:Edit

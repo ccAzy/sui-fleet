@@ -42,12 +42,25 @@ async function probeOk(url: string): Promise<boolean> {
   }
 }
 
+/** 两次状态是否有实质变化（epoch / 失败次数 / 上次切换时间）。 */
+export function stateChanged(a: ArbiterState, b: ArbiterState): boolean {
+  return (
+    a.epoch !== b.epoch ||
+    a.failures !== b.failures ||
+    a.lastSwitchAt !== b.lastSwitchAt
+  );
+}
+
 async function pushState(
   env: Env,
   state: ArbiterState,
   decision: string,
   detail: string,
 ) {
+  // 注意：KV 免费版每天只有 1000 次 put。cron 是每分钟一次（1440 次/天），
+  // 原来每个 tick 无条件写 state + log（2 次）+ 删 lastError（1 次）= 4320 次/天，
+  // 必然把配额打爆，然后仲裁者在当天剩余时间里全部失败。
+  // 现在只有状态真的变了才写，健康时一个 put 都不产生。
   await env.STATE.put("state", JSON.stringify(state));
   const log =
     ((await env.STATE.get("log", "json")) as Array<
@@ -185,6 +198,13 @@ async function tick(env: Env): Promise<void> {
     await pushState(env, decision.state, "exhausted", "顺位表里没有可用的备选");
     return;
   }
+  // 健康且无变化 → 什么都不写（这是配额防线的主路径）
+  const noteworthy =
+    decision.action === "switch" ||
+    decision.action === "exhausted" ||
+    decision.action === "would-switch";
+  if (!stateChanged(state, decision.state) && !noteworthy) return;
+
   await pushState(
     env,
     decision.state,
@@ -197,7 +217,11 @@ export default {
   async scheduled(_event: ScheduledEvent, env: Env): Promise<void> {
     try {
       await tick(env);
-      await env.STATE.delete("lastError");
+      // KV 的 delete 同样计入每日写配额，所以先读一下：没有就不删。
+      // 读是 10 万次/天，写只有 1000 次/天，这个交换很划算。
+      if ((await env.STATE.get("lastError")) !== null) {
+        await env.STATE.delete("lastError");
+      }
     } catch (err) {
       // 没有 tail 的环境里靠这条把错误留在 KV，GET / 能直接看到
       await env.STATE.put(
