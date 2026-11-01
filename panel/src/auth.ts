@@ -10,8 +10,13 @@ const ITER_NODE = 600_000;
 
 /** 当前运行时的密码哈希目标迭代数。 */
 export function targetIterations(): number {
-  const g: { process?: { versions?: Record<string, string> } } = globalThis;
-  return typeof g.process?.versions?.node === "string" ? ITER_NODE : ITER_WORKER;
+  // 交集断言：既保留 globalThis 原类型（Workers 类型下也能过），又能在 Node 下读 process
+  const g = globalThis as typeof globalThis & {
+    process?: { versions?: { node?: string } };
+  };
+  return typeof g.process?.versions?.node === "string"
+    ? ITER_NODE
+    : ITER_WORKER;
 }
 
 function b64(buf: ArrayBuffer): string {
@@ -179,7 +184,12 @@ export async function login(
   const stored = parseInt(u.password_hash.split("$")[1] ?? "0", 10);
   if (stored > 0 && stored < targetIterations()) {
     const fresh = await hashPassword(password);
-    await run(db, "UPDATE users SET password_hash = ? WHERE id = ?", fresh, u.id);
+    await run(
+      db,
+      "UPDATE users SET password_hash = ? WHERE id = ?",
+      fresh,
+      u.id,
+    );
     u.password_hash = fresh;
   }
   return u;

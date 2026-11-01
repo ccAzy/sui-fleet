@@ -69,7 +69,7 @@ export function createAssets(distDir: string): AssetsBinding {
       const immutable =
         /-(?:[A-Za-z0-9_-]{8,})\.[a-z0-9]+$/.test(target) &&
         !target.endsWith("index.html");
-      return new Response(file, {
+      return new Response(new Uint8Array(file), {
         status: 200,
         headers: {
           "Content-Type": TYPES[ext] ?? "application/octet-stream",
@@ -83,7 +83,7 @@ export function createAssets(distDir: string): AssetsBinding {
     // SPA 兜底：未命中的路径交给前端路由
     const index = await readIfFile(join(root, "index.html"));
     if (!index) return new Response("not found", { status: 404 });
-    return new Response(index, {
+    return new Response(new Uint8Array(index), {
       status: 200,
       headers: { "Content-Type": TYPES[".html"], "Cache-Control": "no-cache" },
     });

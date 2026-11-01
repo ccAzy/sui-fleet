@@ -106,7 +106,8 @@ export async function importBundle(
   // 2) 预检 + 拼语句
   const imported: Record<string, number> = {};
   const stmts: ReturnType<typeof db.prepare>[] = [];
-  for (const t of [...order].reverse()) stmts.push(db.prepare(`DELETE FROM ${t}`));
+  for (const t of [...order].reverse())
+    stmts.push(db.prepare(`DELETE FROM ${t}`));
   for (const t of order) {
     const rows = data.tables?.[t] ?? [];
     if (!Array.isArray(rows)) throw new Error(`备份里的 ${t} 不是数组`);
@@ -142,7 +143,9 @@ export async function importBundle(
   }
 
   await db
-    .prepare("INSERT OR REPLACE INTO meta (key, value) VALUES ('import_in_progress', ?)")
+    .prepare(
+      "INSERT OR REPLACE INTO meta (key, value) VALUES ('import_in_progress', ?)",
+    )
     .bind(String(now()))
     .run();
   try {

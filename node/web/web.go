@@ -1,6 +1,7 @@
 package web
 
 import (
+	"fmt"
 	"context"
 	"crypto/tls"
 	"embed"
@@ -26,7 +27,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-//go:embed *
+// 只嵌入 html 目录：写成 `*` 时，如果 html/ 不存在（本仓库 .gitignore 忽略了它），
+// 编译照样通过、嵌进去的只有 web.go 自己，然后 ParseFS 在运行时报错 —— 表现为
+// “CI 绿、二进制起不来”。显式写目录名可以让缺文件在**编译期**就失败。
+//
+//go:embed html
 var content embed.FS
 
 type Server struct {
@@ -60,7 +65,10 @@ func (s *Server) initRouter() (*gin.Engine, error) {
 	t := template.New("").Funcs(engine.FuncMap)
 	template, err := t.ParseFS(content, "html/index.html")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf(
+			"内置前端缺失（web/html/index.html）: %w —— 这个二进制只编了 agent？请用 `sui-agent agent` 子命令，或先构建前端再打包",
+			err,
+		)
 	}
 	engine.SetHTMLTemplate(template)
 

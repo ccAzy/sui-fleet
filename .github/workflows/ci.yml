@@ -63,3 +63,30 @@ jobs:
             -ldflags '-w -s -checklinkname=0' \
             -o /tmp/sui-agent .
           ls -lh /tmp/sui-agent
+
+  arbiter:
+    name: 仲裁者（单测）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --no-audit --no-fund
+        working-directory: apps/arbiter
+      - run: npm test
+        working-directory: apps/arbiter
+
+  selfhost:
+    name: 自托管运行时（类型检查）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --no-audit --no-fund
+        working-directory: apps/selfhost
+      - name: tsc（同时校验 panel/src，两个运行时共用一份业务代码）
+        run: npx tsc --noEmit -p tsconfig.json
+        working-directory: apps/selfhost
