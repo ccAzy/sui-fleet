@@ -124,5 +124,5 @@ echo "  sui-agent = $(systemctl is-active sui-agent)"
 journalctl -u sui-agent -n 5 --no-pager | tail -3
 echo
 echo "回到面板刷新，这台应显示 running。"
-`
+`;
 }

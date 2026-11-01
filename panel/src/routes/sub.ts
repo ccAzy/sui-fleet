@@ -67,7 +67,10 @@ function renderSubscription(
   if (subType === "singbox") {
     return new Response(JSON.stringify(buildSingboxOutbounds(links), null, 2), {
       status: 200,
-      headers: { ...headers, "Content-Type": "application/json; charset=utf-8" },
+      headers: {
+        ...headers,
+        "Content-Type": "application/json; charset=utf-8",
+      },
     });
   }
   const text = links.join(String.fromCharCode(10));
@@ -86,7 +89,9 @@ function prefixRemark(uri: string, nodeName: string): string {
   return `${base}#${encodeURIComponent(`${nodeName} · ${remark || "node"}`)}`;
 }
 
-function clientHeaders(cl: Record<string, unknown> | null): Record<string, string> {
+function clientHeaders(
+  cl: Record<string, unknown> | null,
+): Record<string, string> {
   const up = Number(cl?.up ?? 0) || 0;
   const down = Number(cl?.down ?? 0) || 0;
   const total = Number(cl?.volume ?? 0) || 0;
@@ -159,13 +164,16 @@ export function registerSub(app: Hono<{ Bindings: Env }>) {
         matchedClients++;
         up += Number(cl.up ?? 0) || 0;
         down += Number(cl.down ?? 0) || 0;
-        for (const uri of collectLinks(cl)) links.push(prefixRemark(uri, node.name));
+        for (const uri of collectLinks(cl))
+          links.push(prefixRemark(uri, node.name));
       }
     }
 
     if (links.length === 0) {
       return c.text(
-        clientFilter ? `client not found: ${clientFilter}` : "no nodes available",
+        clientFilter
+          ? `client not found: ${clientFilter}`
+          : "no nodes available",
         404,
         { "Cache-Control": "no-store" },
       );
@@ -190,7 +198,11 @@ export function registerSub(app: Hono<{ Bindings: Env }>) {
     if (!node || !node.enabled) return c.text("not found", 404);
     if (!node.sub_key) return c.text("forbidden", 403);
 
-    const { key: rawKey, clientFilter: parsedClient, subType } = parseSubQuery({
+    const {
+      key: rawKey,
+      clientFilter: parsedClient,
+      subType,
+    } = parseSubQuery({
       k: c.req.query("k"),
       client: c.req.query("client"),
       type: c.req.query("type"),
@@ -201,7 +213,8 @@ export function registerSub(app: Hono<{ Bindings: Env }>) {
     let clientFilter = parsedClient;
     if (rawKey !== node.sub_key) {
       if (!rawKey.startsWith(node.sub_key)) return c.text("forbidden", 403);
-      if (!clientFilter) clientFilter = rawKey.slice(node.sub_key.length).trim();
+      if (!clientFilter)
+        clientFilter = rawKey.slice(node.sub_key.length).trim();
     }
 
     const clients = await all<{ data: string }>(
@@ -232,7 +245,10 @@ export function registerSub(app: Hono<{ Bindings: Env }>) {
     return renderSubscription(
       links,
       node.name || "s-ui",
-      { ...clientHeaders(subClient), "Profile-Title": encodeURIComponent(node.name || "s-ui") },
+      {
+        ...clientHeaders(subClient),
+        "Profile-Title": encodeURIComponent(node.name || "s-ui"),
+      },
       subType,
     );
   });
