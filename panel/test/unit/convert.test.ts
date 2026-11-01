@@ -117,24 +117,48 @@ describe("sing-box 转换", () => {
 // 「节点在旁边、就是不通」，很难定位。
 // ---------------------------------------------------------------------------
 describe("genLinks 的 flow 选取", () => {
-  const client = { name: "user-x", config: { vless: { uuid: "u-1", flow: "xtls-rprx-vision" } } };
-  const tls = { server: { enabled: true, server_name: "a.example.com" }, client: { enabled: true, insecure: true, server_name: "a.example.com" } };
+  const client = {
+    name: "user-x",
+    config: { vless: { uuid: "u-1", flow: "xtls-rprx-vision" } },
+  };
+  const tls = {
+    server: { enabled: true, server_name: "a.example.com" },
+    client: { enabled: true, insecure: true, server_name: "a.example.com" },
+  };
 
   const realityInbound = {
-    type: "vless", tag: "vless-reality", listen: "::", listen_port: 443,
-    transport: {}, tls_id: 1,
+    type: "vless",
+    tag: "vless-reality",
+    listen: "::",
+    listen_port: 443,
+    transport: {},
+    tls_id: 1,
     users: [{ name: "user-x", uuid: "u-1", flow: "xtls-rprx-vision" }],
   };
   const wsInbound = {
-    type: "vless", tag: "vless-argo", listen: "127.0.0.1", listen_port: 2087,
-    transport: { type: "ws", path: "/argo", headers: { Host: "a.example.com" } }, tls_id: 1,
+    type: "vless",
+    tag: "vless-argo",
+    listen: "127.0.0.1",
+    listen_port: 2087,
+    transport: {
+      type: "ws",
+      path: "/argo",
+      headers: { Host: "a.example.com" },
+    },
+    tls_id: 1,
     addrs: [{ server: "a.example.com", server_port: 443 }],
     users: [{ name: "user-x", uuid: "u-1", flow: "" }],
   };
 
   it("reality 入站保留 flow", async () => {
     const { genLinks } = await import("../../src/links");
-    const [uri] = genLinks(client.config, realityInbound, tls, "1.2.3.4", "user-x");
+    const [uri] = genLinks(
+      client.config,
+      realityInbound,
+      tls,
+      "1.2.3.4",
+      "user-x",
+    );
     expect(uri).toContain("flow=xtls-rprx-vision");
   });
 

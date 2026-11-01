@@ -2,12 +2,15 @@
 # 在三个 argo 节点上装：真实链路探针 + 保活
 set -uo pipefail
 for t in "rn1 107.175.234.130 rn1-argo.example.com 22c417b0-4060-4009-ab0b-895904917b48" \
-         "NY 96.47.231.197 ny-argo.example.com 2192c1f9-66ff-43ae-86db-d0805807dc44" \
-         "US 67.215.233.13 us-argo.example.com cce4004c-a440-44a9-a4ca-a63153a7fe65"; do
-  set -- $t
-  name=$1; ip=$2; host=$3; uuid=$4
-  printf "== %s (%s) %s\n" "$name" "$ip" "$host"
-  ssh -p 6688 -i /root/.ssh/exec_ed25519 -o StrictHostKeyChecking=no -o ConnectTimeout=15 root@$ip "HOST=$host bash -s" <<'REMOTE'
+       "NY 96.47.231.197 ny-argo.example.com 2192c1f9-66ff-43ae-86db-d0805807dc44" \
+       "US 67.215.233.13 us-argo.example.com cce4004c-a440-44a9-a4ca-a63153a7fe65"; do
+       set -- $t
+       name=$1
+       ip=$2
+       host=$3
+       uuid=$4
+       printf "== %s (%s) %s\n" "$name" "$ip" "$host"
+       ssh -p 6688 -i /root/.ssh/exec_ed25519 -o StrictHostKeyChecking=no -o ConnectTimeout=15 root@$ip "HOST=$host bash -s" <<'REMOTE'
 set -e
 cat >/usr/local/bin/cf-check.sh <<'CHK'
 #!/usr/bin/env bash

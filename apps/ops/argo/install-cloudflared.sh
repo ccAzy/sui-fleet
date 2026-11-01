@@ -25,7 +25,8 @@ if ! command -v cloudflared >/dev/null 2>&1; then
 fi
 
 mkdir -p /etc/cloudflared
-umask 077; printf '%s' "$TOKEN" > /etc/cloudflared/token
+umask 077
+printf '%s' "$TOKEN" >/etc/cloudflared/token
 chmod 600 /etc/cloudflared/token
 
 cat >/etc/systemd/system/cloudflared.service <<'UNIT'
@@ -48,5 +49,7 @@ UNIT
 systemctl daemon-reload
 systemctl enable --now cloudflared
 sleep 5
-echo -n "服务: "; systemctl is-active cloudflared
-echo -n "版本: "; cloudflared --version | head -1
+echo -n "服务: "
+systemctl is-active cloudflared
+echo -n "版本: "
+cloudflared --version | head -1
