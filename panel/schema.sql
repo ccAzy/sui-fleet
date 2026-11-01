@@ -74,6 +74,9 @@ CREATE TABLE IF NOT EXISTS changes (
   obj     TEXT NOT NULL DEFAULT '{}'
 );
 CREATE INDEX IF NOT EXISTS idx_changes_node_ts ON changes(node_id, ts);
+-- 清理只按 ts 过滤（DELETE ... WHERE ts < ?），复合 (node_id, ts) 用不上，
+-- 没这条就是每次 cron 全表扫描：720 次/天 × 3 千多行就抳爆免费额度。
+CREATE INDEX IF NOT EXISTS idx_changes_ts ON changes(ts);
 
 -- 节点上报的流量增量(按客户端 tag 聚合,落库后累加到 objects.clients)
 CREATE TABLE IF NOT EXISTS usage (
@@ -85,6 +88,7 @@ CREATE TABLE IF NOT EXISTS usage (
   down    INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_usage_node_ts ON usage(node_id, ts);
+CREATE INDEX IF NOT EXISTS idx_usage_ts ON usage(ts);
 
 -- 下发给节点的指令(pull 时取走,执行后 report 回执)
 CREATE TABLE IF NOT EXISTS commands (

@@ -2,9 +2,13 @@
 import type { D1Database } from "@cloudflare/workers-types";
 import { all, batch, now, run } from "./db";
 import { listObjects } from "./objects";
-import { refreshKernelInfo } from "./kernel";
+import { metaGet, metaSet, refreshKernelInfo } from "./kernel";
 
 const STALE_SECONDS = 180;
+// 用量/变更日志清理的节流间隔。cron 每 2 分钟跑一次，清理一天一次就够：
+// 这两条 DELETE 只按 ts 过滤，没有 ts 索引就是全表扫描 —— 实测 usage/changes 各 3 千多行，
+// 720 次/天 × ~7000 行 ≈ 5,000,000 rows_read，白吃光免费额度（"什么都没删"也会扫）。
+const CLEANUP_INTERVAL = 6 * 3600;
 
 export async function cronTick(db: D1Database): Promise<void> {
   const ts = now();
@@ -137,8 +141,12 @@ export async function cronTick(db: D1Database): Promise<void> {
     }
   }
 
-  // 3) 用量明细只留 30 天
-  await run(db, "DELETE FROM usage WHERE ts < ?", ts - 30 * 86400);
-  // 4) 变更日志只留 14 天
-  await run(db, "DELETE FROM changes WHERE ts < ?", ts - 14 * 86400);
+  // 3) 用量明细只留 30 天；4) 变更日志只留 14 天。
+  //    两条都按 ts 过滤，索引已建（idx_usage_ts / idx_changes_ts），再用时间戳节流到 6 小时一次。
+  const lastCleanup = parseInt((await metaGet(db, "cleanup_at")) || "0", 10);
+  if (ts - lastCleanup >= CLEANUP_INTERVAL) {
+    await run(db, "DELETE FROM usage WHERE ts < ?", ts - 30 * 86400);
+    await run(db, "DELETE FROM changes WHERE ts < ?", ts - 14 * 86400);
+    await metaSet(db, "cleanup_at", String(ts));
+  }
 }
