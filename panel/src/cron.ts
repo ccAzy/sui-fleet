@@ -5,7 +5,7 @@ import { listObjects } from "./objects";
 import { metaGet, metaSet, refreshKernelInfo } from "./kernel";
 
 const STALE_SECONDS = 180;
-// 用量/变更日志清理的节流间隔。cron 每 2 分钟跑一次，清理一天一次就够：
+// 用量/变更日志清理的节流间隔。cron 每 10 分钟跑一次，清理一天一次就够：
 // 这两条 DELETE 只按 ts 过滤，没有 ts 索引就是全表扫描 —— 实测 usage/changes 各 3 千多行，
 // 720 次/天 × ~7000 行 ≈ 5,000,000 rows_read，白吃光免费额度（"什么都没删"也会扫）。
 const CLEANUP_INTERVAL = 6 * 3600;

@@ -41,6 +41,16 @@ jobs:
         working-directory: frontend
       - run: npm run build
         working-directory: frontend
+      - name: 校验已提交的 panel/frontend-dist 与源码一致
+        # 仓库里提交了构建产物（Deploy 按钮要求子目录自包含），所以必须防止
+        # 「改了 frontend/src 忘了重建产物 → CI 全绿、线上还是旧 UI」。
+        run: |
+          bash panel/build-frontend.sh
+          if ! git diff --exit-code -- panel/frontend-dist; then
+            echo "panel/frontend-dist 与源码不一致"
+            echo "请在本地跑 bash panel/build-frontend.sh 后一并提交"
+            exit 1
+          fi
 
   node:
     name: 节点（Go 构建 linux/amd64）

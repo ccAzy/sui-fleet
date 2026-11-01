@@ -209,7 +209,14 @@ export function registerApiRead(app: Hono<{ Bindings: Env }>) {
           "FROM objects WHERE node_id = ? AND kind = 'clients'",
         node.id,
       );
-      dbInfo = {
+      // 大备份导入中途失败会留下这个标记（backup.ts 写的），但它原来没有任何读者，
+      // 用户永远不知道库是半成品。这里把它带出来，前端能显示、运维能 grep。
+      const half = await first<{ value: string }>(
+        c.env.DB,
+        "SELECT value FROM meta WHERE key = 'import_in_progress'",
+      );
+
+      const info: Record<string, number> = {
         clients: 0,
         inbounds: 0,
         outbounds: 0,
@@ -219,8 +226,10 @@ export function registerApiRead(app: Hono<{ Bindings: Env }>) {
         clientDown: traffic?.down ?? 0,
       };
       for (const row of counts) {
-        if (row.kind in dbInfo) dbInfo[row.kind] = row.c;
+        if (row.kind in info) info[row.kind] = row.c;
       }
+      if (half?.value) info.import_in_progress = Number(half.value) || 0;
+      dbInfo = info;
     }
 
     const sbd = (status.sbd as Record<string, unknown>) ?? {};
@@ -283,7 +292,10 @@ export function registerApiRead(app: Hono<{ Bindings: Env }>) {
   app.get("/api/logs", async (c) => {
     // 前端传 c（class/级别）与 l（行数），原来两个参数都不读。
     const cls = (c.req.query("c") ?? "").trim();
-    const lim = Math.min(Math.max(parseInt(c.req.query("l") ?? "50", 10) || 50, 1), 500);
+    const lim = Math.min(
+      Math.max(parseInt(c.req.query("l") ?? "50", 10) || 50, 1),
+      500,
+    );
     const node = await resolveNode(c.env.DB, c.req.header("X-Remote-Server"));
     if (!node) return json(c, []);
     let st: Record<string, unknown> = {};
@@ -298,7 +310,9 @@ export function registerApiRead(app: Hono<{ Bindings: Env }>) {
       : typeof st.last_log === "string" && st.last_log
         ? [st.last_log]
         : [];
-    const filtered = cls ? raw.filter((l) => l.toLowerCase().includes(cls.toLowerCase())) : raw;
+    const filtered = cls
+      ? raw.filter((l) => l.toLowerCase().includes(cls.toLowerCase()))
+      : raw;
     return json(c, filtered.slice(-lim));
   });
 
@@ -450,7 +464,10 @@ export function registerApiRead(app: Hono<{ Bindings: Env }>) {
     const online = node.last_seen > 0 && age < 180;
     return json(c, {
       online,
-      latency: online ? Math.max(1, age) : 0,
+      // 这里给的是「距上次上报多少秒」，不是网络延迟（面板从不反连节点）。
+      // 字段名原来叫 latency，前端直接拼成 "N ms"，170 秒没上报会显示成 170 ms。
+      age,
+      latency: online ? Math.max(1, age) : 0, // 保留旧字段，避免老前端炸
       error: online
         ? ""
         : node.last_seen === 0

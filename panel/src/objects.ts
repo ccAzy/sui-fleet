@@ -492,6 +492,17 @@ export async function saveObject(
         const item = { ...raw };
         const tr = o(item.transport);
         if (s(tr.type) === "tcp") item.transport = {};
+        // id 只允许「缺省 / 0 / 正整数」。原来 num() 会把 "abc" 静默变成 0，
+        // 于是「编辑」被当成「新建」，用户改一个对象却多出一个，且全程没有报错。
+        const rawId = item.id;
+        if (
+          rawId !== undefined &&
+          rawId !== null &&
+          String(rawId).trim() !== "" &&
+          !Number.isFinite(Number(rawId))
+        ) {
+          throw new Error(`invalid id: ${String(rawId)}（id 必须是数字，缺省表示新建）`);
+        }
         const editId = num(item.id);
         const isNew = effAction === "new" || editId <= 0;
         let id: number;

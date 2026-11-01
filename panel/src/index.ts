@@ -411,7 +411,7 @@ app.use("/api/*", async (c, next) => {
       "login",
       "users",
       "changes",
-      "tokens",
+      // 不能放行 tokens：默认口令的会话能读到明文 API token，等于把「必须先改密」这道闸绕过。
       "servers",
     ].includes(action)
   ) {

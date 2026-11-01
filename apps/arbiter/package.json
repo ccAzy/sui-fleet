@@ -9,5 +9,6 @@
   "devDependencies": {
     "tsx": "^4.19.2",
     "wrangler": "^4.154.0"
-  }
+  },
+  "license": "GPL-3.0-or-later"
 }

@@ -40,8 +40,8 @@
 
 ## 特性
 
-- **面板**：多节点管理、入站/出站/客户端/TLS/DNS/规则全功能、7 套皮肤、明暗主题
-- **下发**：节点每 30 秒拉一次配置，未变更返回 304 级响应，带宽开销可忽略
+- **面板**：多节点管理、入站/出站/客户端/TLS/DNS/规则全功能、明暗主题 + 自定义壁纸
+- **下发**：节点按间隔（默认 30 秒，面板生成的安装脚本用 60 秒）拉配置；未变更时只回一个 `{ok:true,unchanged:true}` 小包，带宽开销可忽略
 - **上报**：流量增量、在线数、CPU/内存/磁盘、内核状态
 - **订阅**：`base64` 链接列表 / `Clash YAML` / `sing-box JSON` 三种格式
 - **配额**：流量上限、到期时间、延迟启动、周期重置（语义与 s-ui 一致）
@@ -52,7 +52,8 @@
 
 ### 1. 部署控制面
 
-需要：Node.js 18+、Cloudflare 账号、（推荐）一个自己的域名。
+需要：Node.js 18+（仅本地构建/部署用）、Cloudflare 账号、（推荐）一个自己的域名。
+> 自托管运行时（`apps/selfhost`）要求 **Node ≥ 22.5**，因为它用了 `node:sqlite`。
 
 #### 方式 A：一键（点按钮）
 
@@ -198,7 +199,7 @@ go build -tags "with_quic,with_grpc,with_utls,with_acme,with_gvisor,badlinkname,
 
 节点排障：`sui-agent agent --panel x --token y --dump-config` 会打印本地渲染出的 sing-box 配置。
 
-自检：`python panel/test/e2e.py http://127.0.0.1:8787`
+自检：`python3 panel/test/e2e.py http://127.0.0.1:8787`（需空库 + 可登录实例，跑法见下）
 
 ### e2e 怎么跑（首次实例）
 
@@ -235,10 +236,10 @@ SUI_DB=./data/sui.db SUI_DIST=../../panel/frontend-dist \
   JWT_SECRET=$(openssl rand -hex 32) npm start
 ```
 
-日常改代码用 `scripts/deploy-code.sh`（只换代码/前端产物，**不碰数据库**，失败自动回滚）；
-新机器接管才用 `scripts/promote.sh`（会导入备份库，所以带了“本地库更新就跳过”的保护）。
+日常改代码用 `apps/selfhost/scripts/deploy-code.sh`（只换代码/前端产物，**不碰数据库**，失败自动回滚）；
+新机器接管才用 `apps/selfhost/scripts/promote.sh`（会导入备份库，所以带了“本地库更新就跳过”的保护）。
 
-TLS：`scripts/enable-tls.sh` 装一个单文件 Caddy 反代到 8788；Cloudflare 后面用 Origin Certificate（zone 是 strict 时自签会被拒）。
+TLS：`apps/selfhost/scripts/enable-tls.sh` 装一个单文件 Caddy 反代到 8788；Cloudflare 后面用 Origin Certificate（zone 是 strict 时自签会被拒）。
 
 ## 审计与修复记录
 

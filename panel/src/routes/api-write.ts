@@ -202,24 +202,44 @@ export function registerApiWrite(app: Hono<{ Bindings: Env }>) {
 
   app.post("/api/importdb", async (c) => {
     const ct = c.req.header("content-type") ?? "";
-    let data: Bundle;
+    // 整库覆盖是不可逆操作：先卡住体积，避免一个超大文件把请求打到超时/内存爆掉，
+    // 也避免把 D1/KV 的底层异常原文回给浏览器。
+    const MAX_BYTES = 64 * 1024 * 1024;
+    let text: string;
     try {
       if (ct.includes("multipart/form-data")) {
         const form = await c.req.formData();
         const file = form.get("db");
         if (!file || typeof file === "string")
           return json(c, null, new Error("没有收到文件"));
-        data = JSON.parse(await (file as File).text()) as Bundle;
+        if ((file as File).size > MAX_BYTES)
+          return json(c, null, new Error("备份文件超过 64MB，请先在源面板排除统计再导出"));
+        text = await (file as File).text();
       } else {
-        data = (await c.req.json()) as Bundle;
+        text = await c.req.text();
+        if (text.length > MAX_BYTES)
+          return json(c, null, new Error("备份文件超过 64MB"));
       }
-    } catch (e) {
-      return json(c, null, new Error(`备份文件解析失败: ${String(e)}`));
+    } catch {
+      return json(c, null, new Error("读取上传内容失败"));
     }
+
+    let data: Bundle;
+    try {
+      data = JSON.parse(text) as Bundle;
+    } catch {
+      // 不要把 JSON.parse 的原文（含位置偏移/片段）回给浏览器
+      return json(c, null, new Error("备份文件不是合法的 JSON（本接口只接受面板导出的 JSON，不接受 SQLite 文件）"));
+    }
+
     try {
       return json(c, await importBundle(c.env.DB, data));
     } catch (e) {
-      return json(c, null, e);
+      const msg = e instanceof Error ? e.message : String(e);
+      // 业务错误（备份格式/版本）原样回；数据库层异常只回摘要，细节留在服务端日志
+      const safe = /备份|备份版本|不是数组/.test(msg) ? msg : "导入失败，数据库已回滚或标记为半成品（详见服务端日志）";
+      console.error("[importdb]", msg);
+      return json(c, null, new Error(safe));
     }
   });
 

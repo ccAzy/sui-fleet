@@ -5,7 +5,7 @@
 import type { Hono } from "hono";
 import { json } from "../http";
 import type { Env } from "../db";
-import { metaGet } from "../kernel";
+import { metaGet, metaSet } from "../kernel";
 
 /**
  * 面板对外地址：优先用请求的 host（Caddy 会透传 Host 头），
@@ -23,10 +23,21 @@ function publicBase(rawUrl: string, fallback: string): string {
   return fallback.replace(/\/+$/, "");
 }
 
+/** 聚合订阅密钥：32 hex。首次使用时自动生成——之前全仓只有读取方，导致这个功能永远是死的。 */
+async function ensureAggKey(db: Env["DB"]): Promise<string> {
+  const cur = await metaGet(db, "agg_key");
+  if (cur) return cur;
+  const raw = crypto.getRandomValues(new Uint8Array(16));
+  const key = [...raw].map((b) => b.toString(16).padStart(2, "0")).join("");
+  await metaSet(db, "agg_key", key);
+  return key;
+}
+
 export function registerSubInfo(app: Hono<{ Bindings: Env }>) {
   app.get("/api/sub-info", async (c) => {
-    const key = await metaGet(c.env.DB, "agg_key");
-    if (!key) return json(c, { ok: false, reason: "no_agg_key" });
+    // 缺密钥就当场生成。这一步必须放在登录守卫之后（本文件在 registerSubInfo
+    // 里注册于 /api/* 守卫之后），所以只有管理员能触发。
+    const key = await ensureAggKey(c.env.DB);
 
     const base = publicBase(c.req.url, c.env.PANEL_BASE ?? "");
     if (!base) return json(c, { ok: false, reason: "no_base" });
@@ -42,5 +53,13 @@ export function registerSubInfo(app: Hono<{ Bindings: Env }>) {
         plain: mk(""),
       },
     });
+  });
+
+  // 轮换聚合订阅密钥：泄露后不用手工改库（原来唯一的“办法”是直接 UPDATE meta）。
+  app.post("/api/sub-info/rotate", async (c) => {
+    const raw = crypto.getRandomValues(new Uint8Array(16));
+    const key = [...raw].map((b) => b.toString(16).padStart(2, "0")).join("");
+    await metaSet(c.env.DB, "agg_key", key);
+    return json(c, { ok: true, key });
   });
 }

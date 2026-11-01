@@ -41,7 +41,13 @@
             </v-btn>
           </v-col>
         </v-row>
-        <v-card style="background-color: background" dir="ltr" v-html="lines.join('<br />')"></v-card>
+        <!-- 不能用 v-html：日志里有节点侧可控字符串（SNI/域名），一旦日志功能修好就是注入面 -->
+        <!-- 这个文件没有 <style> 块（改之前踩过：往里加 class 是静默 no-op），
+             换行与等宽只能写在行内。 -->
+        <v-card
+          style="background-color: rgb(var(--v-theme-surface-variant)); white-space: pre-wrap; font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px; line-height: 1.55; padding: 10px 12px; max-height: 60vh; overflow: auto;"
+          dir="ltr"
+        >{{ lines.join('\n') }}</v-card>
       </v-card-text>
     </v-card>
   </v-dialog>

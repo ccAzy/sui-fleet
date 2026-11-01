@@ -17,20 +17,53 @@ SERVICE="sui-agent"
 FORCE=0
 while [ $# -gt 0 ]; do
   case "$1" in
-    --force) FORCE=1; shift ;;
-    --panel) PANEL="$2"; shift 2 ;;
-    --token) TOKEN="$2"; shift 2 ;;
-    --bin)   BIN="$2";   shift 2 ;;
-    --dir)   DIR="$2";   shift 2 ;;
-    -h|--help) sed -n '2,12p' "$0"; exit 0 ;;
-    *) echo "unknown arg: $1" >&2; exit 2 ;;
+  --force)
+    FORCE=1
+    shift
+    ;;
+  --panel)
+    PANEL="$2"
+    shift 2
+    ;;
+  --token)
+    TOKEN="$2"
+    shift 2
+    ;;
+  --bin)
+    BIN="$2"
+    shift 2
+    ;;
+  --dir)
+    DIR="$2"
+    shift 2
+    ;;
+  -h | --help)
+    sed -n '2,12p' "$0"
+    exit 0
+    ;;
+  *)
+    echo "unknown arg: $1" >&2
+    exit 2
+    ;;
   esac
 done
 
-[ "$(id -u)" = "0" ] || { echo "请用 root 运行" >&2; exit 1; }
-[ -n "$PANEL" ] || { echo "缺少 --panel" >&2; exit 1; }
-[ -n "$TOKEN" ] || { echo "缺少 --token" >&2; exit 1; }
-[ -f "$BIN" ] || { echo "找不到二进制: $BIN" >&2; exit 1; }
+[ "$(id -u)" = "0" ] || {
+  echo "请用 root 运行" >&2
+  exit 1
+}
+[ -n "$PANEL" ] || {
+  echo "缺少 --panel" >&2
+  exit 1
+}
+[ -n "$TOKEN" ] || {
+  echo "缺少 --token" >&2
+  exit 1
+}
+[ -f "$BIN" ] || {
+  echo "找不到二进制: $BIN" >&2
+  exit 1
+}
 
 echo "==> 检查已有 s-ui 面板"
 if systemctl is-active --quiet s-ui 2>/dev/null && [ "$FORCE" != "1" ]; then
@@ -47,7 +80,7 @@ install -m 0755 "$BIN" "$DIR/bin/sui-agent"
 
 echo "==> 写入环境变量 /etc/sui-agent.env"
 umask 077
-cat > /etc/sui-agent.env <<EOF
+cat >/etc/sui-agent.env <<EOF
 SUI_AGENT_PANEL=$PANEL
 SUI_AGENT_TOKEN=$TOKEN
 SUI_DB_FOLDER=$DIR/db
@@ -56,7 +89,7 @@ EOF
 chmod 600 /etc/sui-agent.env
 
 echo "==> 写 systemd 服务"
-cat > /etc/systemd/system/$SERVICE.service <<EOF
+cat >/etc/systemd/system/$SERVICE.service <<EOF
 [Unit]
 Description=s-ui node agent (managed by $PANEL)
 After=network-online.target
