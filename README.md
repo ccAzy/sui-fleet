@@ -240,6 +240,12 @@ SUI_DB=./data/sui.db SUI_DIST=../../panel/frontend-dist \
 
 TLS：`scripts/enable-tls.sh` 装一个单文件 Caddy 反代到 8788；Cloudflare 后面用 Origin Certificate（zone 是 strict 时自签会被拒）。
 
+## 审计与修复记录
+
+`docs/audit-fixes-2026-11-01.md` 记录了两轮独立只读审计指出问题的逐条修复：现象、根因、改法、
+验证方式，以及**明确保留的取舍**（Worker 侧 PBKDF2 受 CPU 限制、`apps/ops` 属于可选高权限组件、
+节点二进制不入库等）。改动范围对应提交 `0b39565..19d7021`。
+
 ## 与上游 s-ui 的差异
 
 | 方面 | 上游 s-ui | 本项目 |
