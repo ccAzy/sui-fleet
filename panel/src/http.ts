@@ -44,6 +44,23 @@ export async function currentUser(c: any): Promise<Session | null> {
   };
 }
 
+/**
+ * 登录限流用的客户端地址。
+ *
+ * 不能只看 CF-Connecting-IP：自托管部署没有这个头，全站会挤成同一个 "local" 桶，
+ * 任意人失败 8 次就把管理员锁在门外。这里按「Cloudflare 专有头 → 反代链 → 兜底」取值。
+ * 注意：XFF 可被客户端伪造，所以它只用来分摊限流桶，不用于任何权限判断。
+ */
+export function clientIp(c: any): string {
+  const cf = c.req.header("CF-Connecting-IP");
+  if (cf) return cf;
+  const xff = c.req.header("X-Forwarded-For");
+  if (xff) return xff.split(",")[0].trim();
+  const real = c.req.header("X-Real-IP");
+  if (real) return real;
+  return "local";
+}
+
 /** 选中的节点：X-Remote-Server 头优先，缺省落到第一个启用节点。 */
 export async function resolveNode(
   db: Env["DB"],

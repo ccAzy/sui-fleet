@@ -610,18 +610,24 @@ func (a *agent) selfUpdate(raw json.RawMessage) error {
 	}
 	f.Close()
 
-	if p.SHA256 != "" {
-		got := hex.EncodeToString(h.Sum(nil))
-		if !strings.EqualFold(got, p.SHA256) {
-			os.Remove(tmp)
-			return fmt.Errorf("sha256 mismatch: got %s", got)
-		}
+	if p.SHA256 == "" {
+		os.Remove(tmp)
+		return fmt.Errorf("refusing update: panel did not provide sha256")
+	}
+	got := hex.EncodeToString(h.Sum(nil))
+	if !strings.EqualFold(got, p.SHA256) {
+		os.Remove(tmp)
+		return fmt.Errorf("sha256 mismatch: got %s", got)
 	}
 	if err := os.Chmod(tmp, 0o755); err != nil {
 		os.Remove(tmp)
 		return err
 	}
+	// 先把旧二进制改名留底：新二进制起不来时还能手工回滚（cp .old 回去）。
+	_ = os.Remove(exe + ".old")
+	_ = os.Rename(exe, exe+".old")
 	if err := os.Rename(tmp, exe); err != nil {
+		_ = os.Rename(exe+".old", exe) // 替换失败 → 先把自己的旧版还回去
 		os.Remove(tmp)
 		return fmt.Errorf("replace binary: %w", err)
 	}

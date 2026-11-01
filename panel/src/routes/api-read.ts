@@ -21,6 +21,7 @@ import {
   changedSince,
   getConfig,
   getSettings,
+  listObjects,
   loadFull,
   loadPartial,
 } from "../objects";
@@ -57,6 +58,61 @@ export function registerApiRead(app: Hono<{ Bindings: Env }>) {
       return json(c, { onlines: onlinesOf(node) });
     }
     return json(c, await loadFull(c.env.DB, node.id, subURI));
+  });
+
+  // 按 id 批量取对象。上游 s-ui 的 Go 面板有这两个接口，移植到 Worker 时漏了；
+  // 后果不是“少个功能”，而是静默数据错：
+  //   - 客户端编辑弹窗拿到空对象 → 保存时 id=0 → 变成“新建一个随机名的新账号”；
+  //   - 入站弹窗拿不到数据 → 打开就 TypeError。
+  const parseIds = (raw: string): number[] =>
+    raw
+      .split(",")
+      .map((x) => parseInt(x.trim(), 10))
+      .filter((n) => Number.isFinite(n) && n > 0);
+
+  const idsOfClient = (cl: Record<string, unknown>): number[] => {
+    const list = Array.isArray(cl.inbounds) ? cl.inbounds : [];
+    return list
+      .map((x) =>
+        typeof x === "number"
+          ? x
+          : Number((x as Record<string, unknown>)?.id ?? 0),
+      )
+      .filter((n) => n > 0);
+  };
+
+  app.get("/api/inbounds", async (c) => {
+    const node = await resolveNode(c.env.DB, c.req.header("X-Remote-Server"));
+    if (!node) return json(c, { inbounds: [] });
+    const ids = parseIds(c.req.query("id") ?? "");
+
+    const [inbounds, clients] = await Promise.all([
+      listObjects(c.env.DB, node.id, "inbounds"),
+      listObjects(c.env.DB, node.id, "clients"),
+    ]);
+    const picked = ids.length
+      ? inbounds.filter((ib) => ids.includes(Number(ib.id)))
+      : inbounds;
+
+    // users 回“客户端名字”：与上游 GetAll 语义一致，直接回对象会在列表里rendered 成 [object Object]
+    const withUsers = picked.map((ib) => ({
+      ...ib,
+      users: clients
+        .filter((cl) => idsOfClient(cl).includes(Number(ib.id)))
+        .map((cl) => String(cl.name ?? "")),
+    }));
+    return json(c, { inbounds: withUsers });
+  });
+
+  app.get("/api/clients", async (c) => {
+    const node = await resolveNode(c.env.DB, c.req.header("X-Remote-Server"));
+    if (!node) return json(c, { clients: [] });
+    const ids = parseIds(c.req.query("id") ?? "");
+    const rows = await listObjects(c.env.DB, node.id, "clients");
+    const picked = ids.length
+      ? rows.filter((cl) => ids.includes(Number(cl.id)))
+      : rows;
+    return json(c, { clients: picked });
   });
 
   // 一键添加（QuickTemplate）依赖：生成 Reality 密钥对 / 自签证书

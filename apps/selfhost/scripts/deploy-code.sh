@@ -84,7 +84,7 @@ ssh -p "$SSH_PORT" -i "$SSH_KEY" -o StrictHostKeyChecking=no -o UserKnownHostsFi
   "root@$HOST" "bash /tmp/deploy-remote.sh"
 
 if [ -z "$DOMAIN" ]; then
-  DOMAIN=$(ssh -n -p "$SSH_PORT" -i "$SSH_KEY" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null     "root@$HOST" "sed -n 's/^Environment=PANEL_BASE=//p' /etc/systemd/system/sui-panel.service" 2>/dev/null | tr -d '')
+  DOMAIN=$(ssh -n -p "$SSH_PORT" -i "$SSH_KEY" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "root@$HOST" "sed -n 's/^Environment=PANEL_BASE=//p' /etc/systemd/system/sui-panel.service" 2>/dev/null | tr -d '')
   case "$DOMAIN" in https://*) DOMAIN="${DOMAIN#https://}" ;; esac
 fi
 

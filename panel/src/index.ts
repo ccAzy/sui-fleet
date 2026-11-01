@@ -30,6 +30,7 @@ import {
   readBody,
   secretOf,
   baseUrl,
+  clientIp,
 } from "./http";
 import { cronTick } from "./cron";
 import { hashRecovery, totpVerify } from "./otp";
@@ -121,7 +122,7 @@ async function issueSession(c: any, user: UserRow) {
 // ---------- 登录 ----------
 
 app.post("/api/login", async (c) => {
-  const ip = c.req.header("CF-Connecting-IP") ?? "local";
+  const ip = clientIp(c);
   const ts = now();
   const recent = await first<{ c: number }>(
     c.env.DB,
@@ -168,7 +169,7 @@ app.post("/api/login", async (c) => {
 });
 
 app.post("/api/login/otp", async (c) => {
-  const ip = c.req.header("CF-Connecting-IP") ?? "local";
+  const ip = clientIp(c);
   const ts = now();
   const recent = await first<{ c: number }>(
     c.env.DB,
@@ -394,7 +395,7 @@ app.use("/api/*", async (c, next) => {
         "backup-token",
         "backup",
         "download",
-        JSON.stringify({ ip: c.req.header("CF-Connecting-IP") ?? "" }),
+        JSON.stringify({ ip: clientIp(c) }),
       );
       return await next();
     }

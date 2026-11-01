@@ -147,6 +147,8 @@ export async function cronTick(db: D1Database): Promise<void> {
   if (ts - lastCleanup >= CLEANUP_INTERVAL) {
     await run(db, "DELETE FROM usage WHERE ts < ?", ts - 30 * 86400);
     await run(db, "DELETE FROM changes WHERE ts < ?", ts - 14 * 86400);
+    // 登录尝试只保留 7 天：这张表会被爆破写满，不清理会一直吃掉 D1 的行数与存储。
+    await run(db, "DELETE FROM login_attempts WHERE ts < ?", ts - 7 * 86400);
     await metaSet(db, "cleanup_at", String(ts));
   }
 }

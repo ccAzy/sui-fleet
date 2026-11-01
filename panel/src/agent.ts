@@ -27,6 +27,29 @@ export async function authAgent(
 
 type Cmd = { id: number; kind: string; payload: string };
 
+/** 指令重投窗口：下发后 10 分钟仍无回执才退回 pending（正常慢回执不应被重发）。 */
+const COMMAND_RETRY_AFTER = 600;
+
+/** 老库补两列（sent_at / attempts）。ALTER 幂等，每个 isolate 只尝试一次。 */
+let commandSchemaReady: Promise<void> | null = null;
+function ensureCommandRetrySchema(db: D1Database): Promise<void> {
+  if (!commandSchemaReady) {
+    commandSchemaReady = (async () => {
+      for (const ddl of [
+        "ALTER TABLE commands ADD COLUMN sent_at INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE commands ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0",
+      ]) {
+        try {
+          await run(db, ddl);
+        } catch {
+          // 列已存在（新库由 schema.sql 建好），忽略
+        }
+      }
+    })();
+  }
+  return commandSchemaReady;
+}
+
 // 上一个节点记 usage 变更的时间（模块内存，冷启动丢失也无所谓：
 // 这只是一条“面板该刷新了”的提示，不是业务数据）。
 const USAGE_LOG_INTERVAL = 300;
@@ -44,6 +67,20 @@ export async function pullPayload(
   node: NodeRow,
   clientRev: number,
 ): Promise<J | null> {
+  // 指令一旦被下发就标成 sent，避免节点重启后反复拿到同一条（update_agent 会因此
+  // 陷入“更新→重启→再更新”的死循环）。但这样做有个代价：节点拿到指令后、上报之前
+  // 崩了或断网，这条指令就永远停在 sent，没人再发给它。
+  // 所以补一条有限重投：超过 10 分钟仍未回执、且重试不到 3 次的，退回 pending。
+  await ensureCommandRetrySchema(db);
+  await run(
+    db,
+    `UPDATE commands SET status = 'pending', sent_at = 0, attempts = attempts + 1
+      WHERE node_id = ? AND status = 'sent' AND sent_at > 0
+        AND sent_at < ? AND attempts < 3`,
+    node.id,
+    now() - COMMAND_RETRY_AFTER,
+  );
+
   const cmds = await all<Cmd>(
     db,
     // 只取 pending：一旦下发就标 sent，否则节点重启后会反复拿到同一条指令
@@ -73,16 +110,17 @@ export async function pullPayload(
     ),
   ]);
 
-  // 标记为 sent（节点下次 report 里回执 done/failed）
+  // 标记为 sent（节点下次 report 里回执 done/failed）；同时记下发时间，供重投判定。
   if (cmds.length) {
+    const ts = now();
     await batch(
       db,
       cmds.map((c) =>
         db
           .prepare(
-            "UPDATE commands SET status = 'sent' WHERE id = ? AND status = 'pending'",
+            "UPDATE commands SET status = 'sent', sent_at = ? WHERE id = ? AND status = 'pending'",
           )
-          .bind(c.id),
+          .bind(ts, c.id),
       ),
     );
   }

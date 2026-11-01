@@ -102,10 +102,12 @@ CREATE TABLE IF NOT EXISTS commands (
   node_id    TEXT NOT NULL,
   kind       TEXT NOT NULL,              -- restart_core|stop_core|kick_user|reset_traffic
   payload    TEXT NOT NULL DEFAULT '{}',
-  status     TEXT NOT NULL DEFAULT 'pending', -- pending|done|failed
+  status     TEXT NOT NULL DEFAULT 'pending', -- pending|sent|done|failed
   result     TEXT NOT NULL DEFAULT '',
   created_at INTEGER NOT NULL,
-  done_at    INTEGER NOT NULL DEFAULT 0
+  done_at    INTEGER NOT NULL DEFAULT 0,
+  sent_at    INTEGER NOT NULL DEFAULT 0,     -- 下发时刻，用于“丢回执后有限重投”
+  attempts   INTEGER NOT NULL DEFAULT 0      -- 已重投次数（上限 3）
 );
 CREATE INDEX IF NOT EXISTS idx_commands_pending ON commands(node_id, status);
 
