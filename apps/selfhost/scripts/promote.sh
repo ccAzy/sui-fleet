@@ -9,7 +9,7 @@ set -euo pipefail
 
 PRIMARY=""
 OPS_TOKEN=""
-DRY=0
+DRY=0; FORCE_DB=0
 PORT="${PORT:-8788}"
 DIR="${DIR:-/opt/sui-panel}"
 while [ $# -gt 0 ]; do
@@ -106,15 +106,36 @@ step "4/8 安装依赖"
 (cd "$DIR/panel" && npm install --omit=dev --no-audit --no-fund >/dev/null 2>&1)
 ok "依赖就绪"
 
-step "5/8 拉最新库并导入"
+step "5/8 拉最新库"
 mkdir -p "$DIR/data"
 curl -fsSL --retry 3 --max-time 180 "$PRIMARY/api/getdb?token=$OPS_TOKEN" -o /tmp/bundle.json
 size=$(wc -c </tmp/bundle.json)
 [ "$size" -gt 10000 ] || die "备份体积异常（$size 字节），检查 token"
-[ -f "$DIR/data/sui.db" ] && cp "$DIR/data/sui.db" "$DIR/data/sui.db.bak-$(date +%Y%m%d-%H%M%S)"
-(cd "$DIR/apps/selfhost" && npm run --silent import-bundle -- /tmp/bundle.json "$DIR/data/sui.db" | tail -3)
+
+# 安全检查：本地库比备份新时跳过导入（除非 --force-db）。
+# 否则在正在跑的主控上重跑 promote，会把线上数据换成旧快照——真实的丢数据风险。
+local_seen=0
+if [ -f "$DIR/data/sui.db" ]; then
+  local_seen=$(node -e '
+const { DatabaseSync } = require("node:sqlite")
+try {
+  const d = new DatabaseSync(process.argv[1], { readOnly: true })
+  const r = d.prepare("select max(last_seen) m from nodes").get()
+  process.stdout.write(String(r && r.m ? r.m : 0))
+} catch { process.stdout.write("0") }
+' "$DIR/data/sui.db" 2>/dev/null || echo 0)
+fi
+bundle_at=$(node -e 'process.stdout.write(String(JSON.parse(require("fs").readFileSync("/tmp/bundle.json","utf8")).exported_at||0))' 2>/dev/null || echo 0)
+
+if [ "$local_seen" -gt "$bundle_at" ] && [ "$FORCE_DB" != "1" ]; then
+  warn "本地库比备份新（本地最后心跳 $local_seen > 备份时间 $bundle_at），跳过导入"
+  warn "确实要用备份覆盖就加 --force-db"
+else
+  [ -f "$DIR/data/sui.db" ] && cp "$DIR/data/sui.db" "$DIR/data/sui.db.bak-$(date +%Y%m%d-%H%M%S)"
+  (cd "$DIR/apps/selfhost" && npm run --silent import-bundle -- /tmp/bundle.json "$DIR/data/sui.db" | tail -3)
+  ok "库已导入"
+fi
 rm -f /tmp/bundle.json
-ok "库已导入"
 
 step "6/8 配置与单元"
 if [ ! -f /etc/sui-panel.env ]; then
