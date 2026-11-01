@@ -15,14 +15,24 @@ import {
 } from './db'
 import { getConfig, listObjects } from './objects'
 
-export async function authAgent(db: D1Database, token: string): Promise<NodeRow | null> {
-  if (!token) return null
+export async function authAgent(db: D1Database, token: string): Promise<NodeRow | null> {  if (!token) return null
   const node = await getNodeByTokenHash(db, await sha256(token))
   if (!node || !node.enabled) return null
   return node
 }
 
 type Cmd = { id: number; kind: string; payload: string }
+
+// 上一个节点记 usage 变更的时间（模块内存，冷启动丢失也无所谓：
+// 这只是一条“面板该刷新了”的提示，不是业务数据）。
+const USAGE_LOG_INTERVAL = 300
+const lastUsageLog = new Map<string, number>()
+function shouldLogUsage(nodeId: string, ts: number): boolean {
+  const last = lastUsageLog.get(nodeId) ?? 0
+  if (ts - last < USAGE_LOG_INTERVAL) return false
+  lastUsageLog.set(nodeId, ts)
+  return true
+}
 
 /** 拉取期望状态。返回 null 表示版本未变且无指令（节点不用重载）。 */
 export async function pullPayload(db: D1Database, node: NodeRow, clientRev: number): Promise<J | null> {
@@ -35,11 +45,16 @@ export async function pullPayload(db: D1Database, node: NodeRow, clientRev: numb
   )
   if (clientRev === node.revision && cmds.length === 0) return null
 
-  const [config, clients, tls, inbounds, outbounds, endpoints, services, settings] = await Promise.all([
+  // 注意：Cloudflare 规定**每个请求最多 6 个同时出站连接**（D1 连接也算）。
+  // 原来这里一口气 Promise.all 8 个查询，平时能跑通是因为查询都很轻，但 D1 变慢时会
+  // 排队失败/超时，而且极难复现。拆成两轮，每轮 4 个，既不超连接数也不丢并发。
+  const [config, clients, tls, inbounds] = await Promise.all([
     getConfig(db, node.id),
     listObjects(db, node.id, 'clients'),
     listObjects(db, node.id, 'tls'),
     listObjects(db, node.id, 'inbounds'),
+  ])
+  const [outbounds, endpoints, services, settings] = await Promise.all([
     listObjects(db, node.id, 'outbounds'),
     listObjects(db, node.id, 'endpoints'),
     listObjects(db, node.id, 'services'),
@@ -155,8 +170,10 @@ export async function handleReport(db: D1Database, node: NodeRow, body: ReportBo
   }
 
   // 流量变了要让面板刷新，但这不是"配置变更"——不能 bump revision，
-  // 否则节点每 30 秒都会重新拉一遍全量配置。
-  if (traffic.length) {
+  // 否则节点每 60 秒都会重新拉一遍全量配置。
+  // 也不能每轮都记：这是 D1 写配额的最大单一消耗（约 1.4 万行/天），还会把 changes 表撑大。
+  // 面板轮询只需要"知道有变化"，所以每节点 5 分钟最多记一条（模块内存节流，不额外读库）。
+  if (traffic.length && shouldLogUsage(node.id, ts)) {
     stmts.push(logChange(db, node.id, '', 'usage', 'report', { count: traffic.length }))
   }
 

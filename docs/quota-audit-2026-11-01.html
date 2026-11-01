@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>s-ui Cloud · Cloudflare 配额体检</title>
+<style>
+  :root{
+    --ink:#1c1b19; --ink-2:#5b5852; --ink-3:#8d897f;
+    --paper:#faf8f4; --rule:#e0dbd1; --accent:#8a6a3b;
+    --warn:#a5432f; --ok:#3f6b3a;
+    --mono: ui-monospace, "SFMono-Regular", "Cascadia Mono", Consolas, monospace;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:#efece6; color:var(--ink);
+    font-family:"Noto Serif SC","Songti SC",Georgia,serif;
+    font-size:15px; line-height:1.72;
+    -webkit-font-smoothing:antialiased;
+  }
+  .sheet{
+    max-width:920px; margin:28px auto 64px; background:var(--paper);
+    padding:52px 60px 64px; border:1px solid var(--rule);
+    box-shadow:0 22px 50px -34px rgba(0,0,0,.35);
+  }
+  h1{font-size:30px; line-height:1.3; margin:0 0 6px; font-weight:600; letter-spacing:-.01em}
+  .sub{color:var(--ink-2); font-size:13px; margin:0 0 30px}
+  h2{font-size:18px; margin:44px 0 12px; font-weight:600; letter-spacing:-.01em}
+  h2::before{content:""; display:inline-block; width:14px; height:1px; background:var(--accent);
+    vertical-align:middle; margin-right:10px; transform:translateY(-3px)}
+  h3{font-size:15px; margin:26px 0 8px; font-weight:600}
+  p{margin:10px 0}
+  code{font-family:var(--mono); font-size:.86em; background:#f1ede5; padding:1px 5px; border-radius:2px}
+  table{width:100%; border-collapse:collapse; margin:14px 0 6px; font-size:13.5px}
+  th,td{text-align:left; padding:8px 10px; border-bottom:1px solid var(--rule); vertical-align:top}
+  th{font-weight:600; color:var(--ink-2); font-size:12px; letter-spacing:.06em; text-transform:uppercase;
+     border-bottom:1px solid var(--ink-3)}
+  td.num,th.num{text-align:right; font-family:var(--mono); font-size:12.5px}
+  .tag{display:inline-block; font-size:11px; letter-spacing:.04em; padding:1px 7px; border-radius:2px;
+       border:1px solid currentColor; vertical-align:1px}
+  .p0{color:var(--warn)} .p1{color:var(--accent)} .p2{color:var(--ink-3)} .ok{color:var(--ok)}
+  .note{border-left:2px solid var(--accent); padding:8px 0 8px 14px; color:var(--ink-2); font-size:13.5px; margin:16px 0}
+  ul,ol{margin:8px 0 8px 20px; padding:0}
+  li{margin:5px 0}
+  .kv{display:grid; grid-template-columns:180px 1fr; gap:4px 18px; font-size:13.5px; margin:12px 0}
+  .kv b{font-weight:600; color:var(--ink-2)}
+  footer{margin-top:46px; padding-top:14px; border-top:1px solid var(--rule); color:var(--ink-3); font-size:12px}
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <h1>Cloudflare 配额体检</h1>
+  <p class="sub">s-ui Cloud 控制面 · 2026-11-01 · 数值取自 Cloudflare 官方文档与 D1 实测 meta</p>
+
+  <p>结论先说：真正会先撞墙的不是你担心的那个 500 万读取，而是
+  <b>Workers 每天 10 万次请求</b>（现用 46%）和 <b>D1 每天 10 万行写入</b>（现用 58%）。
+  两者都还有余量，但写配额是当前最紧的一项，且和"节点心跳多密"直接绑定。</p>
+
+  <h2>一、与本项目相关的限额（已核对官方文档）</h2>
+
+  <table>
+    <thead><tr><th>资源</th><th>免费额度</th><th>超出后果</th></tr></thead>
+    <tbody>
+      <tr><td>Workers 请求</td><td class="num">100,000 / 天（UTC 00:00 重置）</td><td>Error 1027；开了 <code>run_worker_first</code> 时静态资源也一起 429</td></tr>
+      <tr><td>Workers CPU</td><td class="num">10 ms / 请求；Cron 10 ms</td><td>Error 1102 <code>exceededCpu</code></td></tr>
+      <tr><td>单次请求子请求</td><td class="num">50</td><td>超出报错</td></tr>
+      <tr><td>同时出站连接</td><td class="num">6 / 请求（含 D1 连接）</td><td>排队或失败</td></tr>
+      <tr><td>Worker 体积 / 启动</td><td class="num">64 MiB / 1 s</td><td>部署被拒</td></tr>
+      <tr><td>静态资源</td><td class="num">20,000 个文件；单文件 25 MiB；<b>资源请求免费不限量</b></td><td>—</td></tr>
+      <tr><td>Cron 触发器</td><td class="num">5 / 账户</td><td>—</td></tr>
+      <tr><td>D1 读取</td><td class="num">5,000,000 行 / 天</td><td>查询报错</td></tr>
+      <tr><td><b>D1 写入</b></td><td class="num"><b>100,000 行 / 天</b></td><td>写入报错</td></tr>
+      <tr><td>D1 存储</td><td class="num">5 GB / 账户；单库 500 MB；10 个库</td><td>无法写入</td></tr>
+      <tr><td>D1 单查询</td><td class="num">30 s；结果 50 MB；SQL 100 KB；绑定参数 100</td><td>查询报错</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note">
+    <b>关键细节</b>：静态资源请求本身免费且不限量，但一旦 <code>run_worker_first = ["/*"]</code>，
+    这些请求会先调用 Worker —— 于是既计入 10 万次配额，额度用尽时连页面都打不开（429），而不会回落到静态托管。
+    我们用通配是因为要加安全响应头，代价就是把静态资源也算进请求数。目前资源请求每天只有几百次，影响很小，属于"知道就行"。
+  </div>
+
+  <h2>二、当前实际消耗（实测 + 推算）</h2>
+
+  <p>单行 <code>UPDATE</code> 实测 <code>rows_read=1, rows_written=1</code>；全表 <code>SELECT * FROM nodes</code> 为 10 行读取。
+  节点心跳 60 秒一次，每轮两条请求（pull + report）。</p>
+
+  <table>
+    <thead><tr><th>来源</th><th class="num">请求 / 天</th><th class="num">读 / 天</th><th class="num">写 / 天</th></tr></thead>
+    <tbody>
+      <tr><td>10 台节点心跳（60 s）</td><td class="num">28,800</td><td class="num">≈43,000</td><td class="num">≈57,600</td></tr>
+      <tr><td>面板首页轮询（10 s，单标签页）</td><td class="num">8,640</td><td class="num">≈8,600</td><td class="num">0</td></tr>
+      <tr><td><code>/api/load</code> 轮询（10 s）</td><td class="num">8,640</td><td class="num">≈17,000</td><td class="num">0</td></tr>
+      <tr><td>节点列表（5 min）与订阅拉取</td><td class="num">≈400</td><td class="num">≈2,000</td><td class="num">0</td></tr>
+      <tr><td>Cron（10 min）</td><td class="num">144</td><td class="num">≈3,600</td><td class="num">≈50</td></tr>
+      <tr><th>合计</th><th class="num">≈46,600（46%）</th><th class="num">≈74,000（1.5%）</th><th class="num">≈58,000（58%）</th></tr>
+    </tbody>
+  </table>
+
+  <p>存储侧完全安全：库 <code>0.79 MB / 500 MB</code>，账户 <code>&lt;1 MB / 5 GB</code>
+  （<code>changes</code> 每天新增约 1.4 万行，14 天清理后稳定在 20 MB 量级）。</p>
+
+  <h2>三、体检发现（按严重度）</h2>
+
+  <h3><span class="tag p0">P0</span> 单次请求并发 8 个 D1 查询，超过 6 连接上限</h3>
+  <p><code>agent.ts::pullPayload</code> 用 <code>Promise.all</code> 同时发起 8 个查询（config + clients + tls + inbounds +
+  outbounds + endpoints + services + settings），<code>objects.ts::loadFull</code> 是 7 个。文档明确每请求最多 6 个同时连接。
+  平时能跑通是因为多数请求很轻、排队也能过；一旦 D1 变慢就会偶发失败，而且这种错很难复现。属于"该改"的确定性问题，不是配额问题。</p>
+
+  <h3><span class="tag p1">P1</span> 写配额最紧：58% 来自"每次心跳都记一条变更"</h3>
+  <p>每轮上报会写 4 行：<code>nodes</code> 一行、<code>usage</code> 一行、<code>objects(clients)</code> 一行、
+  <code>changes</code> 一行（<code>logChange('usage')</code>）。其中最后那条纯粹是为了让面板轮询感知"流量变了"，
+  但它同时也是 <code>changes</code> 表膨胀到三千多行的原因。</p>
+  <p>把这条变更日志节流到 5 分钟一次，可省下约 <b>1.15 万行写入/天</b>（58% → 46%），并让 <code>changes</code> 增速降到 1/5。</p>
+
+  <h3><span class="tag p1">P1</span> 请求配额：心跳占 62%</h3>
+  <p>每轮心跳是两条请求（pull 取配置、report 回状态）。合并成一条 <code>/agent/sync</code>
+  （请求体带上状态，响应体带上配置）可把 2.88 万降到 1.44 万，整天请求从 4.6 万降到 3.2 万。</p>
+
+  <h3><span class="tag p2">P2</span> 静态资源被计入请求配额，且额度耗尽时页面一起 429</h3>
+  <p>改造方向有两条：把 <code>run_worker_first</code> 收窄到 <code>/api/* /agent/* /sub/*</code>，
+  安全头改由 Zone 级 Transform Rule 下发（免费版可用）；或者维持现状（量小）。需要你在面板里建规则，我这边可以直接改配置。</p>
+
+  <h3><span class="tag p2">P2</span> CPU 10 ms 值得盯</h3>
+  <p>登录要跑 PBKDF2（已从 120k 降到 10k 迭代）加 JWT 签发，属于唯一可能贴上限的路径。
+  目前没有 1102 报错记录，但这是"免费版最常见的隐形杀手"：一旦报 1102，现象是登录按钮点了没反应。先保持 10k 迭代不动。</p>
+
+  <h3><span class="tag ok">已解决</span> 此前 490 万读取来自 cron 全表扫描</h3>
+  <p>两条只按 <code>ts</code> 过滤的 <code>DELETE</code> 缺索引，720 次/天 × 约 7,000 行。已补 <code>idx_usage_ts</code> /
+  <code>idx_changes_ts</code> 并节流到 6 小时一次，现在这块基本归零。</p>
+
+  <h2>四、建议的改动顺序</h2>
+  <ol>
+    <li><b>P0 并发修正</b>（纯面板侧，不需动节点）：把 8 个查询拆成两批，或改用 <code>batch()</code> 一次发多个语句。</li>
+    <li><b>P1 变更日志节流</b>（纯面板侧）：<code>logChange('usage')</code> 每节点 5 分钟最多一条。</li>
+    <li><b>P1 心跳合并为一条请求</b>（协议双端改动）：先上面板新增 <code>/agent/sync</code> 并保留旧接口，
+       再逐台换 agent（vn 先跑 3 分钟验证，再推其余 9 台），全部稳定后才删旧接口。</li>
+    <li><b>P2 静态资源分流</b>（需要你在 Zone 里建一条 Transform Rule），确认安全头仍然生效后再切 <code>run_worker_first</code>。</li>
+  </ol>
+
+  <p>做完 1–3 的预估：请求 <b>4.6 万 → 3.2 万</b>（32%），写入 <b>5.8 万 → 4.6 万</b>（46%），读取 <b>7.4 万 → 6 万</b>（1.2%）。
+  距离两条硬线都有 2 倍以上余量；再要压就得拉长心跳间隔，那是以"配置生效更慢"换数字，不建议现在做。</p>
+
+  <h2>五、和你之前那个问题的关系</h2>
+  <p>重编 agent 本身<b>不改任何节点配置</b>：只替换 <code>/opt/sui-agent/bin/sui-agent</code> 一个文件，
+  旧文件留作 <code>sui-agent.prev</code>；节点/入站/客户端/配额/订阅链接全部在 D1 里，不受影响。
+  唯一可见影响是重启内核时每台断流 2–5 秒。第 3 步（心跳合并）必须走这个流程，
+  而第 1、2 步只是面板代码，可以在任意时间上线，不碰节点。</p>
+
+  <footer>
+    数据来源：Cloudflare Workers / D1 / Static Assets 官方 Limits 与 Pricing 文档（2026-11-01 抓取）；
+    本地实测经 <code>wrangler d1 execute --json</code> 的 <code>meta.rows_read / rows_written</code>。
+    台账：<code>projects/proxy-tools-ops/MIGRATION-ALL-2026-10-29.md</code> §20。
+  </footer>
+</div>
+</body>
+</html>

@@ -113,11 +113,15 @@ export async function getSettings(db: D1Database, nodeId: string): Promise<Recor
 
 /** /api/load 的完整响应（前端 setNewData 消费）。 */
 export async function loadFull(db: D1Database, nodeId: string, subURI: string): Promise<J> {
-  const [config, clients, tls, inboundsRaw, outbounds, endpoints, services] = await Promise.all([
+  // 同 pullPayload：Cloudflare 每个请求最多 6 个同时出站连接（D1 也算），
+  // 原来 7 个 Promise.all 已经在踩线，拆成两轮（4 + 3）。
+  const [config, clients, tls, inboundsRaw] = await Promise.all([
     getConfig(db, nodeId),
     listObjects(db, nodeId, 'clients'),
     listObjects(db, nodeId, 'tls'),
     listObjects(db, nodeId, 'inbounds'),
+  ])
+  const [outbounds, endpoints, services] = await Promise.all([
     listObjects(db, nodeId, 'outbounds'),
     listObjects(db, nodeId, 'endpoints'),
     listObjects(db, nodeId, 'services'),
