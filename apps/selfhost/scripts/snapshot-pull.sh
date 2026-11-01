@@ -8,6 +8,9 @@
 #   - 保留最近 KEEP 份，便于"主控没了但待机也坏了"时往回退。
 set -euo pipefail
 
+# systemd 环境里没有 /opt/node/bin，显式补上（面板就是用这个 Node 跑的）
+export PATH=/opt/node/bin:$PATH
+
 PANEL_URL="${PANEL_URL:?需要 PANEL_URL，例如 https://panel.example.org}"
 BACKUP_TOKEN="${BACKUP_TOKEN:?需要 BACKUP_TOKEN（面板 meta.backup_token_hash 对应的原始令牌）}"
 DATA_DIR="${DATA_DIR:-/opt/sui-panel/data}"
@@ -59,6 +62,7 @@ mv "$staging" "$target"
 echo "[$(date -Is)] 已更新 $target"
 
 # 只保留最近 KEEP 份历史
+# 没有历史快照时 ls 会以 2 退出，配合 set -e 会把整个任务判失败——这里显式兜住
 ls -1t "$DATA_DIR"/standby-*.db 2>/dev/null | tail -n +$((KEEP + 1)) | while read -r old; do
   rm -f "$old" && echo "  清理旧快照 $(basename "$old")"
-done
+done || true

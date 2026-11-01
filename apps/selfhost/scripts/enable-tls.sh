@@ -92,7 +92,7 @@ say "caddy: active"
 
 FIRST=${DOMAINS%%,*}
 if curl -fsSk --resolve "$FIRST:$LISTEN_PORT:127.0.0.1" \
-    "https://$FIRST:$LISTEN_PORT/health" -m 8 | grep -q '"ok":true'; then
+  "https://$FIRST:$LISTEN_PORT/health" -m 8 | grep -q '"ok":true'; then
   say "https://$FIRST:$LISTEN_PORT/health → ok（本机回环验证）"
 else
   say "本机 HTTPS 自检失败"

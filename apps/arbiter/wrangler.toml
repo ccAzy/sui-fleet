@@ -9,9 +9,9 @@ crons = ["* * * * *"]
 
 # 顺位表（第一项视为当前主控）。改这里之后要重新 deploy。
 [vars]
-# 顺位：真实迁移后是 hk → jp；当前主控仍在 Cloudflare
+# 顺位：主控已在 hk（hksui），jp 为待机；DRY_RUN=1 时只观察不改 DNS
 ORDER = "hk,jp"
-PROBE_URL = "https://panel.example.org/health"
+PROBE_URL = "https://hksui.example.com/health"
 PANEL_URL = "https://panel.example.org"
 DRY_RUN = "1"
 THRESHOLD = "3"
