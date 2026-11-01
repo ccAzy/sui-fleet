@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 在面板主机上装 TLS 前端（Caddy），把 https://<域名>[:端口] 反代到本机面板。
 #
-#   LISTEN_PORT=8443 bash enable-tls.sh 'panel.example.org,hksui.example.com'
+#   LISTEN_PORT=8443 bash enable-tls.sh 'panel.example.org,sui.example.com'
 #
 # 为什么用自签证书：Cloudflare 该 zone 的 SSL 模式是 Full（非 strict），边缘到源站允许自签。
 # 这样不依赖 ACME、不需要先把域名指过来、也不会因为续期失败把面板搞挂。

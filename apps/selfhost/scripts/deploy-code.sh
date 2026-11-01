@@ -13,7 +13,7 @@ HOST="${HOST:?需要 HOST，例如 HOST=192.0.2.10}"
 SSH_PORT="${SSH_PORT:-6688}"
 SSH_KEY="${SSH_KEY:-$HOME/.ssh/id_ed25519}"
 REMOTE="${REMOTE:-/opt/sui-panel}"
-DOMAIN="${DOMAIN:-hksui.example.com}"
+DOMAIN="${DOMAIN:-sui.example.com}"
 REPO="$(cd "$(dirname "$0")/../../.." && pwd)"
 
 tmp=$(mktemp -d)

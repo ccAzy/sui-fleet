@@ -13,7 +13,7 @@ set -euo pipefail
 
 HOST="${HOST:?需要 HOST，例如 HOST=jp}"
 IP="${IP:?需要 IP，例如 IP=85.121.122.96}"
-DOMAIN="${DOMAIN:-hksui.example.com}"
+DOMAIN="${DOMAIN:-sui.example.com}"
 LISTEN_PORT="${LISTEN_PORT:-8443}"
 PANEL_PORT="${PANEL_PORT:-8788}"
 SSH_PORT="${SSH_PORT:-6688}"
@@ -22,7 +22,10 @@ CERT_DIR="/opt/sui-panel/tls/$DOMAIN"
 
 say() { printf '  %s\n' "$1"; }
 
-[ -x /opt/caddy/caddy ] || { echo "本机没有 /opt/caddy/caddy，先在主控上装好 TLS 前端"; exit 1; }
+[ -x /opt/caddy/caddy ] || {
+  echo "本机没有 /opt/caddy/caddy，先在主控上装好 TLS 前端"
+  exit 1
+}
 
 # 证书可能放在 tls/<域名>/ 或 tls/<短名>/（历史原因 hk 上叫 tls/hksui/）。
 # 按「哪张证书真的覆盖这个域名」来挑，别赌目录名。
@@ -35,7 +38,10 @@ if [ ! -f "$CERT_DIR/fullchain.pem" ]; then
       break
     fi
   done
-  [ -n "$found" ] || { echo "本机找不到覆盖 $DOMAIN 的证书（/opt/sui-panel/tls/*/）"; exit 1; }
+  [ -n "$found" ] || {
+    echo "本机找不到覆盖 $DOMAIN 的证书（/opt/sui-panel/tls/*/）"
+    exit 1
+  }
   echo "  用证书目录: $found  →  目标目录: $CERT_DIR"
   SRC_CERT="$found"
 else
