@@ -129,6 +129,25 @@ export function linkToOutbound(uri: string): J | null {
         password: str(p.password),
         ...(tls ? { tls } : {}),
       }
+    // links.ts 会给 socks / mixed 入站生成 socks5://，给 http 入站生成 http(s)://。
+    // 原来 sing-box 侧没有这两个 case → 这些节点在 ?format=singbox 订阅里静默消失。
+    case 'socks5':
+    case 'socks':
+      return {
+        type: 'socks',
+        ...base,
+        ...(p.username ? { username: str(p.username) } : {}),
+        ...(p.password ? { password: str(p.password) } : {}),
+      }
+    case 'http':
+    case 'https':
+      return {
+        type: 'http',
+        ...base,
+        ...(p.username ? { username: str(p.username) } : {}),
+        ...(p.password ? { password: str(p.password) } : {}),
+        ...(tls ? { tls } : {}),
+      }
     default:
       return null
   }

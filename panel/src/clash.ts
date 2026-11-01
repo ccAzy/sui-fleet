@@ -190,6 +190,40 @@ export function linkToProxy(uri: string): Proxy | null {
         if (q.get("insecure") === "1") proxy["skip-cert-verify"] = true;
         return proxy;
       }
+      case "socks5":
+      case "socks": {
+        // links.ts 会给 socks / mixed 入站生成 socks5:// 链接，原来这里不认识 →
+        // Clash 与 sing-box 订阅里静默少一批节点（不报错，用户以为没配）。
+        const proxy: Proxy = {
+          name,
+          type: "socks5",
+          server: host,
+          port,
+          udp: true,
+        };
+        if (u.username) proxy.username = decodeURIComponent(u.username);
+        if (u.password) proxy.password = decodeURIComponent(u.password);
+        // socks5/http 链接不带 transport 参数，按默认 tcp 处理即可
+        applyTransport(proxy, q.get("type") ?? "tcp", q.get("host"), q.get("path"));
+        return proxy;
+      }
+      case "http":
+      case "https": {
+        const proxy: Proxy = {
+          name,
+          type: "http",
+          server: host,
+          port,
+        };
+        if (u.username) proxy.username = decodeURIComponent(u.username);
+        if (u.password) proxy.password = decodeURIComponent(u.password);
+        const scheme = u.protocol.replace(":", "");
+        if (scheme === "https" || q.get("tls") === "1") {
+          proxy.tls = true;
+          if (q.get("sni")) proxy.servername = q.get("sni");
+        }
+        return proxy;
+      }
       default:
         return null;
     }

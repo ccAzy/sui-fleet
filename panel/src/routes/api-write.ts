@@ -180,13 +180,25 @@ export function registerApiWrite(app: Hono<{ Bindings: Env }>) {
   // 落到 SPA 兜底返回 HTML → 前端报 `unknown data: <!doctype html>`。
   // 显式给一条可读的拒绝，比让人看到 HTML 好。
   app.post("/api/updatePanel", async (c) =>
-    json(c, null, new Error("本部署不支持面板自更新：Cloudflare 上用 wrangler deploy，自托管用 deploy-code.sh")),
+    json(
+      c,
+      null,
+      new Error(
+        "本部署不支持面板自更新：Cloudflare 上用 wrangler deploy，自托管用 deploy-code.sh",
+      ),
+    ),
   );
 
   // 重启面板：Worker 没有进程可重启；自托管由 systemd 负责。
   // 保留端点是为了让前端的按钮不至于 404，但必须说清楚它什么都没做。
   app.post("/api/restartApp", async (c) =>
-    json(c, null, new Error("本部署没有可重启的进程：自托管请执行 systemctl restart sui-panel")),
+    json(
+      c,
+      null,
+      new Error(
+        "本部署没有可重启的进程：自托管请执行 systemctl restart sui-panel",
+      ),
+    ),
   );
 
   app.post("/api/changePass", async (c) => {

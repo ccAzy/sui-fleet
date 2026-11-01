@@ -179,3 +179,62 @@ describe("genLinks 的 flow 选取", () => {
     expect(uri).toContain("flow=xtls-rprx-vision");
   });
 });
+
+// ---------------------------------------------------------------------------
+// 回归：socks / http 入站的链接原来在 Clash 与 sing-box 订阅里被静默丢弃。
+//
+// links.ts 会给 socks、mixed、http 入站生成 socks5:// / http(s):// 链接，
+// 但 clash.ts 的 linkToProxy 只认 vless/vmess/trojan/ss/hysteria2/tuic/anytls，
+// 于是这些节点在订阅里「消失」且不报错。下面锁住四种形态。
+// ---------------------------------------------------------------------------
+describe("socks / http 链接的解析对称性", () => {
+  const SOCKS = "socks5://alice:s3cret@1.2.3.4:1080#socks-node";
+  const HTTP = "https://bob:pw@5.6.7.8:8080?sni=cdn.example.com#http-node";
+
+  it("socks5 → clash", () => {
+    const p = linkToProxy(SOCKS);
+    expect(p).not.toBeNull();
+    expect(p!.type).toBe("socks5");
+    expect(p!.server).toBe("1.2.3.4");
+    expect(p!.port).toBe(1080);
+    expect(p!.username).toBe("alice");
+    expect(p!.password).toBe("s3cret");
+  });
+
+  it("socks5 → sing-box", () => {
+    const o = linkToOutbound(SOCKS);
+    expect(o).not.toBeNull();
+    expect(o!.type).toBe("socks");
+    expect(o!.username).toBe("alice");
+  });
+
+  it("https → clash（带 tls 与 sni）", () => {
+    const p = linkToProxy(HTTP);
+    expect(p).not.toBeNull();
+    expect(p!.type).toBe("http");
+    expect(p!.tls).toBe(true);
+    expect(p!.servername).toBe("cdn.example.com");
+    expect(p!.username).toBe("bob");
+  });
+
+  it("https → sing-box", () => {
+    const o = linkToOutbound(HTTP);
+    expect(o).not.toBeNull();
+    expect(o!.type).toBe("http");
+    expect((o!.tls as Record<string, unknown>)?.enabled).toBe(true);
+  });
+
+  it("clash 配置里两个节点都出现（不再静默丢弃）", () => {
+    const yaml = buildClashConfig([SOCKS, HTTP], "t");
+    expect(yaml).toContain("socks-node");
+    expect(yaml).toContain("http-node");
+    expect(yaml).toContain("type: socks5");
+    expect(yaml).toContain("type: http");
+  });
+
+  it("sing-box 配置里两个节点都出现", () => {
+    const arr = buildSingboxOutbounds([SOCKS, HTTP]);
+    expect(arr.length).toBe(2);
+    expect(arr.map((x) => x.type).sort()).toEqual(["http", "socks"]);
+  });
+});

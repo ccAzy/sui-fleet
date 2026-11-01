@@ -6,8 +6,8 @@
 // 加减节点后客户端刷新一次就自动增减条目。
 import type { Hono } from "hono";
 import { all, getNode, listNodes, type Env } from "../db";
-import { buildClashConfig } from "../clash";
-import { buildSingboxOutbounds } from "../singbox";
+import { buildClashConfig, linkToProxy } from "../clash";
+import { buildSingboxOutbounds, linkToOutbound } from "../singbox";
 
 type SubFormat = "" | "clash" | "singbox";
 
@@ -51,6 +51,25 @@ function parseSubQuery(raw: {
   return { key, clientFilter, subType };
 }
 
+/**
+ * 统计有多少条链接是目标格式表达不了的。
+ *
+ * Clash 与 sing-box 的协议覆盖不完全一样（例如 hysteria v1、naive 两边都不支持）。
+ * 这类节点原来会**静默消失**——用户在面板里配好了，订阅里却没有，而且没有任何提示。
+ * 用响应头把数量带出去，客户端不显示，但用 curl 一看就知道少了几条。
+ */
+function countUnsupported(links: string[], subType: SubFormat): number {
+  let n = 0;
+  for (const uri of links) {
+    // 两种格式的协议覆盖面不一样（clash.ts 与 singbox.ts 各有一张表），
+    // 所以要按目标格式分别统计，不能只看 linkToProxy。
+    const ok =
+      subType === "singbox" ? linkToOutbound(uri) !== null : linkToProxy(uri) !== null;
+    if (!ok) n += 1;
+  }
+  return n;
+}
+
 /** 三种格式的统一渲染出口。 */
 function renderSubscription(
   links: string[],
@@ -58,6 +77,10 @@ function renderSubscription(
   headers: Record<string, string>,
   subType: SubFormat,
 ): Response {
+  if (subType === "clash" || subType === "singbox") {
+    const skipped = countUnsupported(links, subType);
+    if (skipped > 0) headers = { ...headers, "X-Sub-Unsupported": String(skipped) };
+  }
   if (subType === "clash") {
     return new Response(buildClashConfig(links, title), {
       status: 200,
@@ -159,22 +182,22 @@ export function registerSub(app: Hono<{ Bindings: Env }>) {
           ...enabled.map((n) => n.id),
         )
       : [];
-      for (const r of rows) {
-        const nodeName = nameById.get(r.node_id) ?? "";
-        let cl: Record<string, unknown>;
-        try {
-          cl = JSON.parse(r.data) as Record<string, unknown>;
-        } catch {
-          continue;
-        }
-        if (cl.enable === false) continue;
-        if (clientFilter && String(cl.name ?? "") !== clientFilter) continue;
-        matchedClients++;
-        up += Number(cl.up ?? 0) || 0;
-        down += Number(cl.down ?? 0) || 0;
-        for (const uri of collectLinks(cl))
-          links.push(prefixRemark(uri, nodeName));
+    for (const r of rows) {
+      const nodeName = nameById.get(r.node_id) ?? "";
+      let cl: Record<string, unknown>;
+      try {
+        cl = JSON.parse(r.data) as Record<string, unknown>;
+      } catch {
+        continue;
       }
+      if (cl.enable === false) continue;
+      if (clientFilter && String(cl.name ?? "") !== clientFilter) continue;
+      matchedClients++;
+      up += Number(cl.up ?? 0) || 0;
+      down += Number(cl.down ?? 0) || 0;
+      for (const uri of collectLinks(cl))
+        links.push(prefixRemark(uri, nodeName));
+    }
 
     if (links.length === 0) {
       return c.text(
