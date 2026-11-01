@@ -281,6 +281,10 @@ app.post("/api/login/otp", async (c) => {
   return await issueSession(c, user);
 });
 
+// 显式挡掉 GET：登出有副作用（提升会话代次 = 全设备失效），
+// 不能是"访问一个 URL 就生效"的动词。之前 GET 会落到 SPA 兜底返回 HTML 200，容易被误认为成功。
+app.get("/api/logout", (c) => c.json({ success: false, msg: "use POST" }, 405));
+
 app.post("/api/logout", async (c) => {
   // 光删 cookie 不算登出：JWT 还在有效期内，谁复制过这枚 cookie 就还照样能用。
   // 面板没有会话表，最接近「只登出这个人」的做法是把该用户的会话代次 +1
