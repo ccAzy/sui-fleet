@@ -251,9 +251,11 @@ const reloadSys = async () => {
 let intervalId: ReturnType<typeof setInterval> | null = null
 
 const startTimer = () => {
+  // 2 秒一次会把 D1 rows_read 抬得很高（每次请求都要读节点行 + 内核/版本缓存），
+  // 首屏这些读数 5 秒刷新完全够用。
   intervalId = setInterval(() => {
     reloadData()
-  }, 2000)
+  }, 5000)
 }
 
 const stopTimer = () => {

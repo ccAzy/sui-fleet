@@ -49,9 +49,17 @@ export async function resolveNode(
   headerId: string | undefined,
 ): Promise<NodeRow | null> {
   if (headerId) return await getNode(db, headerId);
-  const nodes = await listNodes(db);
-  return nodes.find((n) => n.enabled) ?? null;
+  // 前端没指定节点时，每次请求都扫一遍 nodes 表（10 行）。面板轮询很密，
+  // 而「第一个启用节点」几乎不变——缓 60 秒；单这一项每天能省下十几万 rows_read。
+  const ts = Math.floor(Date.now() / 1000);
+  if (!defaultNodeCache || ts - defaultNodeCache.at > 60) {
+    const nodes = await listNodes(db);
+    defaultNodeCache = { at: ts, node: nodes.find((n) => n.enabled) ?? null };
+  }
+  return defaultNodeCache.node;
 }
+
+let defaultNodeCache: { at: number; node: NodeRow | null } | null = null;
 
 /** s-ui 的响应约定：永远 200 + { success, msg, obj }。 */
 export const json = (c: any, obj: unknown, error?: unknown) =>

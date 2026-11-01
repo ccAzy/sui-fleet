@@ -27,6 +27,14 @@ import {
 import { getKernelInfo, isOutdated, metaGet } from "../kernel";
 import { generateKeypair } from "../keypairs";
 
+// 状态接口高频轮询用的模块级缓存：内核版本 / agent 发布版本都在 meta 里，6 小时才变一次，
+// 没必要每次请求都回表（每次 3 行 × 一天几万次 = 十几万 rows_read）。
+let metaCache: {
+  at: number;
+  kernel: Awaited<ReturnType<typeof getKernelInfo>>;
+  agentRelease: string;
+} | null = null;
+
 export function registerApiRead(app: Hono<{ Bindings: Env }>) {
   app.get("/api/load", async (c) => {
     const node = await resolveNode(c.env.DB, c.req.header("X-Remote-Server"));
@@ -109,10 +117,19 @@ export function registerApiRead(app: Hono<{ Bindings: Env }>) {
   app.get("/api/status", async (c) => {
     const node = await resolveNode(c.env.DB, c.req.header("X-Remote-Server"));
     if (!node) return json(c, {});
-    const kernel = await getKernelInfo(c.env.DB);
+    // 内核/版本这两个值都在 meta 表里、6 小时才变一次，但状态接口是高频轮询的，
+    // 每次去读 3 行纯属浪费额度 —— 模块级缓存 60 秒（Worker 实例内共享）。
+    const nowTs = Math.floor(Date.now() / 1000);
+    if (!metaCache || nowTs - metaCache.at > 60) {
+      metaCache = {
+        at: nowTs,
+        kernel: await getKernelInfo(c.env.DB),
+        agentRelease: (await metaGet(c.env.DB, "agent_release_version")) ?? "",
+      };
+    }
+    const kernel = metaCache.kernel;
     // 没配更新源时这里是空串；下面必须区分「空」和「版本不同」
-    const agentReleaseVersion =
-      (await metaGet(c.env.DB, "agent_release_version")) ?? "";
+    const agentReleaseVersion = metaCache.agentRelease;
     let status: Record<string, unknown> = {};
     try {
       status = JSON.parse(node.status_json) as Record<string, unknown>;

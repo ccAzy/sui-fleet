@@ -34,6 +34,8 @@ const Data = defineStore('Data', {
     tlsConfigs: <any[]>[],
     servers: <any[]>[],
     currentServer: localStorage.getItem('currentServer') ?? '',
+    // 节点列表上一次拉取的时间戳：轮询里不再每 10 秒重拉（/api/servers 每次都扫全部 nodes）
+    serversAt: 0,
   }),
   actions: {
     // The server registry is always local (never proxied to a remote).
@@ -68,10 +70,13 @@ const Data = defineStore('Data', {
       this.loadData()
     },
     async loadData() {
-      // Resolve the registry FIRST (awaited): if the server we're "managing" was
-      // removed, loadServers() drops currentServer back to local, so the api/load
-      // below isn't proxied to a gone remote and 404'd on every poll tick.
-      await this.loadServers()
+      // 节点列表只在首次 / 5 分钟后 / 手动切换时拉：这个接口要扫全部 nodes，
+      // 10 秒一次纯属浪费 D1 免费额度（单标签页一天能多扫 8 万行）。
+      const nowTs = Math.floor(Date.now() / 1000)
+      if (!this.servers.length || nowTs - (this.serversAt || 0) > 300) {
+        await this.loadServers()
+        this.serversAt = nowTs
+      }
       setRemoteServer(this.currentServer)
       const msg = await HttpUtils.get('api/load', this.lastLoad >0 ? {lu: this.lastLoad} : {} )
       if(msg.success) {

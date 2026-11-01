@@ -17,7 +17,7 @@ database_name = "sui-panel"
 database_id = "00000000-0000-0000-0000-000000000000"
 
 [triggers]
-crons = ["*/2 * * * *"]
+crons = ["*/10 * * * *"]
 
 [vars]
 # 部署后改成你的面板域名，例如 https://panel.example.com
