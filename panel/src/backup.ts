@@ -6,7 +6,25 @@ import type { D1Database } from '@cloudflare/workers-types'
 import { all, batch, now } from './db'
 
 const TABLES = ['nodes', 'objects', 'settings', 'changes', 'usage', 'commands', 'users', 'tokens'] as const
-type Table = (typeof TABLES)[number]
+
+// meta 单独处理：它是"运维配置 + 密钥"混在一起的表。
+// 必须带走的（否则恢复后聚合订阅/仲裁代次会丢）：agg_key、control_*、内核与发布缓存。
+// 必须留下的（跟这台实例绑定的秘密）：jwt_secret、ops_token_hash、backup_token_hash。
+const META_CARRY = [
+  'agg_key',
+  'control_epoch',
+  'control_primary',
+  'control_order',
+  'control_switched_at',
+  'kernel_latest',
+  'kernel_checked_at',
+  'agent_release_url',
+  'agent_release_sha256',
+  'agent_release_version',
+  'cleanup_at',
+  'schema_ver',
+]
+type Table = (typeof TABLES)[number] | 'meta'
 
 export interface Bundle {
   kind: 'sui-cf-backup'
@@ -24,6 +42,12 @@ export async function exportBundle(
     if (exclude.includes(t)) continue
     tables[t] = await all<Record<string, unknown>>(db, `SELECT * FROM ${t}`)
   }
+  const placeholders = META_CARRY.map(() => '?').join(', ')
+  tables.meta = await all<Record<string, unknown>>(
+    db,
+    `SELECT key, value FROM meta WHERE key IN (${placeholders})`,
+    ...META_CARRY,
+  )
   return { kind: 'sui-cf-backup', version: 1, exported_at: now(), tables }
 }
 
@@ -51,7 +75,7 @@ export async function importBundle(db: D1Database, data: Bundle): Promise<{ impo
   if (!data || data.kind !== 'sui-cf-backup') throw new Error('不是本面板导出的备份文件')
   if (Number(data.version) !== 1) throw new Error(`不支持的备份版本: ${data.version}`)
 
-  const order: Table[] = ['nodes', 'users', 'tokens', 'objects', 'settings', 'changes', 'usage', 'commands']
+  const order: Table[] = ['nodes', 'users', 'tokens', 'objects', 'settings', 'changes', 'usage', 'commands', 'meta']
   const imported: Record<string, number> = {}
 
   // 清空（逆序）

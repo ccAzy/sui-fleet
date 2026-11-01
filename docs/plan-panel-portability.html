@@ -44,8 +44,8 @@
 <div class="sheet">
 
   <h1>控制面可移植化 · 顺位接管 · 一键接入</h1>
-  <p class="sub">s-ui Cloud · 方案 v9 · 2026-11-01 · P0–P6 全部完成：接管演练已在真实 DNS 上跑通</p>
-  <span class="draft">PLAN v9 — 演练通过，等待正式切主</span>
+  <p class="sub">s-ui Cloud · 方案 v10 · 2026-11-01 · P0–P7：迁移已脚本化，jp 成为真正的待机主控</p>
+  <span class="draft">PLAN v10 — 待拍板正式切主</span>
 
   <h2>零、已确认的前提</h2>
   <table>
@@ -407,9 +407,33 @@ sed -i 's/^DRY_RUN = "1"/DRY_RUN = "0"/' wrangler.toml &amp;&amp; npx wrangler d
     剩下唯一的变量是"再切回去"：按设计不做自动回切，需要人工在面板点一下。
   </div>
 
-  <h2>十五、下一步：正式切主（需你拍板）</h2>
-  <p>正式切主 = 把 <code>panel.example.org</code> 这条记录的源站从 Cloudflare 换到 hk，并把 <code>DRY_RUN</code> 关掉。
-    建议顺序：先在 hk 上补 <code>SUI_OPS_TOKEN</code>（启用代次闸门）→ 面板数据导出到 hk → 低 TTL 预热 → 切 DNS → 观察 10 台节点心跳 → 稳定 24 小时后再把 Cloudflare 那份停下。</p>
+  <h2>十五、P7：迁移已脚本化（jp 已成真待机）</h2>
+  <p class="decided">已完成 · promote.sh 在 jp 上真跑 8/8 通过</p>
+
+  <table>
+    <thead><tr><th>脚本</th><th>作用</th><th>实测</th></tr></thead>
+    <tbody>
+      <tr><td><code>preflight.sh</code></td><td>只读体检：架构 / Node ≥22.5 / 端口 / 磁盘 / 网络 / 已有角色</td><td>hk 上 9 OK / 5 WARN / 0 FAIL</td></tr>
+      <tr><td><code>promote.sh</code></td><td>在任意机器一条命令拉起控制面：装 Node → 拉代码包 → 拉库 → 起服务 → 自检（带 <code>--dry-run</code>、幂等）</td><td>jp 上 8/8 通过；订阅 md5 与生产完全一致</td></tr>
+      <tr><td><code>publish-app.sh</code></td><td>把运行时源码打包到 <code>/dl/app-bundle.tar.gz</code></td><td>747K，sha256 校验通过</td></tr>
+    </tbody>
+  </table>
+
+  <h3>跑通过程中揪出两个真 bug</h3>
+  <ul>
+    <li><code>/api/getdb</code> 只认 <code>backup_token_hash</code>，不认后来加的 <code>ops_token_hash</code> —— 换台机器就拉不到备份（第一次在 jp 上就是卡在这里）。已统一为 <code>verifyOpsToken</code>。</li>
+    <li>备份的 <code>meta</code> 整表不带走，导致待机机没有 <code>agg_key</code>（聚合订阅 403）也没有 <code>control_*</code>（代次丢失）。已改为**白名单携带**：带走 <code>agg_key</code>/<code>control_*</code>/内核与发布缓存，仍然排除 <code>jwt_secret</code> 与各类 token hash。</li>
+  </ul>
+
+  <div class="note">
+    <b>jp 现在是什么状态</b>：Node 24 + 面板运行时 + 生产快照（10 节点 / 130 对象）+ systemd 常驻，
+    <code>/health</code> 正常、聚合订阅 200 / 13132 字节、单节点订阅 md5 与生产逐字节一致。
+    也就是说 hk 真挂了，jp 是能接的——之前"备用轮胎没打气"的风险已关闭。
+  </div>
+
+  <h2>十六、离"一键按钮"还差什么</h2>
+  <p>脚本层已经就绪，包成面板按钮还剩两件事：<b>执行器要有 SSH 通道</b>（Worker 不能 SSH，所以执行器得跑在某台服务器上），
+    以及<b>DNS 切换那一步</b>——它现在由仲裁者做，并带 3 次判定 + 5 分钟自动切回。</p>
 
   <footer>
     方案 v3 · 基于 2026-11-01 的代码与线上状态 · 相关：<code>docs/quota-audit-2026-11-01.html</code>、<code>MIGRATION-ALL-2026-10-29.md</code>。

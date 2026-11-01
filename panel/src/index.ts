@@ -8,7 +8,6 @@ import {
   ensureAdmin,
   login as doLogin,
   signJWT,
-  verifyBackupToken,
   verifyJWT,
   verifyOpsToken,
 } from "./auth";
@@ -370,7 +369,7 @@ app.use("/api/*", async (c, next) => {
   // 备份令牌：只放行 getdb 一个端点，供备用机无人值守拉快照（见 auth.verifyBackupToken）
   if (p === "/api/getdb") {
     const tk = c.req.query("token") ?? "";
-    if (tk && (await verifyBackupToken(c.env.DB, tk))) {
+    if (tk && (await verifyOpsToken(c.env.DB, tk))) {
       await run(
         c.env.DB,
         "INSERT INTO changes (node_id, ts, actor, kind, action, obj) VALUES (?, ?, ?, ?, ?, ?)",
