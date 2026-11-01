@@ -10,8 +10,8 @@ OUT="$(cd "$(dirname "$0")" && pwd)/frontend-dist"
 # deploy.sh 早就做了这种兜底，但本脚本原来两处写死 python，会在这里直接失败。
 PYTHON="$(command -v python3 || command -v python || true)"
 if [ -z "$PYTHON" ]; then
-  echo "需要 python3（用于子集化 MDI 与产物校验）" >&2
-  exit 1
+    echo "需要 python3（用于子集化 MDI 与产物校验）" >&2
+    exit 1
 fi
 
 cd "$SRC"

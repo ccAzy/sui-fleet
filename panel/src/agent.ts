@@ -12,6 +12,7 @@ import {
   run,
   type NodeRow,
   type ObjectRow,
+  ensureConfigHashSchema,
 } from "./db";
 import { getConfig, listObjects } from "./objects";
 
@@ -62,11 +63,47 @@ function shouldLogUsage(nodeId: string, ts: number): boolean {
 }
 
 /** 拉取期望状态。返回 null 表示版本未变且无指令（节点不用重载）。 */
+/**
+ * 稳定序列化：对象按 key 排序，数组保持原序。
+ *
+ * 指纹必须对「同样的内容」给出同样的值，所以不能直接 JSON.stringify ——
+ * 同一个对象经过 SELECT 换序、字段顺序变化后，stringify 的结果就不同了，
+ * 会导致「每轮都判定内容变了」→ 节点每 30 秒重启一次内核。
+ */
+function canonical(v: unknown): string {
+  if (v === null || typeof v !== "object") return JSON.stringify(v) ?? "null";
+  if (Array.isArray(v)) return "[" + v.map(canonical).join(",") + "]";
+  const o = v as Record<string, unknown>;
+  const keys = Object.keys(o).sort();
+  return (
+    "{" + keys.map((k) => JSON.stringify(k) + ":" + canonical(o[k])).join(",") + "}"
+  );
+}
+
+/** 配置指纹：内容相同 → 值相同；revision 相同不代表内容相同。 */
+export async function configHashOf(payload: {
+  config: unknown;
+  settings: unknown;
+  inbounds: unknown;
+  outbounds: unknown;
+  endpoints: unknown;
+  services: unknown;
+  tls: unknown;
+  clients: unknown;
+}): Promise<string> {
+  return sha256(canonical(payload));
+}
+
+/** 指纹过期多久后强制重算一次（秒）。 */
+const HASH_RECHECK_SECONDS = 3600;
+
 export async function pullPayload(
   db: D1Database,
   node: NodeRow,
   clientRev: number,
+  clientHash = "",
 ): Promise<J | null> {
+  await ensureConfigHashSchema(db);
   // 指令一旦被下发就标成 sent，避免节点重启后反复拿到同一条（update_agent 会因此
   // 陷入“更新→重启→再更新”的死循环）。但这样做有个代价：节点拿到指令后、上报之前
   // 崩了或断网，这条指令就永远停在 sent，没人再发给它。
@@ -88,7 +125,29 @@ export async function pullPayload(
     "SELECT id, kind, payload FROM commands WHERE node_id = ? AND status = 'pending' ORDER BY id ASC LIMIT 20",
     node.id,
   );
-  if (clientRev === node.revision && cmds.length === 0) return null;
+  // ---- 是否需要下发 ----
+  //
+  // 只比 revision 是不够的：revision 说明「改过几次」，说明不了「内容是什么」。
+  // 从备份恢复、把待机机的库 promote 上来、手工改库之后，revision 可能正好等于
+  // 节点上的值，而内容已经不同 —— 那样节点会永远收到 unchanged，永远跑旧配置，
+  // 而面板上 last_seen / core_state 一切正常，几乎无法察觉。
+  //
+  // 现在：revision 相同还要看内容指纹。
+  //   快路径：库里的指纹未过期且与节点一致 → 直接 unchanged（不查库）
+  //   慢路径：指纹过期/为空 → 重算一次；算出来一样就只刷新校验时间，不重启内核
+  //
+  // 旧版 agent 不发送指纹（clientHash 为空），保持原来的行为，避免升级期每轮全量下发。
+  if (clientRev === node.revision && cmds.length === 0) {
+    const fresh =
+      !!node.config_hash &&
+      node.config_hash === clientHash &&
+      now() - (node.hash_checked_at || 0) < HASH_RECHECK_SECONDS;
+    if (fresh) return null;
+    // 已经种子过、只是对端是旧版 agent（不送指纹）→ 保持原来的行为，不折腾它
+    if (!clientHash && node.config_hash) return null;
+    // 其余情况（首次种子：两边都空 / 指纹不符）落到下面全量算一次：
+    // 升级后节点会因此多应用一次配置，换来的是从此具备「内容变了也能发现」的能力。
+  }
 
   // 注意：Cloudflare 规定**每个请求最多 6 个同时出站连接**（D1 连接也算）。
   // 原来这里一口气 Promise.all 8 个查询，平时能跑通是因为查询都很轻，但 D1 变慢时会
@@ -110,7 +169,32 @@ export async function pullPayload(
     ),
   ]);
 
+  const settingsMap = Object.fromEntries(settings.map((x) => [x.key, x.value]));
+  const hash = await configHashOf({
+    config,
+    settings: settingsMap,
+    inbounds,
+    outbounds,
+    endpoints,
+    services,
+    tls,
+    clients,
+  });
+  await run(
+    db,
+    "UPDATE nodes SET config_hash = ?, hash_checked_at = ? WHERE id = ?",
+    hash,
+    now(),
+    node.id,
+  );
+
+  // 算出来和节点上的一样 → 内容其实没变，只是库里的指纹过期了。
+  // 这时仍然返回 unchanged，不要为了刷新一次指纹去重启内核。
+  if (clientHash && hash === clientHash && clientRev === node.revision && cmds.length === 0)
+    return null;
+
   // 标记为 sent（节点下次 report 里回执 done/failed）；同时记下发时间，供重投判定。
+  // 必须在确定要下发之后再标：否则上面判成 unchanged 时会留下「已发送但从未送达」的指令。
   if (cmds.length) {
     const ts = now();
     await batch(
@@ -127,9 +211,10 @@ export async function pullPayload(
 
   return {
     revision: node.revision,
+    hash,
     node: { id: node.id, name: node.name },
     config,
-    settings: Object.fromEntries(settings.map((x) => [x.key, x.value])),
+    settings: settingsMap,
     inbounds,
     outbounds,
     endpoints,

@@ -33,6 +33,7 @@ export function registerAgentApi(app: Hono<{ Bindings: Env }>) {
       c.env.DB,
       node,
       Number(body.revision ?? 0),
+      String((body as { hash?: string }).hash ?? ""),
     );
     if (!payload)
       return c.json({ ok: true, unchanged: true, revision: node.revision });

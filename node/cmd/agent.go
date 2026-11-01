@@ -39,11 +39,15 @@ import (
 // ---------------------------------------------------------------------------
 
 const agentRevKey = "agent_revision"
+// 配置内容指纹：只比 revision 会漏掉「内容变了但版本号撞车」的情况（恢复备份、
+// 待机机 promote、手工改库）。两者都比，才能真正判断「节点跑的就是面板里的」。
+const agentHashKey = "agent_config_hash"
 
 type agentPullResp struct {
 	OK        bool                      `json:"ok"`
 	Unchanged bool                      `json:"unchanged"`
 	Revision  int64                     `json:"revision"`
+	Hash      string                    `json:"hash"`
 	Node      struct{ ID, Name string } `json:"node"`
 	Config    json.RawMessage           `json:"config"`
 	Settings  map[string]string         `json:"settings"`
@@ -88,6 +92,7 @@ type agent struct {
 
 	coreSvc *service.ConfigService
 	rev     int64
+	hash    string
 	started time.Time
 	mu      sync.Mutex
 
@@ -138,6 +143,7 @@ func agentCmd(args []string) {
 		os.Exit(1)
 	}
 	a.rev = loadLocalRevision()
+	a.hash = loadLocalHash()
 
 	if *dumpCfg {
 		svc := service.NewConfigService(core.NewCore())
@@ -252,7 +258,11 @@ func (a *agent) pullOnce() (bool, []map[string]interface{}, error) {
 	rev := a.rev
 	a.mu.Unlock()
 
-	body, _ := json.Marshal(map[string]int64{"revision": rev})
+	a.mu.Lock()
+	hash := a.hash
+	a.mu.Unlock()
+
+	body, _ := json.Marshal(map[string]any{"revision": rev, "hash": hash})
 	resp, err := a.do("POST", "/agent/pull", body)
 	if err != nil {
 		return false, nil, err
@@ -276,8 +286,10 @@ func (a *agent) pullOnce() (bool, []map[string]interface{}, error) {
 
 	a.mu.Lock()
 	a.rev = pr.Revision
+	a.hash = pr.Hash
 	a.mu.Unlock()
 	saveLocalRevision(pr.Revision)
+	saveLocalHash(pr.Hash)
 	fmt.Printf("agent: applied revision %d (inbounds=%d clients=%d)\n", pr.Revision, len(pr.Inbounds), len(pr.Clients))
 	return true, results, nil
 }
@@ -715,6 +727,28 @@ func loadLocalRevision() int64 {
 	}
 	v, _ := strconv.ParseInt(s.Value, 10, 64)
 	return v
+}
+
+func loadLocalHash() string {
+	var s model.Setting
+	if err := database.GetDB().Where("key = ?", agentHashKey).First(&s).Error; err != nil {
+		return ""
+	}
+	return s.Value
+}
+
+func saveLocalHash(hash string) {
+	if hash == "" {
+		return
+	}
+	db := database.GetDB()
+	var s model.Setting
+	err := db.Where("key = ?", agentHashKey).First(&s).Error
+	if err != nil {
+		_ = db.Create(&model.Setting{Key: agentHashKey, Value: hash}).Error
+		return
+	}
+	_ = db.Model(&model.Setting{}).Where("key = ?", agentHashKey).Update("value", hash).Error
 }
 
 func saveLocalRevision(rev int64) {

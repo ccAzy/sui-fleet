@@ -38,7 +38,12 @@
 - **HTTP 状态码不承载语义**：`/api/*` 的成功与失败都是 HTTP 200 + `{success:false}` 信封。
   任何用 `curl -f` 或按状态码做健康检查的脚本都必须改为读信封。
 - **备份是逻辑备份，不是事务快照**：导出期间有写入可能产生跨表不一致。
-- **登录限流的客户端地址默认只信 Cloudflare 边缘**：只有 `CF-Connecting-IP` 与 `cf-ray`
+- **pull 的「是否要下发」同时看 revision 和内容指纹**：`nodes.config_hash` 存配置内容的
+  SHA-256（规范化 JSON，键排序）。只用 revision 时，恢复备份 / 待机机 promote / 手工改库
+  都可能让版本号撞车而内容不同，节点会永远收 `unchanged`、永远跑旧配置。
+  指纹在「revision 相同」时才重算（默认 1 小时一次），正常变更走 revision 快路径，
+  不会额外消耗 D1 配额。旧版 agent 不发送指纹时退回只比 revision。
+：只有 `CF-Connecting-IP` 与 `cf-ray`
   同时存在时才采用（`cf-ray` 由边缘添加并覆盖客户端伪造值）。自建反代若会重写
   `X-Forwarded-For`，可设 `TRUST_PROXY=1` 采信第一跳；`TRUST_PROXY=off` 则一律落到同一桶。
   另外无论 IP 是否可伪造，5 分钟内全站最多 30 次失败即触发限流，伪造 IP 只能分摊、不能突破总量。

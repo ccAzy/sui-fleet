@@ -186,6 +186,11 @@ export async function importBundle(
     }
     imported[t] = filtered.length;
   }
+  // 导入会把 nodes 整表替换掉：revision 很可能与节点上已应用的值相同，
+  // 但内容来自另一份库。清空 config_hash 强制下一次 pull 重算指纹，
+  // 这样「恢复/克隆之后节点永远跑旧配置」就不会发生。
+  stmts.push(db.prepare("UPDATE nodes SET config_hash = '', hash_checked_at = 0"));
+
   for (const s of localSecrets)
     stmts.push(
       db

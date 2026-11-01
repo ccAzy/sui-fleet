@@ -138,7 +138,7 @@ function hostOnly(raw: string): string {
   let v = s(raw).trim();
   if (!v) return v;
   v = v.replace(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//, ""); // 去掉 scheme
-  v = v.split("/")[0];                                 // 去掉 path
+  v = v.split("/")[0]; // 去掉 path
   v = v.split("?")[0];
   return v;
 }

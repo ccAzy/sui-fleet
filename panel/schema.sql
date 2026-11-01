@@ -46,7 +46,13 @@ CREATE TABLE IF NOT EXISTS nodes (
   kernel_ver   TEXT NOT NULL DEFAULT '', -- 节点上 sing-box 的编译版本
   core_state   TEXT NOT NULL DEFAULT 'unknown', -- running / stopped / error
   status_json  TEXT NOT NULL DEFAULT '{}',
-  applied_rev  INTEGER NOT NULL DEFAULT 0        -- 节点已生效的 revision
+  applied_rev  INTEGER NOT NULL DEFAULT 0,       -- 节点已生效的 revision
+
+  -- 配置内容的指纹：revision 只说明「改过几次」，说明不了「内容是什么」。
+  -- 从备份恢复/克隆待机/手工改库之后，revision 可能撞在同一个值上而内容已经不同，
+  -- 只比 revision 会让节点永远收 unchanged、永远跑旧配置。详见 docs/audit-fixes。
+  config_hash      TEXT    NOT NULL DEFAULT '',
+  hash_checked_at  INTEGER NOT NULL DEFAULT 0    -- 上次重算指纹的时间(秒)
 );
 
 -- 每节点一套面板对象。kind ∈ inbounds|outbounds|endpoints|services|tls|clients|servers

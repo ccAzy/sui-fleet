@@ -37,6 +37,8 @@ export interface NodeRow {
   core_state: string;
   status_json: string;
   applied_rev: number;
+  config_hash: string;
+  hash_checked_at: number;
 }
 
 export interface ObjectRow {
@@ -151,6 +153,28 @@ export function now(): number {
   return Math.floor(Date.now() / 1000);
 }
 
+/**
+ * 老库补 config_hash / hash_checked_at 两列。
+ *
+ * 沿用本项目既有的「用到才补」策略（ensureOtpSchema / ensureCommandRetrySchema），
+ * 没有引入迁移框架 —— 这两列都是带默认值的可空语义列，补不上时退回「只比 revision」。
+ */
+let configHashReady = false;
+export async function ensureConfigHashSchema(db: D1Database): Promise<void> {
+  if (configHashReady) return;
+  for (const col of [
+    "config_hash TEXT NOT NULL DEFAULT ''",
+    "hash_checked_at INTEGER NOT NULL DEFAULT 0",
+  ]) {
+    try {
+      await db.prepare(`ALTER TABLE nodes ADD COLUMN ${col}`).run();
+    } catch {
+      // 已存在就是正常情况
+    }
+  }
+  configHashReady = true;
+}
+
 /** 节点配置版本 +1，让 agent 下次 pull 时拿到新快照。 */
 export function bumpRevision(
   db: D1Database,
@@ -158,7 +182,9 @@ export function bumpRevision(
 ): D1PreparedStatement {
   return db
     .prepare(
-      "UPDATE nodes SET revision = revision + 1, updated_at = ? WHERE id = ?",
+      // 同时清空 config_hash：内容一定变了，旧指纹必须失效，
+      // 否则下一次 pull 会拿旧指纹和节点上的值比对，判成「没变化」。
+      "UPDATE nodes SET revision = revision + 1, updated_at = ?, config_hash = '' WHERE id = ?",
     )
     .bind(now(), nodeId);
 }

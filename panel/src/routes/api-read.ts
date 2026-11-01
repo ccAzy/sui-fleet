@@ -301,10 +301,7 @@ export function registerApiRead(app: Hono<{ Bindings: Env }>) {
       ql = t;
     }
     const cls = qc;
-    const lim = Math.min(
-      Math.max(parseInt(ql || "50", 10) || 50, 1),
-      500,
-    );
+    const lim = Math.min(Math.max(parseInt(ql || "50", 10) || 50, 1), 500);
     const node = await resolveNode(c.env.DB, c.req.header("X-Remote-Server"));
     if (!node) return json(c, []);
     let st: Record<string, unknown> = {};
@@ -334,8 +331,11 @@ export function registerApiRead(app: Hono<{ Bindings: Env }>) {
     const rawK = (c.req.query("k") ?? "").trim();
     const sinceParam = c.req.query("since");
     const kindParam = c.req.query("kind");
-    const since = parseInt(sinceParam ?? (/^\d+$/.test(rawK) ? rawK : "0"), 10) || 0;
-    const kind = (kindParam ?? (rawK && !/^\d+$/.test(rawK) ? rawK : "")).trim();
+    const since =
+      parseInt(sinceParam ?? (/^\d+$/.test(rawK) ? rawK : "0"), 10) || 0;
+    const kind = (
+      kindParam ?? (rawK && !/^\d+$/.test(rawK) ? rawK : "")
+    ).trim();
     const actor = c.req.query("a") ?? "";
     const count = Math.min(parseInt(c.req.query("c") ?? "100", 10) || 100, 500);
     const rows = await all<{
@@ -351,7 +351,13 @@ export function registerApiRead(app: Hono<{ Bindings: Env }>) {
         (actor ? " AND actor = ?" : "") +
         (kind ? " AND kind = ?" : "") +
         " ORDER BY id DESC LIMIT ?",
-      ...[node.id, since, ...(actor ? [actor] : []), ...(kind ? [kind] : []), count],
+      ...[
+        node.id,
+        since,
+        ...(actor ? [actor] : []),
+        ...(kind ? [kind] : []),
+        count,
+      ],
     );
     // 前端 Changes.vue 读的是 dateTime / key / obj
     return json(
