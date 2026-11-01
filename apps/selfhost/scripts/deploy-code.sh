@@ -32,7 +32,7 @@ scp -q -P "$SSH_PORT" -i "$SSH_KEY" -o StrictHostKeyChecking=no -o UserKnownHost
   "$tmp/code.tar.gz" "root@$HOST:/tmp/code.tar.gz"
 
 # 远端脚本单独写成文件再执行：避免 heredoc 里 \$ 转义、CRLF 之类的坑
-cat > "$tmp/remote.sh" <<'REMOTE_SH'
+cat >"$tmp/remote.sh" <<'REMOTE_SH'
 set -euo pipefail
 STAMP=$(date +%Y%m%d-%H%M%S)
 BK=/opt/sui-panel/backup/code-$STAMP
@@ -44,6 +44,18 @@ echo "  已备份旧代码 → $BK"
 
 tar xzf /tmp/code.tar.gz -C /opt/sui-panel
 rm -f /tmp/code.tar.gz
+
+# 清掉旧入口包：index-<hash>.js 每次构建都换名，覆盖式解包会留下历史版本，
+# 让 grep 排查时误判"改动没生效"。只保留 index.html 真正引用的那一个。
+cd /opt/sui-panel/panel/frontend-dist
+CUR=$(grep -o 'assets/index-[^"]*\.js' index.html | head -1 | xargs -r basename)
+if [ -n "$CUR" ]; then
+  for f in assets/index-*.js; do
+    [ -e "$f" ] || continue
+    [ "$(basename "$f")" = "$CUR" ] || rm -f "$f"
+  done
+  echo "  入口包已收敛到 $CUR"
+fi
 ( cd /opt/sui-panel/apps/selfhost && npm install --no-audit --no-fund >/dev/null 2>&1 ) || true
 
 systemctl restart sui-panel

@@ -9,7 +9,8 @@ set -euo pipefail
 
 PRIMARY=""
 OPS_TOKEN=""
-DRY=0; FORCE_DB=0
+DRY=0
+FORCE_DB=0
 PORT="${PORT:-8788}"
 DIR="${DIR:-/opt/sui-panel}"
 while [ $# -gt 0 ]; do

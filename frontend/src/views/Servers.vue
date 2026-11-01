@@ -57,6 +57,35 @@
     </v-card>
   </v-dialog>
 
+  <!-- 聚合订阅：一个地址管全部节点，加/退节点自动增减 -->
+  <v-dialog v-model="sub.visible" max-width="680">
+    <v-card :title="$t('server.subAll')">
+      <v-divider></v-divider>
+      <v-card-text>
+        <p v-if="!sub.ok" class="promote-hint">{{ $t('server.subUnavailable') }}</p>
+        <template v-else>
+          <p class="promote-hint">{{ $t('server.subHint') }}</p>
+          <div v-for="row in subRows" :key="row.key" class="sub-row">
+            <span class="sub-label">{{ row.label }}</span>
+            <code class="sub-url">{{ row.url }}</code>
+            <v-btn
+              size="x-small"
+              variant="text"
+              :prepend-icon="sub.copied === row.key ? 'mdi-check' : 'mdi-content-copy'"
+              @click="copySub(row)"
+            >
+              {{ sub.copied === row.key ? $t('server.subCopied') : $t('server.subCopy') }}
+            </v-btn>
+          </div>
+          <p class="promote-hint mb-0">{{ $t('server.subNote') }}</p>
+        </template>
+      </v-card-text>
+      <v-card-actions>
+        <v-btn variant="text" @click="sub.visible = false">{{ $t('actions.close') }}</v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
   <!-- 工具栏：动作靠右，左侧只放一句数量；节点本身按账簿一行一台排下去 -->
   <div class="page-head">
     <span class="page-head-note">{{ servers.length }} {{ $t('pages.servers') }}</span>
@@ -66,6 +95,9 @@
       </v-btn>
       <v-btn v-if="servers.length > 0" variant="text" size="small" class="toolbar-ghost" prepend-icon="mdi-download" @click="bulkUpdate">
         {{ $t('server.updateAll') }}
+      </v-btn>
+      <v-btn size="small" variant="text" class="toolbar-ghost" prepend-icon="mdi-link-variant" @click="openSub">
+        {{ $t('server.subAll') }}
       </v-btn>
       <v-btn size="small" variant="text" class="toolbar-ghost" prepend-icon="mdi-swap-horizontal" @click="openPromote">
         {{ $t('server.promote') }}
@@ -180,6 +212,37 @@ const runPromote = async (dry: boolean) => {
     promote.value.running = false
   }
 }
+// ---- 聚合订阅：客户端只存一个地址，加/退节点自动增减 ----
+const sub = ref<{ visible: boolean, ok: boolean, urls: Record<string, string>, copied: string }>({
+  visible: false, ok: false, urls: {}, copied: '',
+})
+
+const subRows = computed(() => [
+  { key: 'clash', label: 'Clash / Mihomo', url: sub.value.urls.clash ?? '' },
+  { key: 'singbox', label: 'sing-box', url: sub.value.urls.singbox ?? '' },
+  { key: 'plain', label: 'Base64 通用', url: sub.value.urls.plain ?? '' },
+])
+
+const openSub = async () => {
+  sub.value = { ...sub.value, visible: true, ok: false, copied: '' }
+  const r = await HttpUtils.get('api/sub-info')
+  if (r.success && r.obj?.ok) {
+    sub.value = { ...sub.value, ok: true, urls: r.obj.urls ?? {} }
+  }
+}
+
+const copySub = async (row: { key: string, url: string }) => {
+  try {
+    await navigator.clipboard.writeText(row.url)
+    sub.value = { ...sub.value, copied: row.key }
+    setTimeout(() => {
+      if (sub.value.copied === row.key) sub.value = { ...sub.value, copied: '' }
+    }, 1500)
+  } catch {
+    // 浏览器拒绝剪贴板时，URL 本身在弹窗里可以手动选中复制
+  }
+}
+
 const currentServer = computed((): string => Data().currentServer)
 
 const editModal = ref<{ visible: boolean, server: any }>({ visible: false, server: null })
@@ -359,3 +422,33 @@ const delServer = async () => {
   }
 }
 </style>
+
+/* 聚合订阅弹窗：地址用等宽字体，允许换行，长 URL 不至于把弹窗撑破 */
+.sub-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.08);
+}
+
+.sub-row:last-of-type {
+  border-bottom: 0;
+}
+
+.sub-label {
+  flex: 0 0 128px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: rgba(var(--v-theme-on-surface), 0.6);
+}
+
+.sub-url {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11.5px;
+  line-height: 1.5;
+  word-break: break-all;
+  user-select: all;
+}
