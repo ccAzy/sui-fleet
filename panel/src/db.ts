@@ -61,6 +61,8 @@ export interface UserRow {
   username: string;
   password_hash: string;
   must_change: number;
+  /** 会话代次：改密/启停 2FA 时 +1，旧 JWT 里的 se 对不上即失效 */
+  session_epoch?: number;
   created_at: number;
   /** TOTP 密钥（base32）；空 = 未开启二次验证 */
   otp_secret?: string;
@@ -173,6 +175,66 @@ export async function ensureConfigHashSchema(db: D1Database): Promise<void> {
     }
   }
   configHashReady = true;
+}
+
+/**
+ * 老库补 users.session_epoch。
+ *
+ * 为什么需要它：JWT 是无状态的，currentUser() 只验签名与 exp，账号侧改密/启停 2FA
+ * 之后此前的 cookie 仍然有效（最多 24 小时），且还能签发新 token —— 改密对已泄露的
+ * 会话等于无效止损。加一个代次位，签进 JWT 的 se，比对不上就当作未登录。
+ */
+let sessionEpochReady = false;
+export async function ensureSessionEpoch(db: D1Database): Promise<void> {
+  if (sessionEpochReady) return;
+  try {
+    await db
+      .prepare("ALTER TABLE users ADD COLUMN session_epoch INTEGER NOT NULL DEFAULT 0")
+      .run();
+  } catch {
+    // 已存在就是正常情况
+  }
+  sessionEpochReady = true;
+}
+
+/**
+ * 读某用户的会话代次（带 30 秒模块内缓存）。
+ *
+ * 为什么不每请求直查：面板前端高频轮询，每个已登录请求多一次 SELECT 会稳定推高
+ * D1 rows_read。30 秒的吊销延迟对「改密止损」这个用途完全够用，且缓存按 uid 分桶，
+ * 不会把新登录的会话误判成旧代次。
+ */
+const epochCache = new Map<number, { value: number; at: number }>();
+const EPOCH_TTL = 30;
+
+export async function sessionEpochOf(
+  db: D1Database,
+  uid: number,
+  nowTs = Math.floor(Date.now() / 1000),
+): Promise<number> {
+  const hit = epochCache.get(uid);
+  if (hit && nowTs - hit.at < EPOCH_TTL) return hit.value;
+  const row = await first<{ session_epoch: number }>(
+    db,
+    "SELECT session_epoch FROM users WHERE id = ?",
+    uid,
+  );
+  const value = Number(row?.session_epoch ?? 0);
+  epochCache.set(uid, { value, at: nowTs });
+  return value;
+}
+
+/** 吊销某用户已签发的全部会话。 */
+export async function bumpSessionEpoch(
+  db: D1Database,
+  uid: number,
+): Promise<void> {
+  await run(
+    db,
+    "UPDATE users SET session_epoch = session_epoch + 1 WHERE id = ?",
+    uid,
+  );
+  epochCache.delete(uid);
 }
 
 /** 节点配置版本 +1，让 agent 下次 pull 时拿到新快照。 */

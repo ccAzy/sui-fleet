@@ -44,6 +44,15 @@ export function registerAgentApi(app: Hono<{ Bindings: Env }>) {
     const node = await agentNode(c);
     if (!node) return c.json({ ok: false, error: "unauthorized" }, 401);
     const body = (await c.req.json().catch(() => ({}))) as ReportBody;
+    // 单次上报的流量条目数必须封顶：handleReport 对每条 traffic 追加 INSERT，
+    // 并对每个命中 tag 再 UPDATE 一次，写放大约 2N。agent token 属于低权主体，
+    // 不能让一次请求就能推动任意多的 D1 写（免费档 10 万/天是全库共享的）。
+    const MAX_TRAFFIC = 2000;
+    if (Array.isArray(body.traffic) && body.traffic.length > MAX_TRAFFIC)
+      return c.json(
+        { ok: false, error: `traffic 条目超上限（${MAX_TRAFFIC}）` },
+        413,
+      );
     await handleReport(
       c.env.DB,
       node,

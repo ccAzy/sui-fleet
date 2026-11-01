@@ -1,8 +1,16 @@
 // 面板各处共用的 HTTP 基础设施：会话、统一响应格式、地址与密钥。
 // 从 index.ts 抽出来，避免路由模块反向 import 入口（那会成环）。
-import { getCookie } from "hono/cookie";
+import { getCookie, setCookie } from "hono/cookie";
 import { COOKIE, isSessionPayload, signJWT, verifyJWT } from "./auth";
-import { first, getNode, listNodes, run, type Env, type NodeRow } from "./db";
+import {
+  first,
+  getNode,
+  listNodes,
+  run,
+  sessionEpochOf,
+  type Env,
+  type NodeRow,
+} from "./db";
 
 export interface Session {
   username: string;
@@ -44,11 +52,53 @@ export async function currentUser(c: any): Promise<Session | null> {
   const payload = await verifyJWT(token, await secretOf(c.env));
   // isSessionPayload 会拒掉二次验证票据（otp:1）——那张票只是“密码正确”，不是登录成功。
   if (!isSessionPayload(payload)) return null;
+  const uid = Number(payload.uid ?? 0);
+  // 会话代次：改密 / 启停 2FA / 强制下线会让 users.session_epoch 前进，
+  // 旧 cookie 里的 se 对不上就当场失效。没有这一位时，改密只是“换了下次登录的密码”，
+  // 已经流出去的会话仍然能用到 24 小时窗口结束（并能签发新 token）。
+  if (uid > 0) {
+    const epoch = await sessionEpochOf(c.env.DB, uid);
+    // payload.se 由 isSessionPayload 的类型谓词声明（auth.ts），签发处是
+    // index.ts issueSession；老 cookie 没有这一位，按 0 处理。
+    if (Number(payload.se ?? 0) !== epoch) return null;
+  }
   return {
     username: payload.u,
-    uid: Number(payload.uid ?? 0),
+    uid,
     mustChange: payload.mc === true,
   };
+}
+
+/**
+ * 重新签发当前会话 cookie。
+ *
+ * 改密 / 启停 2FA 之后必须做这一步：users.session_epoch 已经 +1，旧 cookie 里的 se
+ * 立刻对不上（这正是我们要的吊销效果），但**正在操作的这条会话**不该被自己踢掉，
+ * 所以用新代次补签一次。
+ */
+export async function reissueSession(
+  c: any,
+  user: { uid: number; username: string; mustChange: boolean },
+): Promise<string> {
+  const se = await sessionEpochOf(c.env.DB, user.uid);
+  const token = await signJWT(
+    { u: user.username, uid: user.uid, mc: user.mustChange, se },
+    await secretOf(c.env),
+  );
+  let https = true;
+  try {
+    https = new URL(c.req.url).protocol === "https:";
+  } catch {
+    https = true;
+  }
+  setCookie(c, COOKIE, token, {
+    httpOnly: true,
+    sameSite: "Lax",
+    path: "/",
+    maxAge: 86400,
+    secure: https,
+  });
+  return token;
 }
 
 /**

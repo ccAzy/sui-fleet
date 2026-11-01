@@ -91,8 +91,10 @@ app.use("*", async (c, next) => {
 /** 发正式会话 cookie（密码登录与二次验证后共用） */
 async function issueSession(c: any, user: UserRow) {
   const mustChange = user.must_change === 1;
+  // se = 会话代次。改密/启停 2FA 会 +1，旧 cookie 随即失效（见 http.ts currentUser）。
+  const se = Number(user.session_epoch ?? 0);
   const token = await signJWT(
-    { u: user.username, uid: user.id, mc: mustChange },
+    { u: user.username, uid: user.id, mc: mustChange, se },
     await secretOf(c.env),
   );
   let isHttps = true;
@@ -342,7 +344,13 @@ app.post("/api/arbiter", async (c) => {
     reason?: string;
   };
   const cur = await readControlState(c.env.DB);
-  const nextEpoch = Math.max(Number(body.epoch ?? cur.epoch), cur.epoch);
+  // Number("abc") 是 NaN，Math.max(NaN, n) 也是 NaN，落库就成了字符串 "NaN"；
+  // 而所有读取方都用 `Number(x) || 0` 兜底，NaN 会被读成 0 —— 比任何历史代次都低，
+  // 防脑裂的单调围栏当场失效。非法输入必须拒绝，不能写进控制面状态。
+  const asked = Number(body.epoch ?? cur.epoch);
+  if (!Number.isFinite(asked) || asked < 0)
+    return json(c, null, new Error("epoch 必须是有限的非负整数"));
+  const nextEpoch = Math.max(asked, cur.epoch);
   const stmts = [
     c.env.DB.prepare(
       "INSERT INTO meta (key,value) VALUES ('control_epoch',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
@@ -444,6 +452,9 @@ app.use("/api/*", async (c, next) => {
         "/api/services",
       ]);
       if (READ_ONLY.has(p) && tokenIsValid(row, now())) {
+        // 打标：这几个端点的对象里住着私钥/密码/服务 token，令牌身份读到的响应
+        // 必须过 redactForToken() 再出去。授权粒度是字段，不是端点名。
+        c.set("tokenOnly" as never, true);
         return await next();
       }
     }

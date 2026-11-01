@@ -242,24 +242,53 @@ export function registerSub(app: Hono<{ Bindings: Env }>) {
       format: c.req.query("format"),
     });
 
-    // k 前缀匹配：老前端把 client 名直接拼在 k 后面（`k=<sub_key><clientName>`）
-    let clientFilter = parsedClient;
-    if (rawKey !== node.sub_key) {
-      if (!rawKey.startsWith(node.sub_key)) return c.text("forbidden", 403);
-      if (!clientFilter)
-        clientFilter = rawKey.slice(node.sub_key.length).trim();
-    }
-
-    // 注意：sub_key 是**节点级**的，client 只是过滤参数、不是凭据。
-    // 不带 client 会返回该节点全部启用客户端的链接 —— 这是历史行为，且面板自己下发的
-    // subURI 就是节点级的，硬性要求 client 会打断所有已在客户端里导入的订阅。
-    // 现在的做法：缺省仍兼容，但 UI 生成/复制订阅时一律带上 client，让新链接天然只含自己。
-
     const clients = await all<{ data: string }>(
       c.env.DB,
       "SELECT data FROM objects WHERE node_id = ? AND kind = 'clients' ORDER BY obj_id",
       node.id,
     );
+
+    // 令牌分支必须排在 k 校验之前：`?t=<sub_token>` 不带 k，
+    // 而 k 为空时 startsWith(node.sub_key) 必然为假，会先被 403 挡掉。
+    const subToken = (c.req.query("t") ?? "").trim();
+
+    // k 前缀匹配：老前端把 client 名直接拼在 k 后面（`k=<sub_key><clientName>`）
+    let clientFilter = parsedClient;
+    if (!subToken && rawKey !== node.sub_key) {
+      if (!rawKey.startsWith(node.sub_key)) return c.text("forbidden", 403);
+      if (!clientFilter)
+        clientFilter = rawKey.slice(node.sub_key.length).trim();
+    }
+
+    // 每客户端自己的订阅令牌（`?t=<sub_token>`）：链接本身就是凭据，作用域就是这个客户端。
+    if (subToken) {
+      let matched = "";
+      for (const r of clients) {
+        try {
+          const cl = JSON.parse(r.data) as Record<string, unknown>;
+          if (String(cl.sub_token ?? "") === subToken) matched = String(cl.name ?? "");
+        } catch {
+          /* 坏行跳过 */
+        }
+      }
+      if (!matched) return c.text("forbidden", 403);
+      clientFilter = matched;
+    }
+
+    // sub_key 是**节点级**的，client 只是过滤参数、不是凭据 —— 所以这里必须要求
+    // 调用方带上作用域，否则「去掉一个查询参数」就能拿到同节点全部租户的 UUID/密码
+    // （审计 run-1 实测）。三种带作用域的形式都接受：
+    //   ?t=<sub_token>            新格式，令牌即作用域
+    //   ?k=<sub_key>&client=<名>  旧格式，名字仍是过滤参数，但调用方已经限定了范围
+    //   ?k=<sub_key><名字>        更老的拼接格式
+    if (!clientFilter && !subToken) {
+      return c.text(
+        "forbidden: subscription URL must be scoped to one client " +
+          "(use ?t=<client sub_token> from the panel, or ?k=<sub_key>&client=<name>)",
+        403,
+        { "Cache-Control": "no-store" },
+      );
+    }
     const links: string[] = [];
     let subClient: Record<string, unknown> | null = null;
     for (const r of clients) {

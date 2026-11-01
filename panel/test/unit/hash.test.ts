@@ -51,9 +51,15 @@ describe("configHashOf", () => {
 
   it("数组顺序变化会改变指纹（顺序本身就是配置语义的一部分）", async () => {
     const a = base();
-    a.outbounds = [{ id: 2, tag: "direct" }, { id: 5, tag: "proxy" }];
+    a.outbounds = [
+      { id: 2, tag: "direct" },
+      { id: 5, tag: "proxy" },
+    ];
     const b = base();
-    b.outbounds = [{ id: 5, tag: "proxy" }, { id: 2, tag: "direct" }];
+    b.outbounds = [
+      { id: 5, tag: "proxy" },
+      { id: 2, tag: "direct" },
+    ];
     expect(await configHashOf(a)).not.toBe(await configHashOf(b));
   });
 });

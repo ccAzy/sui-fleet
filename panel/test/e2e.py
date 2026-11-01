@@ -235,9 +235,20 @@ check("sub uri has key", "?k=" in sub_url, sub_url)
 # 只取 path+query，拼回本机 BASE——这样本地/线上都能测。
 _sp = urllib.parse.urlsplit(sub_url)
 SUB_PATH = _sp.path + (("?" + _sp.query) if _sp.query else "")
-sub = get(SUB_PATH)
+# 节点级 key 必须带作用域才放行（审计 run-1：去掉 client= 会拿到同节点全部租户凭据），
+# 所以这里显式带上 client=，模拟面板下发的“每人一条”链接。
+SUB_SCOPED = SUB_PATH + "&client=alice"
+sub = get(SUB_SCOPED)
 decoded = base64.b64decode(sub).decode()
 check("subscription", decoded.startswith("vless://"), decoded[:80])
+
+# 不带作用域一律 403 —— 这是本次收紧的核心行为，回归时必须先看这一条
+try:
+    get(SUB_PATH)
+    _unscoped = 200
+except urllib.error.HTTPError as e:
+    _unscoped = e.code
+check("节点级订阅链接无作用域被拒", _unscoped == 403, str(_unscoped))
 
 # ---- 配额语义：延迟启动 / 超量停用 / 周期重置 ----
 GiB = 1024**3
@@ -388,7 +399,7 @@ check(
 )
 
 # ---- Clash 订阅 ----
-clash_txt = get(SUB_PATH + "&type=clash")
+clash_txt = get(SUB_SCOPED + "&type=clash")
 check(
     "clash 订阅",
     "proxies:" in clash_txt
@@ -398,7 +409,7 @@ check(
 )
 
 # ---- sing-box JSON 订阅 ----
-sb = j(get(SUB_PATH + "&type=singbox"))
+sb = j(get(SUB_SCOPED + "&type=singbox"))
 check(
     "sing-box 订阅",
     isinstance(sb, list)
@@ -484,6 +495,144 @@ r = j(post("/api/otp/disable", form={"code": codes[1]}))
 check("2fa 可用恢复码关闭", r["success"] is True, r)
 st = j(get("/api/otp/status"))
 check("2fa 关闭后为 off", (st.get("obj") or {}).get("on") is False, st)
+
+
+# ---- 审计 run-1 修复的回归断言 ----
+# 这些断言针对「授权粒度画错」这一类问题：端点级白名单、节点级订阅 key、
+# 导入通道绕过在线校验。任何一条回归都会重新打开它们。
+
+
+def status_of(path, token=None):
+    """返回 HTTP 状态码（get 对 4xx/5xx 会抛 HTTPError）。"""
+    try:
+        get(path, token=token)
+        return 200
+    except urllib.error.HTTPError as e:
+        return e.code
+
+
+def link_count(body):
+    try:
+        plain = base64.b64decode(body + "==" * 2).decode("utf-8", "replace")
+    except Exception:
+        plain = body
+    return plain.count("://")
+
+
+# A) 只读令牌读到的对象必须脱敏（原本 4/4 直接给出私钥与密码）
+ep = {
+    "type": "wireguard",
+    "tag": "wg-e2e",
+    "private_key": "E2E-PRIVATE-KEY-SHOULD-NOT-LEAK",
+    "address": ["10.9.9.2/32"],
+}
+j(post("/api/save", form={"object": "endpoints", "action": "new", "data": json.dumps(ep)}))
+mon = j(post("/api/addToken", form={"desc": "e2e-monitor", "expiry": "0"}))["obj"]
+raw = get("/api/endpoints", token=mon)
+d = j(raw)
+txt = json.dumps(d, ensure_ascii=False)
+check(
+    "只读令牌读 endpoints 不含明文私钥",
+    "E2E-PRIVATE-KEY-SHOULD-NOT-LEAK" not in txt,
+    txt[:200],
+)
+_obj = d.get("obj") or {}
+check(
+    "只读令牌读 endpoints 保留结构（字段被标记而非删除）",
+    isinstance(_obj.get("endpoints"), list) and "redacted" in txt,
+    txt[:200],
+)
+
+# B) 订阅链接必须自带作用域：去掉 client 不能再拿到同节点全部租户
+load = j(get("/api/load"))
+sub_uri = (load.get("obj") or {}).get("subURI") or ""
+qs = urllib.parse.parse_qs(urllib.parse.urlparse(sub_uri).query)
+node_id = sub_uri.split("/sub/")[-1].split("?")[0] if "/sub/" in sub_uri else ""
+sub_key = (qs.get("k") or [""])[0]
+clients = (j(get("/api/clients")).get("obj") or {}).get("clients") or []
+alice = next((c for c in clients if c.get("name") == "alice"), {})
+check("能取到节点级 sub_key 与客户端", bool(node_id and sub_key and alice), sub_uri)
+
+check(
+    "不带作用域的订阅链接被拒（403）",
+    status_of("/sub/" + node_id + "?k=" + sub_key) == 403,
+)
+n_filtered = link_count(get("/sub/" + node_id + "?k=" + sub_key + "&client=alice"))
+check("带 client= 只返回该客户端", n_filtered == 1, str(n_filtered))
+tok = str(alice.get("sub_token") or "")
+check("客户端已分配 sub_token", bool(tok), str(list(alice.keys())[:8]))
+n_token = link_count(get("/sub/" + node_id + "?t=" + tok))
+check("用 ?t=<sub_token> 等价于该客户端", n_token == 1, str(n_token))
+
+# D) 改密必须吊销此前签发的一切会话。
+#    原实现是无状态 JWT，currentUser 只验签名与 exp，改密后旧 cookie 仍可用满 24 小时，
+#    而且还能继续签发新 token —— 改密对已泄露的会话等于没有止损。
+cj2 = http.cookiejar.CookieJar()
+op2 = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj2))
+
+
+def op_call(op, path, form=None):
+    data = urllib.parse.urlencode(form).encode() if form is not None else None
+    hdrs = {"Content-Type": "application/x-www-form-urlencoded"} if form is not None else {}
+    # noqa: S310  # nosec B310 -- BASE 是本地常量，只做 http(s) 端到端测试
+    req = urllib.request.Request(BASE + path, data=data, headers=hdrs)  # noqa: S310  # nosec B310
+    try:
+        with op.open(req, timeout=15) as resp:
+            return resp.status, resp.read().decode()
+    except urllib.error.HTTPError as e:
+        return e.code, e.read().decode()
+
+
+_s, _b = op_call(op2, "/api/login", {"user": "admin", "pass": PASS})
+check("第二会话登录成功", '"success":true' in _b.replace(" ", ""), _b[:120])
+_s, _b = op_call(op2, "/api/servers")
+check("第二会话改密前可用", '"success":true' in _b.replace(" ", ""), _b[:160])
+
+NEWPASS = PASS + "-rot"
+r = j(post("/api/changePass", form={"oldPass": PASS, "newPass": NEWPASS}))
+check("改密成功", r.get("success") is True, r)
+
+_s, _b = op_call(op2, "/api/servers")
+_stale_ok = '"success":true' in _b.replace(" ", "")
+check("改密后旧会话立即失效", not _stale_ok, _b[:160])
+
+r = j(get("/api/servers"))
+check("当前会话改密后仍可用（已补签新代次）", r.get("success") is True, str(r)[:120])
+
+# C) 导入通道不能绕过在线校验：meta 重复键必须被整个拒绝
+dup = {
+    "tables": {
+        "nodes": [
+            {
+                "id": "zz",
+                "name": "dup",
+                "token_hash": "x",
+                "address": "203.0.113.9",
+                "sub_key": "k",
+                "remark": "",
+                "enabled": 1,
+                "revision": 1,
+                "created_at": 1,
+                "updated_at": 1,
+            }
+        ],
+        "users": [
+            {
+                "id": 1,
+                "username": "admin",
+                "password_hash": "pbkdf2$10000$AA$BB",
+                "must_change": 0,
+                "created_at": 1,
+            }
+        ],
+        "meta": [
+            {"key": "agg_key", "value": "aaaaaaaaaaaaaaaa"},
+            {"key": "agg_key", "value": "bbbbbbbbbbbbbbbb"},
+        ],
+    }
+}
+r = j(post("/api/importdb", form={"data": json.dumps(dup)}))
+check("重复 meta 键的导入被拒", r.get("success") is False, r)
 
 print()
 print("RESULT:", "ALL PASS" if not fails else f"{len(fails)} FAILED: {fails}")

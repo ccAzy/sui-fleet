@@ -1,16 +1,22 @@
 import type { Hono } from "hono";
-import { setCookie } from "hono/cookie";
-import { COOKIE, login as doLogin, sha256, signJWT } from "../auth";
+import { login as doLogin, sha256 } from "../auth";
 import {
   baseUrl,
   invalidateDefaultNode,
   json,
   okMsg,
   randHex,
+  reissueSession,
   resolveNode,
-  secretOf,
 } from "../http";
-import { getNode, listNodes, now, run, type Env } from "../db";
+import {
+  bumpSessionEpoch,
+  getNode,
+  listNodes,
+  now,
+  run,
+  type Env,
+} from "../db";
 import {
   getConfig,
   loadPartial,
@@ -225,23 +231,14 @@ export function registerApiWrite(app: Hono<{ Bindings: Env }>) {
       await hashPassword(newPass),
       user.id,
     );
-    // 重签 cookie，让 mc 立刻变 false，不用重新登录
-    let https = true;
-    try {
-      https = new URL(c.req.url).protocol === "https:";
-    } catch {
-      https = true;
-    }
-    const fresh = await signJWT(
-      { u: newName, uid: user.id, mc: false },
-      await secretOf(c.env),
-    );
-    setCookie(c, COOKIE, fresh, {
-      httpOnly: true,
-      sameSite: "Lax",
-      path: "/",
-      maxAge: 86400,
-      secure: https,
+    // 改密 = 吊销此前签发的一切会话，然后给**当前这条**补签新代次。
+    // 少了 bump：泄露出去的 cookie 还能用满 24 小时，改密等于没止损。
+    // 少了 reissue：改密的人自己被踢回登录页。
+    await bumpSessionEpoch(c.env.DB, user.id);
+    await reissueSession(c, {
+      uid: user.id,
+      username: newName,
+      mustChange: false,
     });
     return okMsg(c, "save");
   });

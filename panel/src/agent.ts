@@ -76,7 +76,9 @@ function canonical(v: unknown): string {
   const o = v as Record<string, unknown>;
   const keys = Object.keys(o).sort();
   return (
-    "{" + keys.map((k) => JSON.stringify(k) + ":" + canonical(o[k])).join(",") + "}"
+    "{" +
+    keys.map((k) => JSON.stringify(k) + ":" + canonical(o[k])).join(",") +
+    "}"
   );
 }
 
@@ -190,7 +192,12 @@ export async function pullPayload(
 
   // 算出来和节点上的一样 → 内容其实没变，只是库里的指纹过期了。
   // 这时仍然返回 unchanged，不要为了刷新一次指纹去重启内核。
-  if (clientHash && hash === clientHash && clientRev === node.revision && cmds.length === 0)
+  if (
+    clientHash &&
+    hash === clientHash &&
+    clientRev === node.revision &&
+    cmds.length === 0
+  )
     return null;
 
   // 标记为 sent（节点下次 report 里回执 done/failed）；同时记下发时间，供重投判定。

@@ -126,8 +126,14 @@ export default {
 
       // Subscription URLs: one per client (covers all its protocols, auto-updates).
       const subBase = Data().subURI
-      // 同上：用 &client= 过滤，不要拼在 k 上（会 403）
-      this.subList = Data().clients.map((c: any) => ({ name: c.name, uri: `${subBase}&client=${encodeURIComponent(c.name)}` }))
+      const subNode = subBase.replace(/\?.*$/, '')
+      // 优先 `?t=<sub_token>`：作用域写在令牌里，去掉参数也拿不到别人的链接。
+      this.subList = Data().clients.map((c: any) => ({
+        name: c.name,
+        uri: c.sub_token
+          ? `${subNode}?t=${c.sub_token}`
+          : `${subBase}&client=${encodeURIComponent(c.name)}`,
+      }))
 
       // All share links: one request fetches full client rows (with links).
       const ids = Data().clients.map((c: any) => c.id).filter((x: any) => x)

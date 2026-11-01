@@ -13,7 +13,11 @@ CREATE TABLE IF NOT EXISTS users (
   otp_secret    TEXT NOT NULL DEFAULT '',
   otp_on        INTEGER NOT NULL DEFAULT 0,
   otp_last_step INTEGER NOT NULL DEFAULT 0,
-  otp_recovery  TEXT NOT NULL DEFAULT '[]'
+  otp_recovery  TEXT NOT NULL DEFAULT '[]',
+  -- 会话代次（2026-11-01 加入）：改密/启停 2FA 时 +1。JWT 里带 se，
+  -- 比对不上即视为未登录 —— 否则改密对已泄露的 cookie 等于无效止损。
+  -- 老库由 db.ts 的 ensureSessionEpoch 自动 ALTER 补齐。
+  session_epoch INTEGER NOT NULL DEFAULT 0
 );
 
 -- 面板登录令牌(与 s-ui 的 tokens 语义一致,给 apiv2 / 第三方调用)

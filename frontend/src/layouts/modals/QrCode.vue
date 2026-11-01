@@ -122,9 +122,14 @@ export default {
   },
   computed: {
     clientSub() {
-      // subURI 已经是完整的 `.../sub/<id>?k=<sub_key>`，直接拼用户名会污染 k 导致 403。
-      // 用 &client= 表达"只要这个用户的链接"，后端按名字过滤。
+      // subURI 形如 `.../sub/<id>?k=<sub_key>`。sub_key 是**节点级**的，
+      // client= 只是过滤参数 —— 去掉它就能拿到同节点所有人的链接。
+      // 所以优先发 `?t=<sub_token>`：令牌自带作用域，链接本身就是凭据。
       const base = Data().subURI
+      const node = base.replace(/\?.*$/, '')
+      const tok = (this.client as any).sub_token
+      if (tok) return `${node}?t=${tok}`
+      // 老客户端还没补令牌时退回过滤写法（cron 会补 sub_token）
       const name = this.client.name
       return name ? `${base}&client=${encodeURIComponent(name)}` : base
     },

@@ -48,13 +48,33 @@ export async function hashPassword(password: string): Promise<string> {
   return `pbkdf2$${ITER}$${b64(salt.buffer)}$${b64(bits)}`;
 }
 
+
+/** PBKDF2 迭代上限。超过它一定是异常输入（正常的 ITER 是 1 万~60 万）。 */
+export const PBKDF2_MAX_ITER = 2_000_000;
+
+/**
+ * 严格解析 `pbkdf2$<iter>$salt$hash` 里的迭代数。
+ *
+ * 必须**只此一份**：校验方与使用方用不同的解析规则时，上限形同虚设。
+ * 实例：`pbkdf2$+200000$...` 不匹配 `(\d+)`（校验被跳过），
+ * 而 parseInt("+200000") = 200000（照样生效）。统一走这里，
+ * 正则与数值解析是同一套语义，谁都绕不过去。
+ */
+export function pbkdf2Iter(stored: string): number | null {
+  const m = /^pbkdf2\$(\d{1,9})\$/.exec(stored);
+  if (!m) return null;
+  const n = Number(m[1]);
+  return Number.isSafeInteger(n) && n > 0 ? n : null;
+}
+
 export async function verifyPassword(
   password: string,
   stored: string,
 ): Promise<boolean> {
   const parts = stored.split("$");
   if (parts.length !== 4 || parts[0] !== "pbkdf2") return false;
-  const iter = parseInt(parts[1], 10);
+  const iter = pbkdf2Iter(stored);
+  if (iter === null) return false;
   const salt = unb64(parts[2]);
   const expected = parts[3];
   const key = await crypto.subtle.importKey(
@@ -267,7 +287,7 @@ async function hashEquals(
  */
 export function isSessionPayload(
   payload: Record<string, unknown> | null,
-): payload is { u: string; uid?: number; mc?: boolean } {
+): payload is { u: string; uid?: number; mc?: boolean; se?: number } {
   if (!payload || typeof payload.u !== "string") return false;
   return payload.otp !== 1;
 }

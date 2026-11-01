@@ -5,8 +5,15 @@
 //  2. 关闭必须再验证一次（TOTP 码或恢复码），否则临时拿到会话说关就关，等于没加。
 //  3. 恢复码只在启用那一刻明文返回一次，库里只有 sha256——和密码同样的处理。
 import type { Hono } from "hono";
-import { first, now, run, type Env, type UserRow } from "../db";
-import { json, okMsg, readBody } from "../http";
+import {
+  bumpSessionEpoch,
+  first,
+  now,
+  run,
+  type Env,
+  type UserRow,
+} from "../db";
+import { json, okMsg, readBody, reissueSession } from "../http";
 import {
   hashRecovery,
   newRecoveryCodes,
@@ -126,6 +133,14 @@ export function registerOtpAdmin(app: Hono<{ Bindings: Env }>) {
       JSON.stringify(hashed),
       user.id,
     );
+    // 启用 2FA 是安全状态变更：此前签发的会话一律作废（否则「刚加上 2FA，
+    // 攻击者手里的旧 cookie 还照用」），当前这条补签新代次。
+    await bumpSessionEpoch(c.env.DB, user.id);
+    await reissueSession(c, {
+      uid: user.id,
+      username: user.username,
+      mustChange: user.must_change === 1,
+    });
     // 恢复码只在这里明文出现一次
     return json(c, { recovery: codes });
   });

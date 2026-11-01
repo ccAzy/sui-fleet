@@ -11,6 +11,7 @@ import {
   now,
   type ObjectRow,
 } from "./db";
+import { randHex } from "./http";
 import { genLinks } from "./links";
 
 type J = Record<string, unknown>;
@@ -538,7 +539,13 @@ export async function saveObject(
         if (await tagTaken(db, nodeId, kind, tag, id)) {
           throw new Error(`duplicate tag: ${tag}`);
         }
-        const payload = { ...item, id };
+        // 每个客户端一条自己的订阅令牌：链接 `?t=<sub_token>` 只能导出这一个客户端。
+        // 原来是 `?k=<节点级 sub_key>&client=名字`，名字只是过滤参数 —— 去掉它就拿到
+        // 同节点全部租户的 UUID/密码（审计 run-1 实测：1 条变 2 条）。凭据必须自带作用域。
+        const payload =
+          kind === "clients"
+            ? { ...item, id, sub_token: String((item as any).sub_token ?? "") || randHex(16) }
+            : { ...item, id };
         stmts.push(
           db
             .prepare(

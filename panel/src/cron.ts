@@ -2,6 +2,7 @@
 import type { D1Database } from "@cloudflare/workers-types";
 import { all, batch, now, run } from "./db";
 import { listObjects } from "./objects";
+import { randHex } from "./http";
 import { metaGet, metaSet, refreshKernelInfo } from "./kernel";
 
 const STALE_SECONDS = 180;
@@ -158,6 +159,36 @@ export async function cronTick(db: D1Database): Promise<void> {
         JSON.stringify({ changed: stmts.length }),
       );
     }
+  }
+
+  // 2.5) 一次性迁移：给老客户端补 sub_token。
+  //      订阅链接从「节点级 sub_key + client 过滤参数」改成「每客户端一条令牌」，
+  //      老客户端没有这个字段，补上之后 UI 才有东西可发。
+  if (!(await metaGet(db, "sub_tokens_backfilled"))) {
+    const rows = await all<{ node_id: string; obj_id: number; data: string }>(
+      db,
+      "SELECT node_id, obj_id, data FROM objects WHERE kind = 'clients'",
+    );
+    const stmts = [];
+    for (const r of rows) {
+      let cl: Record<string, unknown>;
+      try {
+        cl = JSON.parse(r.data) as Record<string, unknown>;
+      } catch {
+        continue;
+      }
+      if (String(cl.sub_token ?? "")) continue;
+      cl.sub_token = randHex(16);
+      stmts.push(
+        db
+          .prepare(
+            "UPDATE objects SET data = ? WHERE node_id = ? AND kind = 'clients' AND obj_id = ?",
+          )
+          .bind(JSON.stringify(cl, null, 2), r.node_id, r.obj_id),
+      );
+    }
+    if (stmts.length) await batch(db, stmts);
+    await metaSet(db, "sub_tokens_backfilled", String(ts));
   }
 
   // 3) 用量明细只留 30 天；4) 变更日志只留 14 天。

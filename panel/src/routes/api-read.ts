@@ -1,4 +1,5 @@
 import type { Hono } from "hono";
+import { redactForToken } from "../redact";
 import {
   baseUrl,
   currentUser,
@@ -166,7 +167,14 @@ export function registerApiRead(app: Hono<{ Bindings: Env }>) {
       const node = await resolveNode(c.env.DB, c.req.header("X-Remote-Server"));
       if (!node) return json(c, { [kind]: [] });
       const data = await loadPartial(c.env.DB, node.id, [kind]);
-      return json(c, data);
+      // 只读令牌身份读到的响应必须过字段级脱敏。
+      // 这四个（以及 tls/clients）返回的是对象 JSON 原文：endpoints/outbounds 里
+      // 有 WireGuard/Reality 私钥，services 里有 mesh/DERP token，inbounds 里有密码。
+      // 「把这个端点移出白名单」修不干净 —— 授权粒度必须是字段。
+      return json(
+        c,
+        c.get("tokenOnly" as never) ? redactForToken(data) : data,
+      );
     });
   }
 
