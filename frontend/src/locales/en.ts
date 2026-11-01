@@ -330,6 +330,7 @@ export default {
     logout: "Logout",
   },
   admin: {
+    fillAllFields: "Fill in all three fields: current password, username, new password",
     changeCred: "Change credentials",
     oldPass: "Current Password",
     newUname: "New Username",

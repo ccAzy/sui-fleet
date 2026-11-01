@@ -6,8 +6,13 @@
 import { describe, expect, it } from "vitest";
 import { clientIp } from "../../src/http";
 
-function fakeCtx(headers: Record<string, string>, env: Record<string, unknown> = {}) {
-  const lower = new Map(Object.entries(headers).map(([k, v]) => [k.toLowerCase(), v]));
+function fakeCtx(
+  headers: Record<string, string>,
+  env: Record<string, unknown> = {},
+) {
+  const lower = new Map(
+    Object.entries(headers).map(([k, v]) => [k.toLowerCase(), v]),
+  );
   return {
     env,
     req: {
@@ -36,7 +41,10 @@ describe("clientIp", () => {
   });
 
   it("TRUST_PROXY=1 → 采信 XFF 第一跳（自建反代会重写该头时使用）", () => {
-    const c = fakeCtx({ "X-Forwarded-For": "9.9.9.9, 10.0.0.1" }, { TRUST_PROXY: "1" });
+    const c = fakeCtx(
+      { "X-Forwarded-For": "9.9.9.9, 10.0.0.1" },
+      { TRUST_PROXY: "1" },
+    );
     expect(clientIp(c)).toBe("9.9.9.9");
   });
 
@@ -47,7 +55,11 @@ describe("clientIp", () => {
 
   it("TRUST_PROXY=off → 任何头都不采信", () => {
     const c = fakeCtx(
-      { "CF-Connecting-IP": "1.2.3.4", "cf-ray": "x", "X-Forwarded-For": "9.9.9.9" },
+      {
+        "CF-Connecting-IP": "1.2.3.4",
+        "cf-ray": "x",
+        "X-Forwarded-For": "9.9.9.9",
+      },
       { TRUST_PROXY: "off" },
     );
     expect(clientIp(c)).toBe("direct");

@@ -290,10 +290,19 @@ export function registerApiRead(app: Hono<{ Bindings: Env }>) {
   }
 
   app.get("/api/logs", async (c) => {
-    // 前端传 c（class/级别）与 l（行数），原来两个参数都不读。
-    const cls = (c.req.query("c") ?? "").trim();
+    // c = class/级别，l = lines/行数。
+    // 但前端一直发的是 c=行数、l=级别（两个名字反了），于是「级别筛选」实际在筛包含数字的日志、
+    // 行数永远是默认值。这里按「哪个像数字」自动换位，兼容老的前端产物（产物可能有浏览器缓存）。
+    let qc = (c.req.query("c") ?? "").trim();
+    let ql = (c.req.query("l") ?? "").trim();
+    if (/^\d+$/.test(qc) && ql && !/^\d+$/.test(ql)) {
+      const t = qc;
+      qc = ql;
+      ql = t;
+    }
+    const cls = qc;
     const lim = Math.min(
-      Math.max(parseInt(c.req.query("l") ?? "50", 10) || 50, 1),
+      Math.max(parseInt(ql || "50", 10) || 50, 1),
       500,
     );
     const node = await resolveNode(c.env.DB, c.req.header("X-Remote-Server"));
@@ -319,7 +328,14 @@ export function registerApiRead(app: Hono<{ Bindings: Env }>) {
   app.get("/api/changes", async (c) => {
     const node = await resolveNode(c.env.DB, c.req.header("X-Remote-Server"));
     if (!node) return json(c, []);
-    const since = parseInt(c.req.query("k") ?? "0", 10) || 0;
+    // k 有两个历史含义：后端当「时间戳下限」，前端 Changes.vue 当「对象类型过滤」。
+    // 结果是 kind 过滤永远无效（parseInt("inbounds") → NaN → 0），每次都返回全部记录。
+    // 现在：数字当 since，非数字当 kind；同时接受显式 kind=/since= 参数。
+    const rawK = (c.req.query("k") ?? "").trim();
+    const sinceParam = c.req.query("since");
+    const kindParam = c.req.query("kind");
+    const since = parseInt(sinceParam ?? (/^\d+$/.test(rawK) ? rawK : "0"), 10) || 0;
+    const kind = (kindParam ?? (rawK && !/^\d+$/.test(rawK) ? rawK : "")).trim();
     const actor = c.req.query("a") ?? "";
     const count = Math.min(parseInt(c.req.query("c") ?? "100", 10) || 100, 500);
     const rows = await all<{
@@ -333,8 +349,9 @@ export function registerApiRead(app: Hono<{ Bindings: Env }>) {
       c.env.DB,
       "SELECT id, ts, actor, kind, action, obj FROM changes WHERE node_id = ? AND ts >= ?" +
         (actor ? " AND actor = ?" : "") +
+        (kind ? " AND kind = ?" : "") +
         " ORDER BY id DESC LIMIT ?",
-      ...(actor ? [node.id, since, actor, count] : [node.id, since, count]),
+      ...[node.id, since, ...(actor ? [actor] : []), ...(kind ? [kind] : []), count],
     );
     // 前端 Changes.vue 读的是 dateTime / key / obj
     return json(

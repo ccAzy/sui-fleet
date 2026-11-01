@@ -6,6 +6,14 @@ set -e
 SRC="${1:-$(cd "$(dirname "$0")/../frontend" && pwd)}"
 OUT="$(cd "$(dirname "$0")" && pwd)/frontend-dist"
 
+# 只用 python3：Debian/Ubuntu 24 之后没有 "python" 这个名字，
+# deploy.sh 早就做了这种兜底，但本脚本原来两处写死 python，会在这里直接失败。
+PYTHON="$(command -v python3 || command -v python || true)"
+if [ -z "$PYTHON" ]; then
+  echo "需要 python3（用于子集化 MDI 与产物校验）" >&2
+  exit 1
+fi
+
 cd "$SRC"
 
 if [ ! -d node_modules ]; then
@@ -23,7 +31,7 @@ cp -rf dist/. "$OUT"
 
 # 但必须剪掉上一次构建的哈希文件：文件名带 [hash]，不剪会无限堆积，
 # 且 Worker 静态资源会一起上传。只删 dist 里不存在的文件。
-python - "$OUT" <<'PY'
+"$PYTHON" - "$OUT" <<'PY'
 import os, sys
 out = sys.argv[1]
 for sub in ['assets', '.']:
@@ -47,7 +55,7 @@ grep -o '<script src="[^"]*"></script>' "$OUT/index.html" | head -2
 # 完整性门禁：panel/frontend-dist 是提交进仓库、直接上传到 Worker 的产物。
 # 曾被 pi-lens 的 autofix 在打包后改写压缩代码（let→const 等），造成线上白屏——
 # 构建完必须逐文件比对 md5，不一致就直接失败，不给出错误产物。
-python - "$OUT" <<'PY'
+"$PYTHON" - "$OUT" <<'PY'
 import hashlib, os, sys
 out = sys.argv[1]
 bad = []

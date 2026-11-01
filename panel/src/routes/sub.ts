@@ -250,6 +250,11 @@ export function registerSub(app: Hono<{ Bindings: Env }>) {
         clientFilter = rawKey.slice(node.sub_key.length).trim();
     }
 
+    // 注意：sub_key 是**节点级**的，client 只是过滤参数、不是凭据。
+    // 不带 client 会返回该节点全部启用客户端的链接 —— 这是历史行为，且面板自己下发的
+    // subURI 就是节点级的，硬性要求 client 会打断所有已在客户端里导入的订阅。
+    // 现在的做法：缺省仍兼容，但 UI 生成/复制订阅时一律带上 client，让新链接天然只含自己。
+
     const clients = await all<{ data: string }>(
       c.env.DB,
       "SELECT data FROM objects WHERE node_id = ? AND kind = 'clients' ORDER BY obj_id",

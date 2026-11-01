@@ -186,8 +186,11 @@ export default {
     },
     async addToken() {
       this.loading = true
-      this.newToken.expiry = this.newToken.expiry>0 ? this.newToken.expiry : 0
-      const response = await HttpUtils.post('api/addToken', { desc: this.newToken.desc, expiry: this.newToken.expiry })
+      // 输入框的单位是「天」，但库里/展示逻辑用的是**绝对 Unix 秒**（dateFormatted 里 expiry*1000）。
+      // 直接把天数发过去，30 > now 恒为 false → 新建的令牌立即过期，列表显示 1970 年。
+      const days = Number(this.newToken.expiry) > 0 ? Number(this.newToken.expiry) : 0
+      const expiry = days > 0 ? Math.floor(Date.now() / 1000) + days * 86400 : 0
+      const response = await HttpUtils.post('api/addToken', { desc: this.newToken.desc, expiry })
       if (response.success) {
         this.newToken.token = response.obj
         this.loadData()

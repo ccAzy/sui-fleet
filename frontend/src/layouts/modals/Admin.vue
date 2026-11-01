@@ -45,6 +45,7 @@
 
 <script lang="ts">
 import { i18n } from '@/locales'
+import { push } from 'notivue'
 
 export default {
   props: ['visible', 'user'],
@@ -74,7 +75,9 @@ export default {
     resetData() {
       this.newData.id = this.$props.user.id
       this.newData.oldPass = ""
-      this.newData.newUsername = ""
+      // 默认带出当前用户名：只想改密码的人不必先猜「用户名也得重填」，
+      // 而原来的空值 + saveChanges 的空值 return 会让保存静默无反应。
+      this.newData.newUsername = String(this.$props.user?.username ?? "")
       this.newData.newPass = ""
     },
     closeModal() {
@@ -82,7 +85,11 @@ export default {
       this.$emit('close')
     },
     saveChanges() {
-      if (this.newData.oldPass == '' || this.newData.newUsername == '' || this.newData.newPass == '') return
+      if (this.newData.oldPass == '' || this.newData.newUsername == '' || this.newData.newPass == '') {
+        // 原来直接 return：点了保存什么都不发生，用户以为按钮坏了
+        push.error({ title: i18n.global.t('error'), message: i18n.global.t('admin.fillAllFields') })
+        return
+      }
       this.$emit('save', this.newData)
     },
   },

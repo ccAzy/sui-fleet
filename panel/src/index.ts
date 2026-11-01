@@ -431,16 +431,17 @@ app.use("/api/*", async (c, next) => {
         "SELECT id, expiry FROM tokens WHERE token = ?",
         tk,
       );
+      // 只保留「不含秘密」的读接口。
+      // /api/load、/api/tls、/api/clients 都会返回 TLS/Reality 私钥与客户端 UUID/密码，
+      // 给一个长期令牌读这些等于发了一把「随时导出全部凭据」的钥匙，与「只读监控」的用途不符。
+      // 需要看配置的人应该用真会话登录。
       const READ_ONLY = new Set([
-        "/api/load",
         "/api/status",
         "/api/servers",
         "/api/inbounds",
-        "/api/clients",
         "/api/outbounds",
         "/api/endpoints",
         "/api/services",
-        "/api/tls",
       ]);
       if (READ_ONLY.has(p) && tokenIsValid(row, now())) {
         return await next();
@@ -458,7 +459,8 @@ app.use("/api/*", async (c, next) => {
       "logout",
       "login",
       "users",
-      "changes",
+      // 不能放行 changes：它的 obj 是保存时的**完整对象**，含客户端 UUID/密码、
+      // TLS/Reality 私钥、SS 服务端密码。默认口令会话能读它 = 绕过改密闸直接导出全部凭据。
       // 不能放行 tokens：默认口令的会话能读到明文 API token，等于把「必须先改密」这道闸绕过。
       "servers",
     ].includes(action)

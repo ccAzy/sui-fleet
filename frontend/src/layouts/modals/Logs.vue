@@ -75,7 +75,7 @@ export default {
   methods: {
     async loadData() {
       this.loading = true
-      const data = await HttpUtils.get('api/logs',{ c: this.logCount, l: this.logLevel })
+      const data = await HttpUtils.get('api/logs',{ c: this.logLevel, l: this.logCount })
       if (data.success) {
         this.lines = data.obj?? []
         this.loading = false

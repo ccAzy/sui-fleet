@@ -505,9 +505,19 @@ const loadData = async () => {
   }
 }
 
-const setData = (data: any) => {
-  settings.value = data
-  oldSettings.value = { ...data }
+// 后端 getSettings() 返回的是「库里存的设置」，新节点只有一条 config 行，
+// 于是这里是 {}。模板随后会读 settings.webPort.length → undefined.length 直接白屏。
+// 所以必须与初始值合并：缺的键用初始值补齐，多的键原样保留。
+const SETTINGS_DEFAULTS = { ...settings.value } as typeof settings.value
+
+const setData = (msg: any) => {
+  const data = msg && typeof msg === 'object' ? msg : {}
+  const merged = { ...SETTINGS_DEFAULTS } as typeof settings.value
+  for (const [k, v] of Object.entries(data)) {
+    if (v !== undefined && v !== null) (merged as Record<string, unknown>)[k] = v
+  }
+  settings.value = merged
+  oldSettings.value = { ...merged }
 }
 
 const save = async () => {

@@ -126,13 +126,30 @@ type Addr = {
   tls: J | null;
 };
 
+/**
+ * 只保留 host[:port]。
+ *
+ * nodes.address 历史上存过「旧版远程面板地址」（http://1.2.3.4:2095/path），
+ * 而 ServerEdit 的占位符至今仍在提示这种写法。直接拿去拼分享链接会得到
+ *   vless://uuid@http//1.2.3.4:443?...
+ * 客户端导入必然失败，而且面板里看不出任何异常。
+ */
+function hostOnly(raw: string): string {
+  let v = s(raw).trim();
+  if (!v) return v;
+  v = v.replace(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//, ""); // 去掉 scheme
+  v = v.split("/")[0];                                 // 去掉 path
+  v = v.split("?")[0];
+  return v;
+}
+
 function buildAddrs(inbound: J, tls: J | null, fallbackHost: string): Addr[] {
   const raw = Array.isArray(inbound.addrs) ? inbound.addrs.map(o) : [];
   const ct = clientTls(tls);
   if (raw.length === 0) {
     return [
       {
-        server: fallbackHost,
+        server: hostOnly(fallbackHost),
         server_port: num(inbound.listen_port),
         remark: s(inbound.tag),
         tls: ct,

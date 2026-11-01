@@ -330,6 +330,7 @@ export default {
     logout: "退出登录",
   },
   admin: {
+    fillAllFields: "三项都要填：当前密码、用户名、新密码",
     changeCred: "更改凭据",
     oldPass: "当前密码",
     newUname: "新用户名",

@@ -97,7 +97,7 @@ export default {
       changesHeaders: [
         { title: 'ID', key: 'id' },
         { title: i18n.global.t('admin.date') + '-' + i18n.global.t('admin.time'), key: 'dateTime' },
-        { title: i18n.global.t('admin.actor'), key: 'Actor' },
+        { title: i18n.global.t('admin.actor'), key: 'actor' },
         { title: i18n.global.t('admin.key'), key: 'key' },
         { title: i18n.global.t('admin.action'), key: 'action' },
       ],
@@ -106,7 +106,7 @@ export default {
   methods: {
     async loadData() {
       this.loading = true
-      const data = await HttpUtils.get('api/changes',{ a: this.user, k: this.key, c: this.chngCount })
+      const data = await HttpUtils.get('api/changes',{ a: this.user, kind: this.key, c: this.chngCount })
       if (data.success) {
         this.changes = data.obj?? []
         this.loading = false

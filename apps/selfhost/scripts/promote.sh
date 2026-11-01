@@ -89,8 +89,18 @@ if [ "$need_node" = "1" ]; then
   mkdir -p /opt/node && tar xJf /tmp/node.tar.xz -C /opt/node --strip-components=1
   rm -f /tmp/node.tar.xz
 fi
-export PATH=/opt/node/bin:$PATH
-ok "node $(node -v)"
+# 只有「本机没 Node、刚才装到 /opt/node」时才需要把 /opt/node/bin 提到前面。
+# 已有 Node ≥22.5 的机器上不装 /opt/node，硬加会让后面的 /opt/node/bin/npm 指向不存在的文件。
+if [ "$need_node" = "1" ]; then
+  export PATH=/opt/node/bin:$PATH
+fi
+NPM_BIN="$(command -v npm || true)"
+NODE_BIN="$(command -v node || true)"
+if [ -z "$NPM_BIN" ] || [ -z "$NODE_BIN" ]; then
+  die "找不到 npm/node（需要 Node ≥22.5）"
+fi
+NODE_DIR="$(dirname "$NODE_BIN")"
+ok "node $(node -v)（$NODE_DIR）"
 
 step "3/8 拉代码包"
 mkdir -p "$DIR"
@@ -160,8 +170,8 @@ Environment=SUI_DB=$DIR/data/sui.db
 Environment=SUI_DIST=$DIR/panel/frontend-dist
 Environment=PORT=$PORT
 Environment=PANEL_BASE=$PRIMARY
-Environment=PATH=/opt/node/bin:/usr/local/bin:/usr/bin:/bin
-ExecStart=/opt/node/bin/npm start
+Environment=PATH=${NODE_DIR}:/usr/local/bin:/usr/bin:/bin
+ExecStart=${NPM_BIN} start
 Restart=always
 RestartSec=5
 LimitNOFILE=65535

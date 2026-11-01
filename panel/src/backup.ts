@@ -85,6 +85,15 @@ export async function importBundle(
   if (Number(data.version) !== 1)
     throw new Error(`不支持的备份版本: ${data.version}`);
 
+  // 一个「格式合法但没有任何数据」的备份会把整库 DELETE 干净：
+  // 先删后插的 batch 里没有插入语句，最后提交成功、返回 imported:{}。
+  // 这里要求至少带 nodes 或 users，否则直接拒绝。
+  const t = (data.tables ?? {}) as Record<string, unknown>;
+  const nNodes = Array.isArray(t.nodes) ? t.nodes.length : 0;
+  const nUsers = Array.isArray(t.users) ? t.users.length : 0;
+  if (nNodes === 0 && nUsers === 0)
+    throw new Error("备份里既没有 nodes 也没有 users，拒绝导入（会清空整库）");
+
   const order: Table[] = [
     "nodes",
     "users",
@@ -96,6 +105,43 @@ export async function importBundle(
     "commands",
     "meta",
   ];
+
+  // 0) 校验外部数据里「会伤到自己」的两个值
+  //
+  //  (a) control_epoch 必须单调：/api/arbiter 用 Math.max 防止被降低，但导入不看这个，
+  //      恢复一份旧快照就能把 epoch 倒退，防脑裂的闸门等于被绕过。
+  //  (b) PBKDF2 的 iter 来自哈希串本身：一个 pbkdf2$2000000000$... 的备份会让管理员
+  //      下次登录时 CPU 爆炸（Worker 直接超时）。这里限制上界。
+  const incomingMeta = Array.isArray((data.tables as any)?.meta)
+    ? ((data.tables as any).meta as Array<Record<string, unknown>>)
+    : [];
+  const incomingEpoch = Number(
+    incomingMeta.find((r) => r.key === "control_epoch")?.value ?? 0,
+  );
+  if (incomingEpoch > 0) {
+    const localEpochRow = await all<{ value: string }>(
+      db,
+      "SELECT value FROM meta WHERE key = 'control_epoch'",
+    );
+    const localEpoch = Number(localEpochRow[0]?.value ?? 0) || 0;
+    if (incomingEpoch < localEpoch) {
+      // 不能悄悄覆盖：这正是 5.5-C 描述的脑裂入口
+      for (const r of incomingMeta) {
+        if (r.key === "control_epoch") r.value = String(localEpoch);
+      }
+    }
+  }
+  const incomingUsers = Array.isArray((data.tables as any)?.users)
+    ? ((data.tables as any).users as Array<Record<string, unknown>>)
+    : [];
+  for (const u of incomingUsers) {
+    const h = String(u.password_hash ?? "");
+    const m = /^pbkdf2\$(\d+)\$/.exec(h);
+    if (m && Number(m[1]) > 2_000_000)
+      throw new Error(
+        `备份里的 PBKDF2 迭代数异常（${m[1]}），拒绝导入以免登录时耗尽 CPU`,
+      );
+  }
 
   // 1) 先读本地秘密（备份里就算带了也不认）
   const localSecrets = await all<{ key: string; value: string }>(
