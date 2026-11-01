@@ -46,6 +46,8 @@ const env = {
   PANEL_BASE: panelBase,
   ADMIN_USER: process.env.ADMIN_USER,
   ADMIN_PASS: process.env.ADMIN_PASS,
+  // 执行器令牌：只有自托管部署才有，Worker 上没有
+  OPS_EXEC_TOKEN: process.env.OPS_EXEC_TOKEN,
 };
 
 // ---- 防脑裂：启动前对一次代次（epoch） ----

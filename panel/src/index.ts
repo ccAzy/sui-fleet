@@ -36,6 +36,7 @@ import { registerOtpAdmin } from "./routes/otp";
 import { registerSub } from "./routes/sub";
 import { registerAgentApi } from "./routes/agent-api";
 import { registerApiRead } from "./routes/api-read";
+import { registerOps } from "./routes/ops";
 import { installScript } from "./install-script";
 import { registerApiWrite } from "./routes/api-write";
 
@@ -410,6 +411,7 @@ app.use("/api/*", async (c, next) => {
 
 // 顺序敏感：login/logout → /api/* 守卫 → 其余 /api 路由
 registerApiRead(app);
+registerOps(app);
 registerApiWrite(app);
 registerOtpAdmin(app);
 

@@ -44,7 +44,7 @@
 <div class="sheet">
 
   <h1>控制面可移植化 · 顺位接管 · 一键接入</h1>
-  <p class="sub">s-ui Cloud · 方案 v10 · 2026-11-01 · P0–P7：迁移已脚本化，jp 成为真正的待机主控</p>
+  <p class="sub">s-ui Cloud · 方案 v11 · 2026-11-01 · P0–P8：一键迁移的后端已打通（缺前端按钮）</p>
   <span class="draft">PLAN v10 — 待拍板正式切主</span>
 
   <h2>零、已确认的前提</h2>
@@ -431,14 +431,27 @@ sed -i 's/^DRY_RUN = "1"/DRY_RUN = "0"/' wrangler.toml &amp;&amp; npx wrangler d
     也就是说 hk 真挂了，jp 是能接的——之前"备用轮胎没打气"的风险已关闭。
   </div>
 
-  <h2>十六、离"一键按钮"还差什么</h2>
-  <p>脚本层已经就绪，包成面板按钮还剩两件事：<b>执行器要有 SSH 通道</b>（Worker 不能 SSH，所以执行器得跑在某台服务器上），
-    以及<b>DNS 切换那一步</b>——它现在由仲裁者做，并带 3 次判定 + 5 分钟自动切回。</p>
+  <h2>十六、P8：一键迁移的后端已打通</h2>
+  <p class="decided">已完成 · 从面板到目标机整条链路实测通过</p>
 
-  <footer>
-    方案 v3 · 基于 2026-11-01 的代码与线上状态 · 相关：<code>docs/quota-audit-2026-11-01.html</code>、<code>MIGRATION-ALL-2026-10-29.md</code>。
-    P0 已完成且无阻碍项；下一步 P1 在影子实例上跑通，不影响生产。
-  </footer>
+  <table>
+    <thead><tr><th>环节</th><th>实现</th><th>实测</th></tr></thead>
+    <tbody>
+      <tr><td>执行器密钥</td><td>hk 上生成 <code>exec_ed25519</code>，公钥铺到其余 9 台</td><td>hk 逐台 SSH 取 hostname，9/9 通</td></tr>
+      <tr><td><code>sui-ops</code> 服务</td><td>只监听 <code>127.0.0.1:8790</code>，令牌鉴权，目标白名单</td><td><code>/health</code> 200、无令牌 401、未知目标被拒</td></tr>
+      <tr><td>面板代理端点</td><td><code>POST /api/ops/promote</code>（注册在登录守卫之后）</td><td>带会话 → 全链路 dry-run 返回 <code>[DONE exit=0]</code>；未登录 → <code>Invalid login</code></td></tr>
+      <tr><td>真实执行</td><td>面板 → 执行器 → SSH → jp 跑完整 promote</td><td>8/8 通过，jp <code>sui-panel</code> active、<code>/health</code> 正常</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note">
+    <b>安全边界</b>：执行器只绑 127.0.0.1、只认配置里的目标名、令牌来自本机环境变量（<code>OPS_EXEC_TOKEN</code>，不入库不进备份）。
+    面板跑在 Cloudflare 上时这个端点必定失败并明确报错——这是设计，因为 Worker 连不到本机执行器、也不能 SSH。
+  </div>
+
+  <h2>十七、还差最后一块：前端按钮</h2>
+  <p>接口已经能用 <code>curl</code> 打通，剩下就是在面板「服务器」页加一个入口：选目标机 → 先 dry-run 看输出 → 确认后真跑 → 成功后提示切 DNS。
+    这一步纯前端 + 一个弹窗，不动后端。</p>
 </div>
 </body>
 </html>
