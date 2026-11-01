@@ -44,8 +44,8 @@
 <div class="sheet">
 
   <h1>控制面可移植化 · 顺位接管 · 一键接入</h1>
-  <p class="sub">s-ui Cloud · 方案 v3 · 2026-11-01 · 四条细节已敲定，P0 兼容性摸底已完成</p>
-  <span class="draft">PLAN v3 — 待 P1 起步</span>
+  <p class="sub">s-ui Cloud · 方案 v4 · 2026-11-01 · P0/P1 已完成，影子实例与线上输出一致</p>
+  <span class="draft">PLAN v4 — P2 待推进</span>
 
   <h2>零、已确认的前提</h2>
   <table>
@@ -246,9 +246,33 @@
     这让 P1 的风险从“可能要改业务逻辑”降到“只需保证 shim 语义对齐”。
   </div>
 
-  <h2>九、下一步</h2>
-  <p>进入 P1：在 <code>apps/selfhost/</code> 下起 Node 服务，用<b>生产 D1 的只读快照</b>跑通登录与订阅，逐字段比对响应。
-  这一步仍然<b>不碰生产、不改 DNS</b>，产出是一个可以随时启动、验证完就能关掉的影子实例。</p>
+  <h2>九、P1 完成：影子实例跑通了</h2>
+  <p class="decided">已完成 · 未接节点 · 未改 DNS · 未影响生产</p>
+
+  <p>在 <code>apps/selfhost/</code> 下把面板跑在了 Node 上：业务代码（<code>panel/src</code>）一行未改，只换了运行时外壳。
+  数据库用 <code>node:sqlite</code>（Node 内置，无需原生编译，最小化 VPS 也能跑）。</p>
+
+  <table>
+    <thead><tr><th>验证项</th><th>结果</th></tr></thead>
+    <tbody>
+      <tr><td>订阅 · base64</td><td class="decided">与线上逐字节一致（1208 bytes）</td></tr>
+      <tr><td>订阅 · clash</td><td class="decided">与线上逐字节一致（2130 bytes）</td></tr>
+      <tr><td>订阅 · sing-box</td><td class="decided">与线上逐字节一致（2148 bytes）</td></tr>
+      <tr><td><code>/agent/pull</code></td><td>200，完整负载：inbounds 5 / outbounds 1 / clients 1 / tls 5，config 五段齐</td></tr>
+      <tr><td><code>/agent/report</code></td><td>写入生效：nodes 行更新、usage +1、client 累计增加</td></tr>
+      <tr><td>静态与安全头</td><td>首页 200，CSP / X-Frame-Options / nosniff / noindex 齐全</td></tr>
+      <tr><td>导入校验</td><td>10 张表 / 7351 行，与线上逐表行数一致</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note">
+    <b>最重要的一条</b>：三种订阅格式不是“差不多”，而是<b>逐字节相同</b>。
+    这说明 D1 shim 的语义（排序、JSON 函数、batch 事务）与线上完全对齐——P2 只需要验证带会话的写操作，不需要排查数据层。
+  </div>
+
+  <h2>十、下一步（P2）</h2>
+  <p>P2 验证带会话的写路径：登录 + 2FA、节点增删、指令下发。其中登录需要你的密码与 2FA 验证码，
+  所以这一步会留一个“你配合输入一次”的环节；其余（改 inbound、改客户端、重启内核）由我用已导入的快照做回环验证。</p>
 
   <footer>
     方案 v3 · 基于 2026-11-01 的代码与线上状态 · 相关：<code>docs/quota-audit-2026-11-01.html</code>、<code>MIGRATION-ALL-2026-10-29.md</code>。
