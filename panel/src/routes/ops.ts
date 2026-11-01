@@ -10,7 +10,26 @@ import type { Env } from "../db";
 
 type OpsEnv = Env & { OPS_EXEC_TOKEN?: string };
 
+function executorToken(env: Env): string {
+  return (env as OpsEnv).OPS_EXEC_TOKEN ?? "";
+}
+
+/** 可移交的目标白名单（由执行器配置决定，不在这里硬编码）。 */
 export function registerOps(app: Hono<{ Bindings: Env }>) {
+  app.get("/api/ops/targets", async (c) => {
+    const token = executorToken(c.env);
+    if (!token) return json(c, { targets: [], available: false });
+    try {
+      const res = await fetch(`http://127.0.0.1:8790/targets?token=${token}`, {
+        signal: AbortSignal.timeout(5000),
+      });
+      const body = (await res.json()) as { targets?: string[] };
+      return json(c, { targets: body.targets ?? [], available: true });
+    } catch {
+      return json(c, { targets: [], available: false });
+    }
+  });
+
   app.post("/api/ops/promote", async (c) => {
     const target = c.req.query("target") ?? "";
     const dry = c.req.query("dry") === "1" ? "&dry=1" : "";
@@ -19,14 +38,20 @@ export function registerOps(app: Hono<{ Bindings: Env }>) {
     }
     const token = (c.env as OpsEnv).OPS_EXEC_TOKEN ?? "";
     if (!token) {
-      return json(c, null, new Error("未配置 OPS_EXEC_TOKEN（只有自托管面板才有执行器）"));
+      return json(
+        c,
+        null,
+        new Error("未配置 OPS_EXEC_TOKEN（只有自托管面板才有执行器）"),
+      );
     }
     try {
       const res = await fetch(
         `http://127.0.0.1:8790/promote?target=${encodeURIComponent(target)}${dry}&token=${token}`,
         { method: "POST", signal: AbortSignal.timeout(600000) },
       );
-      return c.text(await res.text(), 200, { "Content-Type": "text/plain; charset=utf-8" });
+      return c.text(await res.text(), 200, {
+        "Content-Type": "text/plain; charset=utf-8",
+      });
     } catch (err) {
       return json(
         c,

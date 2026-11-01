@@ -20,6 +20,43 @@
     </v-card>
   </v-dialog>
 
+  <!-- 移交主控：面板 → 本机执行器 → SSH 到目标机跑 promote.sh，本弹窗只负责看输出 -->
+  <v-dialog v-model="promote.visible" max-width="680">
+    <v-card :title="$t('server.promote')">
+      <v-divider></v-divider>
+      <v-card-text>
+        <template v-if="!promote.available">
+          <p class="promote-hint">{{ $t('server.promoteNoExecutor') }}</p>
+        </template>
+        <template v-else>
+          <p class="promote-hint">{{ $t('server.promoteHint') }}</p>
+          <v-select
+            v-model="promote.target"
+            :items="promote.targets"
+            :label="$t('server.promoteTarget')"
+            density="compact"
+            variant="underlined"
+            hide-details
+            class="mb-3"
+          />
+          <div class="promote-actions">
+            <v-btn size="small" variant="text" :disabled="promote.running || !promote.target" @click="runPromote(true)">
+              {{ $t('server.promoteDry') }}
+            </v-btn>
+            <v-btn size="small" variant="flat" :disabled="promote.running || !promote.target" @click="runPromote(false)">
+              {{ $t('server.promoteRun') }}
+            </v-btn>
+          </div>
+          <pre v-if="promote.log" class="promote-log">{{ promote.log }}</pre>
+          <p v-if="promote.done" class="promote-hint">{{ $t('server.promoteDone') }}</p>
+        </template>
+      </v-card-text>
+      <v-card-actions>
+        <v-btn variant="text" @click="promote.visible = false">{{ $t('actions.close') }}</v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
   <!-- 工具栏：动作靠右，左侧只放一句数量；节点本身按账簿一行一台排下去 -->
   <div class="page-head">
     <span class="page-head-note">{{ servers.length }} {{ $t('pages.servers') }}</span>
@@ -29,6 +66,9 @@
       </v-btn>
       <v-btn v-if="servers.length > 0" variant="text" size="small" class="toolbar-ghost" prepend-icon="mdi-download" @click="bulkUpdate">
         {{ $t('server.updateAll') }}
+      </v-btn>
+      <v-btn size="small" variant="text" class="toolbar-ghost" prepend-icon="mdi-swap-horizontal" @click="openPromote">
+        {{ $t('server.promote') }}
       </v-btn>
       <v-btn size="small" variant="outlined" prepend-icon="mdi-server-plus" @click="showEdit(null)">{{ $t('server.add') }}</v-btn>
     </div>
@@ -98,6 +138,48 @@ import { useRouter } from 'vue-router'
 const router = useRouter()
 
 const servers = computed((): any[] => Data().servers ?? [])
+
+// ---- 移交主控：调 /api/ops/promote，这里只负责把逐行输出显示出来 ----
+// 面板跑在 Cloudflare 上时 /api/ops/targets 会返回 available:false，界面直接说明原因，
+// 不做假按钮（点了必然失败的东西不该存在）。
+const promote = ref({
+  visible: false,
+  available: false,
+  targets: <string[]>[],
+  target: '',
+  log: '',
+  running: false,
+  done: false,
+})
+
+const openPromote = async () => {
+  promote.value = { ...promote.value, visible: true, log: '', done: false, running: false }
+  const r = await HttpUtils.get('api/ops/targets')
+  if (r.success) {
+    promote.value.available = !!r.obj?.available
+    promote.value.targets = r.obj?.targets ?? []
+    promote.value.target = promote.value.target || (promote.value.targets[0] ?? '')
+  }
+}
+
+const runPromote = async (dry: boolean) => {
+  if (!promote.value.target || promote.value.running) return
+  promote.value.running = true
+  promote.value.done = false
+  promote.value.log = (dry ? '… 正在体检（不改任何东西）' : '… 正在执行（会安装并启动面板）') + String.fromCharCode(10)
+  try {
+    const res = await fetch(
+      `api/ops/promote?target=${encodeURIComponent(promote.value.target)}${dry ? '&dry=1' : ''}`,
+      { method: 'POST', credentials: 'same-origin' },
+    )
+    promote.value.log = await res.text()
+    promote.value.done = !dry && promote.value.log.includes('[DONE exit=0]')
+  } catch (e) {
+    promote.value.log = `请求失败：${String(e)}`
+  } finally {
+    promote.value.running = false
+  }
+}
 const currentServer = computed((): string => Data().currentServer)
 
 const editModal = ref<{ visible: boolean, server: any }>({ visible: false, server: null })
@@ -206,6 +288,31 @@ const delServer = async () => {
 </script>
 
 <style scoped>
+/* 移交主控弹窗：日志区用等宽，长输出可滚动，不撑破弹窗 */
+.promote-hint {
+  font-size: 13px;
+  color: rgba(var(--v-theme-on-surface), 0.7);
+  margin: 0 0 10px;
+}
+.promote-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.promote-log {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  line-height: 1.55;
+  background: rgba(var(--v-theme-on-surface), 0.04);
+  border: 1px solid rgba(var(--v-border-color), 0.12);
+  border-radius: 3px;
+  padding: 10px 12px;
+  max-height: 300px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0;
+}
 /* 账簿行的五列版：状态与操作各占一列，操作 hover 才显形 */
 .ledger--servers .ledger-row {
   grid-template-columns: 14px minmax(0, 1.1fr) minmax(0, 2.4fr) auto auto;
