@@ -204,7 +204,12 @@ export function linkToProxy(uri: string): Proxy | null {
         if (u.username) proxy.username = decodeURIComponent(u.username);
         if (u.password) proxy.password = decodeURIComponent(u.password);
         // socks5/http 链接不带 transport 参数，按默认 tcp 处理即可
-        applyTransport(proxy, q.get("type") ?? "tcp", q.get("host"), q.get("path"));
+        applyTransport(
+          proxy,
+          q.get("type") ?? "tcp",
+          q.get("host"),
+          q.get("path"),
+        );
         return proxy;
       }
       case "http":

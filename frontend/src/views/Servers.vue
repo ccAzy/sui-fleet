@@ -119,6 +119,7 @@
 
       <span class="ledger-name">
         {{ item.name }}
+        <span v-if="item.enabled === false" class="managing">· {{ $t('server.disabled') }}</span>
         <span v-if="currentServer === String(item.id)" class="managing">● {{ $t('server.managing') }}</span>
       </span>
 
@@ -134,6 +135,17 @@
       </span>
 
       <span class="ledger-actions">
+        <v-btn
+          :icon="item.enabled === false ? 'mdi-power-plug-off' : 'mdi-power-plug'"
+          size="x-small"
+          variant="text"
+          :color="item.enabled === false ? 'warning' : undefined"
+          @click.stop="toggleEnabled(item)"
+        >
+          <v-icon />
+          <v-tooltip activator="parent" location="top"
+            :text="item.enabled === false ? $t('server.enable') : $t('server.disable')"></v-tooltip>
+        </v-btn>
         <v-btn icon="mdi-lan-pending" size="x-small" variant="text" @click.stop="testServer(item)">
           <v-icon />
           <v-tooltip activator="parent" location="top" :text="$t('server.test')"></v-tooltip>
@@ -166,6 +178,8 @@ import api from '@/plugins/api'
 import ServerEdit from '@/layouts/modals/ServerEdit.vue'
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { i18n } from '@/locales'
+import { push } from 'notivue'
 
 const router = useRouter()
 
@@ -275,6 +289,19 @@ const stateText = (item: any) => {
 }
 
 // 刷新一次可达性：后端按 agent 最近上报时间判定，不反连节点。
+// 启用/禁用节点：禁用后它不会成为「默认节点」，也不会进聚合订阅，但配置和客户端都还在。
+const toggleEnabled = async (item: any) => {
+  const next = item.enabled === false
+  const r = await HttpUtils.post('api/nodes/' + item.id + '/enabled', { on: next ? '1' : '0' })
+  if (!r.success) {
+    push.error({ title: i18n.global.t('error'), message: r.msg || '', duration: 5000 })
+    return
+  }
+  item.enabled = next
+  // 拉一次全量，避免本地状态和后端不一致
+  await Data().loadServers()
+}
+
 const testServer = async (item: any) => {
   statusMap.value = { ...statusMap.value, [item.id]: { state: 'testing' } }
   const r = await HttpUtils.get('api/testServer', { id: item.id })

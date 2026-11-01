@@ -64,7 +64,9 @@ function countUnsupported(links: string[], subType: SubFormat): number {
     // 两种格式的协议覆盖面不一样（clash.ts 与 singbox.ts 各有一张表），
     // 所以要按目标格式分别统计，不能只看 linkToProxy。
     const ok =
-      subType === "singbox" ? linkToOutbound(uri) !== null : linkToProxy(uri) !== null;
+      subType === "singbox"
+        ? linkToOutbound(uri) !== null
+        : linkToProxy(uri) !== null;
     if (!ok) n += 1;
   }
   return n;
@@ -79,7 +81,8 @@ function renderSubscription(
 ): Response {
   if (subType === "clash" || subType === "singbox") {
     const skipped = countUnsupported(links, subType);
-    if (skipped > 0) headers = { ...headers, "X-Sub-Unsupported": String(skipped) };
+    if (skipped > 0)
+      headers = { ...headers, "X-Sub-Unsupported": String(skipped) };
   }
   if (subType === "clash") {
     return new Response(buildClashConfig(links, title), {

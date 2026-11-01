@@ -69,6 +69,17 @@ export function clientIp(c: any): string {
 }
 
 /** 选中的节点：X-Remote-Server 头优先，缺省落到第一个启用节点。 */
+/**
+ * 让「第一个启用节点」的缓存立刻失效。
+ *
+ * 缓存 60 秒是为了省 D1 读取，但节点被禁用/删除/新增第一台时，
+ * 这 60 秒里 resolveNode 还会返回旧的 NodeRow —— 表现为「禁用后照样能写它」
+ * 或「新加的第一台节点 60 秒内不生效」。
+ */
+export function invalidateDefaultNode(): void {
+  defaultNodeCache = null;
+}
+
 export async function resolveNode(
   db: Env["DB"],
   headerId: string | undefined,

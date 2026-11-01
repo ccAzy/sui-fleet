@@ -1,7 +1,15 @@
 import type { Hono } from "hono";
 import { setCookie } from "hono/cookie";
 import { COOKIE, login as doLogin, sha256, signJWT } from "../auth";
-import { baseUrl, json, okMsg, randHex, resolveNode, secretOf } from "../http";
+import {
+  baseUrl,
+  invalidateDefaultNode,
+  json,
+  okMsg,
+  randHex,
+  resolveNode,
+  secretOf,
+} from "../http";
 import { getNode, listNodes, now, run, type Env } from "../db";
 import {
   getConfig,
@@ -364,6 +372,38 @@ export function registerApiWrite(app: Hono<{ Bindings: Env }>) {
     const base = baseUrl(c);
     const install_cmd = `curl -fsSL ${base}/install.sh -o /tmp/sui.sh && sudo bash /tmp/sui.sh --token ${token}`;
     return json(c, { id, token, install_cmd });
+  });
+
+  // 启用/禁用节点：不删节点就能把它从「默认节点」「聚合订阅」里摘出去。
+  // 之前 nodes.enabled 只有读取方、没有写入口，这个字段等于死状态。
+  app.post("/api/nodes/:id/enabled", async (c) => {
+    const id = c.req.param("id");
+    const body = await c.req.parseBody();
+    const raw = String(body.on ?? "0");
+    const on = raw === "1" || raw === "true";
+    const node = await getNode(c.env.DB, id);
+    if (!node) return json(c, null, new Error("node not found"));
+    await run(
+      c.env.DB,
+      "UPDATE nodes SET enabled = ?, updated_at = ? WHERE id = ?",
+      on ? 1 : 0,
+      now(),
+      id,
+    );
+    // 「第一个启用节点」的缓存必须立刻失效，否则禁用后 60 秒内还会被当成默认节点
+    invalidateDefaultNode();
+    // 禁用会改变聚合订阅的内容，也记一条 changes 让前端刷新
+    await run(
+      c.env.DB,
+      "INSERT INTO changes (node_id, ts, actor, kind, action, obj) VALUES (?, ?, ?, ?, ?, ?)",
+      id,
+      now(),
+      (c.get("user" as never) as string) ?? "",
+      "nodes",
+      on ? "enable" : "disable",
+      JSON.stringify({ name: node.name }),
+    );
+    return json(c, { id, enabled: on ? 1 : 0 });
   });
 
   // 轮换节点令牌：令牌丢了/疑似泄露时不必删节点（删节点会连带清掉它的客户端与订阅关系）。
