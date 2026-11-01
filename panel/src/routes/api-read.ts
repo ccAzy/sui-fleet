@@ -447,10 +447,18 @@ export function registerApiRead(app: Hono<{ Bindings: Env }>) {
   });
 
   app.post("/api/deleteToken", async (c) => {
+    const session = await currentUser(c);
+    if (!session) return json(c, null, new Error("Invalid login"));
     const body = await c.req.parseBody();
     const id = parseInt(String(body.id ?? "0"), 10);
     if (!id) return json(c, null, new Error("invalid id"));
-    await run(c.env.DB, "DELETE FROM tokens WHERE id = ?", id);
+    // 只删自己的：原来按 id 直接删，任意登录用户都能删别人的令牌
+    await run(
+      c.env.DB,
+      "DELETE FROM tokens WHERE id = ? AND user_id = ?",
+      id,
+      session.uid,
+    );
     return okMsg(c);
   });
 

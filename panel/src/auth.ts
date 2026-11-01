@@ -195,6 +195,22 @@ export async function login(
   return u;
 }
 
+/**
+ * API Token 是否仍然有效（纯函数，便于单测）。
+ *
+ * expiry = 0 表示永不过期；否则必须晚于当前时间。
+ * 这张表原来只在 UI 里增删查、从不参与鉴权（死凭据），
+ * 现在作为「只读接口的脚本访问凭据」使用。
+ */
+export function tokenIsValid(
+  row: { expiry?: number } | null | undefined,
+  nowTs: number,
+): boolean {
+  if (!row) return false;
+  const exp = Number(row.expiry ?? 0) || 0;
+  return exp === 0 || exp > nowTs;
+}
+
 export async function sha256(s: string): Promise<string> {
   const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
   return [...new Uint8Array(d)]

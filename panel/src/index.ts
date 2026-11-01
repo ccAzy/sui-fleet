@@ -10,6 +10,7 @@ import {
   signJWT,
   verifyJWT,
   verifyOpsToken,
+  tokenIsValid,
   verifyPullToken,
 } from "./auth";
 import {
@@ -400,6 +401,38 @@ app.use("/api/*", async (c, next) => {
       return await next();
     }
   }
+  // 只读 API Token：给脚本/监控用（UI 里一直这么宣传，但原来从不校验）。
+  // 只放行读接口，写接口一律要求真实会话 —— 令牌不该能改配置。
+  // 兼容 Authorization: Bearer <t> 和 ?token=<t>（后者会进日志，文档里注明）。
+  if (c.req.method === "GET") {
+    const auth = c.req.header("Authorization") ?? "";
+    const bearer = auth.toLowerCase().startsWith("bearer ")
+      ? auth.slice(7).trim()
+      : "";
+    const tk = bearer || (c.req.query("token") ?? "");
+    if (tk) {
+      const row = await first<{ id: number; expiry: number }>(
+        c.env.DB,
+        "SELECT id, expiry FROM tokens WHERE token = ?",
+        tk,
+      );
+      const READ_ONLY = new Set([
+        "/api/load",
+        "/api/status",
+        "/api/servers",
+        "/api/inbounds",
+        "/api/clients",
+        "/api/outbounds",
+        "/api/endpoints",
+        "/api/services",
+        "/api/tls",
+      ]);
+      if (READ_ONLY.has(p) && tokenIsValid(row, now())) {
+        return await next();
+      }
+    }
+  }
+
   const session = await currentUser(c);
   if (!session) return json(c, null, new Error("Invalid login"));
   const action = c.req.path.split("/").pop() ?? "";

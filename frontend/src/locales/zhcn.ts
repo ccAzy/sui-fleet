@@ -342,7 +342,7 @@ export default {
     action: "操作",
     api: {
       title: "API 令牌",
-      msg: "请复制令牌并保存到安全的地方。它将不再显示。",
+      msg: "只读令牌：用于脚本/监控读取状态与配置。用法 Authorization: Bearer <令牌>，仅放行 /api/load、/api/status、/api/servers 等 GET 接口，不能改任何配置。过期时间到点即失效。",
       token: "令牌",
     },
   },

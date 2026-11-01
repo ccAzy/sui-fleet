@@ -342,7 +342,7 @@ export default {
     action: "Action",
     api: {
       title: "API Tokens",
-      msg: "Please copy the token below and store it somewhere safe. It will not be shown again.",
+      msg: "Read-only token for scripts/monitoring. Use it as Authorization: Bearer <token>. Only GET endpoints such as /api/load, /api/status and /api/servers are allowed — it cannot change any configuration. Expiry is enforced.",
       token: "Token",
     },
   },
