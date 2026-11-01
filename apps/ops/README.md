@@ -10,11 +10,11 @@
 {
   "port": 8790,
   "token": "<OPS_TOKEN>",
-  "panel_url": "https://panel.example.org",
+  "panel_url": "https://panel.example.com",
   "ssh_key": "/root/.ssh/exec_ed25519",
   "ssh_port": 6688,
   "promote_script": "/opt/sui-panel/apps/selfhost/scripts/promote.sh",
-  "targets": { "jp": "85.121.122.96", "vn": "198.51.100.20" }
+  "targets": { "jp": "203.0.113.12", "vn": "203.0.113.18" }
 }
 ```
 

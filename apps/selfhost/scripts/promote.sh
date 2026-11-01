@@ -2,7 +2,7 @@
 # 在目标机上把「控制面」拉起来：装 Node → 拉代码包 → 拉最新库 → 起服务 → 自检。
 # 不含 DNS 切换（那一步由仲裁者或人工完成，见 apps/arbiter）。
 #
-#   bash promote.sh --primary https://panel.example.org --token <OPS_TOKEN> [--dry-run]
+#   bash promote.sh --primary https://panel.example.com --token <OPS_TOKEN> [--dry-run]
 #
 # 幂等：重复执行只会更新代码与数据（旧库自动留 .bak），不会动已有 /etc/sui-panel.env。
 set -euo pipefail

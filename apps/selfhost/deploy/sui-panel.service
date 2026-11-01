@@ -16,7 +16,7 @@ EnvironmentFile=/etc/sui-panel.env
 Environment=SUI_DB=/opt/sui-panel/data/sui.db
 Environment=SUI_DIST=/opt/sui-panel/frontend-dist
 Environment=PORT=8788
-Environment=PANEL_BASE=https://panel.example.org
+Environment=PANEL_BASE=https://panel.example.com
 ExecStart=/usr/bin/npm start
 Restart=always
 RestartSec=5

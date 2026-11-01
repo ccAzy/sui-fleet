@@ -25,10 +25,10 @@ const HY2 = "hysteria2://pass@9.9.9.9:443?sni=www.bing.com#hy2-test";
 
 // 带 insecure=1 的真实形态（节点默认用自签证书，少了 insecure 客户端连不上）
 const HY2_INSECURE =
-  "hysteria2://sMjUfexWEa@67.215.233.13:23059?security=tls&insecure=1&sni=www.apple.com#hy2-insecure";
+  "hysteria2://sMjUfexWEa@203.0.113.20:23059?security=tls&insecure=1&sni=www.apple.com#hy2-insecure";
 
 const TUIC =
-  "tuic://11111111-2222-3333-4444-555555555555:pw@67.215.233.13:18211" +
+  "tuic://11111111-2222-3333-4444-555555555555:pw@203.0.113.20:18211" +
   "?security=tls&insecure=1&sni=www.apple.com&alpn=h3&congestion_control=bbr#tuic-test";
 
 describe("clash 转换", () => {

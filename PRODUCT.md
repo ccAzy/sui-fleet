@@ -44,8 +44,8 @@ web
 
 ## Evidence on Hand
 
-- 真实运行中的面板：<https://panel.example.org（单节点> rn1，6 个入站、1 个用户）
-- 真实数据：节点 rn1 / 107.175.234.130 / 6 个入站（vless-reality ×3、hysteria2、tuic、anytls）
+- 真实运行中的面板：<https://panel.example.com（单节点> rn1，6 个入站、1 个用户）
+- 真实数据：节点 rn1 / 203.0.113.13 / 6 个入站（vless-reality ×3、hysteria2、tuic、anytls）
 - 无品牌素材（无 logo、无吉祥物），不编造
 
 ## Product Principles

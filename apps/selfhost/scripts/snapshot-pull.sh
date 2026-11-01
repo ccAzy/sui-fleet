@@ -11,7 +11,7 @@ set -euo pipefail
 # systemd 环境里没有 /opt/node/bin，显式补上（面板就是用这个 Node 跑的）
 export PATH=/opt/node/bin:$PATH
 
-PANEL_URL="${PANEL_URL:?需要 PANEL_URL，例如 https://panel.example.org}"
+PANEL_URL="${PANEL_URL:?需要 PANEL_URL，例如 https://panel.example.com}"
 BACKUP_TOKEN="${BACKUP_TOKEN:?需要 BACKUP_TOKEN（面板 meta.backup_token_hash 对应的原始令牌）}"
 DATA_DIR="${DATA_DIR:-/opt/sui-panel/data}"
 KEEP="${KEEP:-7}"

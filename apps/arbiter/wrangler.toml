@@ -9,10 +9,10 @@ crons = ["* * * * *"]
 
 # 顺位表（第一项视为当前主控）。改这里之后要重新 deploy。
 [vars]
-# 顺位：主控已在 hk（sui.example.com），jp 为待机；DRY_RUN=1 时只观察不改 DNS
+# 顺位：主控已在 hk（panel.example.com），jp 为待机；DRY_RUN=1 时只观察不改 DNS
 ORDER = "hk,jp"
-PROBE_URL = "https://sui.example.com/health"
-PANEL_URL = "https://panel.example.org"
+PROBE_URL = "https://panel.example.com/health"
+PANEL_URL = "https://panel.example.com"
 DRY_RUN = "1"
 THRESHOLD = "3"
 COOLDOWN_MS = "600000"

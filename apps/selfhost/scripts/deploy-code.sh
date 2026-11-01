@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 从开发机把「代码」推到自托管主控（只换代码与前端产物，不碰数据库）。
 #
-#   HOST=192.0.2.10 bash apps/selfhost/scripts/deploy-code.sh
+#   HOST=203.0.113.11 bash apps/selfhost/scripts/deploy-code.sh
 #
 # 为什么需要它：promote.sh 会连数据库一起覆盖（那是给"新机器首次接管"用的），
 # 在正在跑的主控上直接跑它会把线上数据换成旧快照。日常改代码用这个脚本。
@@ -9,11 +9,11 @@
 # 行为：打包 → 上传 → 远端备份旧代码 → 覆盖 → 重启 → health 自检 → 失败自动回滚
 set -euo pipefail
 
-HOST="${HOST:?需要 HOST，例如 HOST=192.0.2.10}"
+HOST="${HOST:?需要 HOST，例如 HOST=203.0.113.11}"
 SSH_PORT="${SSH_PORT:-6688}"
 SSH_KEY="${SSH_KEY:-$HOME/.ssh/id_ed25519}"
 REMOTE="${REMOTE:-/opt/sui-panel}"
-DOMAIN="${DOMAIN:-sui.example.com}"
+DOMAIN="${DOMAIN:-panel.example.com}"
 REPO="$(cd "$(dirname "$0")/../../.." && pwd)"
 
 tmp=$(mktemp -d)

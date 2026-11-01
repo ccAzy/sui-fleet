@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 让「待机机」具备被域名直接访问的能力（Caddy + 同域名证书 + 8443）。
 #
-#   HOST=jp IP=85.121.122.96 bash push-tls.sh
+#   HOST=jp IP=203.0.113.12 bash push-tls.sh
 #
 # 为什么需要它：promote.sh 只装到这里 —— 面板在本机 8788 上跑起来。
 # 可域名是 https://…:8443 打进来的（Cloudflare Origin Rule 改写端口），
@@ -12,8 +12,8 @@
 set -euo pipefail
 
 HOST="${HOST:?需要 HOST，例如 HOST=jp}"
-IP="${IP:?需要 IP，例如 IP=85.121.122.96}"
-DOMAIN="${DOMAIN:-sui.example.com}"
+IP="${IP:?需要 IP，例如 IP=203.0.113.12}"
+DOMAIN="${DOMAIN:-panel.example.com}"
 LISTEN_PORT="${LISTEN_PORT:-8443}"
 PANEL_PORT="${PANEL_PORT:-8788}"
 SSH_PORT="${SSH_PORT:-6688}"

@@ -7,18 +7,18 @@
 ## 当前状态
 
 - `DRY_RUN = "1"`：**只记录判定，不改 DNS、不推进代次**。
-- 已部署：`https://sui-arbiter.user0214.workers.dev/?token=<OPS_TOKEN>`
-- 顺位表 `hk,jp`；`KV.ips` 已写入两台的真实 IP；探测地址 `https://panel.example.org/health`。
+- 已部署：`https://sui-arbiter.<your-subdomain>.workers.dev/?token=<OPS_TOKEN>`
+- 顺位表 `hk,jp`；`KV.ips` 已写入两台的真实 IP；探测地址 `https://panel.example.com/health`。
 
 ## 要真正接管，需要你出一样东西
 
-**Cloudflare API 令牌**（Zone → DNS → Edit，作用域限定 `example.org`）。拿到后：
+**Cloudflare API 令牌**（Zone → DNS → Edit，作用域限定 `example.com`）。拿到后：
 
 ```bash
 cd apps/arbiter
 printf '%s' '<刚刚创建的令牌>' | npx wrangler secret put CF_API_TOKEN --config wrangler.toml
-npx wrangler secret put ZONE_ID      --config wrangler.toml   # example.org 的 Zone ID
-npx wrangler secret put RECORD_NAME  --config wrangler.toml   # 比如 panel.example.org
+npx wrangler secret put ZONE_ID      --config wrangler.toml   # example.com 的 Zone ID
+npx wrangler secret put RECORD_NAME  --config wrangler.toml   # 比如 panel.example.com
 sed -i 's/^DRY_RUN = "1"/DRY_RUN = "0"/' wrangler.toml && npx wrangler deploy --config wrangler.toml
 ```
 

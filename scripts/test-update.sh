@@ -5,9 +5,9 @@
 # 用法： wsl -d Ubuntu-24.04 bash /mnt/c/.../agent/test-update.sh
 set -e
 
-BIN="/mnt/c/Users/user/projects/sui-cf/agent/dist/sui-agent-linux-amd64"
-PAYLOAD_SRC="/mnt/c/Users/user/projects/sui-cf/panel/test/pull-payload-wsl.json"
-MOCK="/mnt/c/Users/user/projects/sui-cf/panel/test/mock-panel.py"
+BIN="$REPO/agent/dist/sui-agent-linux-amd64"
+PAYLOAD_SRC="$REPO/panel/test/pull-payload-wsl.json"
+MOCK="$REPO/panel/test/mock-panel.py"
 W="$HOME/agent-update-test"
 
 rm -rf "$W"; mkdir -p "$W/db"
