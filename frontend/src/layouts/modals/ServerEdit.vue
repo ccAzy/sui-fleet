@@ -4,7 +4,27 @@
       <v-card-title>{{ $t('actions.' + (form.id ? 'edit' : 'add')) + ' ' + $t('objects.server') }}</v-card-title>
       <v-divider></v-divider>
       <v-card-text>
-        <v-container style="padding: 0;">
+        <!-- 新建成功后的「一次性凭据」区：token 只在这里出现一次，节点侧只存 sha256，
+             关掉就再也找不回来（以前连显示都没有，只能删节点重建）。 -->
+        <template v-if="install">
+          <v-alert type="warning" variant="tonal" density="compact" class="mb-3">
+            {{ $t('server.installOnce') }}
+          </v-alert>
+          <div class="install-row">
+            <span class="install-label">{{ $t('server.token') }}</span>
+            <code class="install-code">{{ install.token }}</code>
+            <v-btn size="x-small" variant="text" :prepend-icon="copied === 'token' ? 'mdi-check' : 'mdi-content-copy'"
+              @click="copy(install.token, 'token')">{{ $t('server.copy') }}</v-btn>
+          </div>
+          <div class="install-row install-row--block">
+            <span class="install-label">{{ $t('server.installCmd') }}</span>
+            <code class="install-code">{{ install.install_cmd }}</code>
+            <v-btn size="x-small" variant="text" :prepend-icon="copied === 'cmd' ? 'mdi-check' : 'mdi-content-copy'"
+              @click="copy(install.install_cmd, 'cmd')">{{ $t('server.copy') }}</v-btn>
+          </div>
+          <p class="install-hint">{{ $t('server.installHint') }}</p>
+        </template>
+        <v-container v-else style="padding: 0;">
           <v-row>
             <v-col cols="12">
               <v-text-field
@@ -46,7 +66,7 @@
       <v-card-actions>
         <v-spacer></v-spacer>
         <v-btn color="primary" variant="outlined" @click="closeModal">{{ $t('actions.close') }}</v-btn>
-        <v-btn color="primary" variant="tonal" :loading="loading" @click="save">{{ $t('actions.save') }}</v-btn>
+        <v-btn v-if="!install" color="primary" variant="tonal" :loading="loading" @click="save">{{ $t('actions.save') }}</v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
@@ -64,6 +84,9 @@ export default {
     return {
       loading: false,
       showPass: false,
+      // 新建成功后展示一次性 token + 安装命令；null 表示正常编辑态
+      install: <any>null,
+      copied: '',
       form: { id: 0, name: '', url: '', token: '', remark: '' },
     }
   },
@@ -81,12 +104,25 @@ export default {
   },
   methods: {
     closeModal() {
+      this.install = null
+      this.copied = ''
       this.$emit('close')
     },
     normalizeUrl(u: string): string {
       u = (u || '').trim()
       if (u && !/^https?:\/\//i.test(u)) u = 'http://' + u
       return u
+    },
+    async copy(text: any, which: string) {
+      try {
+        await navigator.clipboard.writeText(String(text ?? ''))
+        this.copied = which
+        setTimeout(() => {
+          if (this.copied === which) this.copied = ''
+        }, 1500)
+      } catch {
+        // 浏览器拒绝剪贴板时，内容本身在弹窗里可以手动选中
+      }
     },
     async save() {
       const name = (this.form.name || '').trim()
@@ -105,8 +141,54 @@ export default {
       if (this.form.id) payload.id = this.form.id
       const success = await Data().save('servers', this.form.id ? 'edit' : 'new', payload)
       this.loading = false
-      if (success) this.closeModal()
+      if (!success) return
+      // 新建时后端只回一次明文 token；把它留在弹窗里让用户复制，别直接关掉
+      const created = Data().lastCreated
+      if (created && !this.form.id) {
+        Data().lastCreated = null
+        this.install = created
+        return
+      }
+      this.closeModal()
     },
   },
 }
 </script>
+
+<style scoped>
+/* 这个文件原先没有 style 块；一次性凭据区需要等宽与自动换行 */
+.install-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.08);
+}
+
+.install-row--block {
+  align-items: flex-start;
+}
+
+.install-label {
+  flex: 0 0 88px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: rgba(var(--v-theme-on-surface), 0.6);
+}
+
+.install-code {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11.5px;
+  line-height: 1.5;
+  word-break: break-all;
+  user-select: all;
+}
+
+.install-hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: rgba(var(--v-theme-on-surface), 0.65);
+}
+</style>

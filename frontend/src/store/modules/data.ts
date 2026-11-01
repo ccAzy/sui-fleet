@@ -36,6 +36,9 @@ const Data = defineStore('Data', {
     currentServer: localStorage.getItem('currentServer') ?? '',
     // 节点列表上一次拉取的时间戳：轮询里不再每 10 秒重拉（/api/servers 每次都扫全部 nodes）
     serversAt: 0,
+    // 新建节点时后端只回一次明文 token + 安装命令（库里只存 sha256）。
+    // 用 save() 的人拿不到返回值，所以在这里暂存，由 ServerEdit 弹窗读走并立刻清空。
+    lastCreated: <any>null,
   }),
   actions: {
     // The server registry is always local (never proxied to a remote).
@@ -143,6 +146,7 @@ const Data = defineStore('Data', {
           duration: 5000,
           message: i18n.global.t('actions.' + action) + " " + i18n.global.t('objects.' + objectName)
         })
+        this.lastCreated = msg.obj?.created ?? null
         this.setNewData(msg.obj)
       }
       return msg.success

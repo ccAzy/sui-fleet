@@ -70,8 +70,34 @@ export function registerApiWrite(app: Hono<{ Bindings: Env }>) {
           ts,
         );
         await seedNode(c.env.DB, id);
-        // 明文 token 只在这里返回一次，供贴到节点的安装命令里
-        return { servers: [{ id, name, url: address, remark, token }] };
+
+        // 明文 token 只在这里返回一次：节点侧只存 sha256，错过这次就找不回来。
+        // 同时把 install_cmd 一起给前端，否则用户拿不到「粘一条命令就接入」的那条命令。
+        const nodesAfter = await listNodes(c.env.DB);
+        // 用请求的 origin 拼（Caddy/Cloudflare 会透传 Host），与 /api/nodes 里的写法一致
+        const installBase = baseUrl(c);
+        const installCmd =
+          `curl -fsSL ${installBase}/install.sh -o /tmp/sui.sh && ` +
+          `sudo bash /tmp/sui.sh --token ${token}`;
+        return {
+          // 返回**完整**列表：原来只回新节点，前端 setNewData 直接覆盖，
+          // 于是加第二台时用户会以为第一台被删了（要等 5 分钟才重新拉全量）。
+          servers: nodesAfter.map((n) => ({
+            id: n.id,
+            name: n.name,
+            url: n.address,
+            token: "",
+            remark: n.remark,
+            enabled: n.enabled,
+            last_seen: n.last_seen,
+            core_state: n.core_state,
+            kernel_ver: n.kernel_ver,
+            agent_ver: n.agent_ver,
+            revision: n.revision,
+            applied_rev: n.applied_rev,
+          })),
+          created: { id, name, token, install_cmd: installCmd },
+        };
       }
     } else {
       throw new Error(`unknown action: ${action}`);
@@ -213,7 +239,11 @@ export function registerApiWrite(app: Hono<{ Bindings: Env }>) {
         if (!file || typeof file === "string")
           return json(c, null, new Error("没有收到文件"));
         if ((file as File).size > MAX_BYTES)
-          return json(c, null, new Error("备份文件超过 64MB，请先在源面板排除统计再导出"));
+          return json(
+            c,
+            null,
+            new Error("备份文件超过 64MB，请先在源面板排除统计再导出"),
+          );
         text = await (file as File).text();
       } else {
         text = await c.req.text();
@@ -229,7 +259,13 @@ export function registerApiWrite(app: Hono<{ Bindings: Env }>) {
       data = JSON.parse(text) as Bundle;
     } catch {
       // 不要把 JSON.parse 的原文（含位置偏移/片段）回给浏览器
-      return json(c, null, new Error("备份文件不是合法的 JSON（本接口只接受面板导出的 JSON，不接受 SQLite 文件）"));
+      return json(
+        c,
+        null,
+        new Error(
+          "备份文件不是合法的 JSON（本接口只接受面板导出的 JSON，不接受 SQLite 文件）",
+        ),
+      );
     }
 
     try {
@@ -237,7 +273,9 @@ export function registerApiWrite(app: Hono<{ Bindings: Env }>) {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       // 业务错误（备份格式/版本）原样回；数据库层异常只回摘要，细节留在服务端日志
-      const safe = /备份|备份版本|不是数组/.test(msg) ? msg : "导入失败，数据库已回滚或标记为半成品（详见服务端日志）";
+      const safe = /备份|备份版本|不是数组/.test(msg)
+        ? msg
+        : "导入失败，数据库已回滚或标记为半成品（详见服务端日志）";
       console.error("[importdb]", msg);
       return json(c, null, new Error(safe));
     }
@@ -302,6 +340,27 @@ export function registerApiWrite(app: Hono<{ Bindings: Env }>) {
     const base = baseUrl(c);
     const install_cmd = `curl -fsSL ${base}/install.sh -o /tmp/sui.sh && sudo bash /tmp/sui.sh --token ${token}`;
     return json(c, { id, token, install_cmd });
+  });
+
+  // 轮换节点令牌：令牌丢了/疑似泄露时不必删节点（删节点会连带清掉它的客户端与订阅关系）。
+  app.post("/api/nodes/:id/rotate-token", async (c) => {
+    const id = c.req.param("id");
+    const node = await getNode(c.env.DB, id);
+    if (!node) return json(c, null, new Error("node not found"));
+    const raw = crypto.getRandomValues(new Uint8Array(24));
+    const token = [...raw].map((b) => b.toString(16).padStart(2, "0")).join("");
+    await run(
+      c.env.DB,
+      "UPDATE nodes SET token_hash = ?, updated_at = ? WHERE id = ?",
+      await sha256(token),
+      now(),
+      id,
+    );
+    const base = baseUrl(c);
+    const installCmd =
+      `curl -fsSL ${base}/install.sh -o /tmp/sui.sh && ` +
+      `sudo bash /tmp/sui.sh --token ${token}`;
+    return json(c, { id, token, install_cmd: installCmd });
   });
 
   app.post("/api/nodes/:id/delete", async (c) => {

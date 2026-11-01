@@ -501,7 +501,9 @@ export async function saveObject(
           String(rawId).trim() !== "" &&
           !Number.isFinite(Number(rawId))
         ) {
-          throw new Error(`invalid id: ${String(rawId)}（id 必须是数字，缺省表示新建）`);
+          throw new Error(
+            `invalid id: ${String(rawId)}（id 必须是数字，缺省表示新建）`,
+          );
         }
         const editId = num(item.id);
         const isNew = effAction === "new" || editId <= 0;

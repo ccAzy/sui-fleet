@@ -105,7 +105,11 @@ npx wrangler --config wrangler.local.toml secret put JWT_SECRET
 | 面板分发 | 把二进制分片放到 `panel/frontend-dist/dl/`（见 `apps/selfhost/scripts/publish-agent.sh`） | 已有面板 |
 | 直接拷 | 从已有部署的 `/opt/sui-agent/bin/sui-agent` 复制 | 迁移 |
 
-拿到二进制后，在面板「Servers → Add Server」建节点（**token 只显示一次**），然后在服务器上：
+拿到二进制后，在面板「Servers → Add Server」建节点。保存后弹窗会**直接给出一次性 token
+和一条完整的安装命令**（在弹窗里点复制即可；关掉后 token 再也找不回来，但可以点节点的
+「轮换令牌」重新生成一条，不必删节点）。
+
+也可以手工执行：
 
 ```bash
 # 把二进制和安装脚本传上去（文件名保持一致，脚本默认找 ./sui-agent）
