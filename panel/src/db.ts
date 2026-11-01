@@ -214,12 +214,20 @@ export async function sessionEpochOf(
 ): Promise<number> {
   const hit = epochCache.get(uid);
   if (hit && nowTs - hit.at < EPOCH_TTL) return hit.value;
-  const row = await first<{ session_epoch: number }>(
-    db,
-    "SELECT session_epoch FROM users WHERE id = ?",
-    uid,
-  );
-  const value = Number(row?.session_epoch ?? 0);
+  let value: number;
+  try {
+    const row = await first<{ session_epoch: number }>(
+      db,
+      "SELECT session_epoch FROM users WHERE id = ?",
+      uid,
+    );
+    value = Number(row?.session_epoch ?? 0);
+  } catch {
+    // 老库还没补列、或数据库瞬时不可用：返回 -1 表示「无法判定」，
+    // 交给调用方放行并保持可用性（详见 http.ts currentUser 的处理与注释）。
+    // 注意这不是常态：ensureSessionEpoch 会在下一次登录时把列补上。
+    return -1;
+  }
   epochCache.set(uid, { value, at: nowTs });
   return value;
 }

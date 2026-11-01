@@ -57,10 +57,13 @@ export async function currentUser(c: any): Promise<Session | null> {
   // 旧 cookie 里的 se 对不上就当场失效。没有这一位时，改密只是“换了下次登录的密码”，
   // 已经流出去的会话仍然能用到 24 小时窗口结束（并能签发新 token）。
   if (uid > 0) {
+    // epoch < 0 = 无法判定（老库缺列 / 瞬时读失败）。此时**放行**：
+    // 可用性优先于「多吊销一次」——一旦放行失败，后果是所有人都进不了面板；
+    // 而缺列是对称的、下一次登录就会被 ensureSessionEpoch 补上，不会长期存在。
     const epoch = await sessionEpochOf(c.env.DB, uid);
     // payload.se 由 isSessionPayload 的类型谓词声明（auth.ts），签发处是
     // index.ts issueSession；老 cookie 没有这一位，按 0 处理。
-    if (Number(payload.se ?? 0) !== epoch) return null;
+    if (epoch >= 0 && Number(payload.se ?? 0) !== epoch) return null;
   }
   return {
     username: payload.u,

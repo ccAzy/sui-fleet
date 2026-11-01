@@ -17,6 +17,7 @@ import {
   all,
   batch,
   ensureOtpSchema,
+  ensureSessionEpoch,
   first,
   now,
   run,
@@ -158,6 +159,9 @@ app.post("/api/login", async (c) => {
   const body = await readBody(c);
   await ensureAdmin(c.env.DB, c.env.ADMIN_USER, c.env.ADMIN_PASS);
   await ensureOtpSchema(c.env.DB);
+  // 老库没有 session_epoch 列时，currentUser 的查询会直接报错（面板全体 500）。
+  // 与 ensureOtpSchema 一样走「用到才补」：登录路径先补列，之后每次请求才敢查。
+  await ensureSessionEpoch(c.env.DB);
   const user = await doLogin(
     c.env.DB,
     String(body.user ?? ""),
@@ -183,6 +187,9 @@ app.post("/api/login", async (c) => {
     return json(c, { need_otp: true, ticket });
   }
   await ensureOtpSchema(c.env.DB);
+  // 老库没有 session_epoch 列时，currentUser 的查询会直接报错（面板全体 500）。
+  // 与 ensureOtpSchema 一样走「用到才补」：登录路径先补列，之后每次请求才敢查。
+  await ensureSessionEpoch(c.env.DB);
   return await issueSession(c, user);
 });
 
