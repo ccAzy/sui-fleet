@@ -128,7 +128,6 @@ export async function signJWT(
   return `${data}.${b64(sig).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")}`;
 }
 
-
 /**
  * 恒定时间字符串比较。
  *

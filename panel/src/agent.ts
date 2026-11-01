@@ -99,6 +99,28 @@ export async function configHashOf(payload: {
 /** 指纹过期多久后强制重算一次（秒）。 */
 const HASH_RECHECK_SECONDS = 3600;
 
+
+/**
+ * 指纹只覆盖「配置」。
+ *
+ * clients 里混着两类不该进指纹的字段：
+ *  - up/down/totalUp/totalDown：每次上报都会被改写，算进去指纹就每轮必变；
+ *  - sub_token：订阅令牌，不参与内核配置，cron 回填时不该导致一次全量下发。
+ *
+ * 少了这层过滤，`hash_checked_at` 一到点重算就会判定「变了」→ 全量下发 → 内核重启，
+ * 于是有流量的节点会**每小时被重启一次**。
+ */
+export function configFingerprintView(
+  clients: Array<Record<string, unknown>>,
+): Array<Record<string, unknown>> {
+  const IGNORE = new Set(["up", "down", "totalUp", "totalDown", "sub_token"]);
+  return clients.map((cl) => {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(cl)) if (!IGNORE.has(k)) out[k] = v;
+    return out;
+  });
+}
+
 export async function pullPayload(
   db: D1Database,
   node: NodeRow,
@@ -172,6 +194,10 @@ export async function pullPayload(
   ]);
 
   const settingsMap = Object.fromEntries(settings.map((x) => [x.key, x.value]));
+  // 指纹只覆盖「配置」。clients 里混着 up/down/totalUp/totalDown（上报时每轮改写）
+  // 和 sub_token（订阅令牌，不参与内核配置）—— 把它们算进去会让指纹每次上报后必变，
+  // 于是每小时重算时永远判定「变了」，白白全量下发并重启内核。
+  const configClients = configFingerprintView(clients);
   const hash = await configHashOf({
     config,
     settings: settingsMap,
@@ -180,7 +206,7 @@ export async function pullPayload(
     endpoints,
     services,
     tls,
-    clients,
+    clients: configClients,
   });
   await run(
     db,
@@ -277,10 +303,12 @@ export async function handleReport(
     const LOG_ITEM_MAX = 2000;
     const LOG_KEEP = 200;
     const one = String(body.last_log).slice(0, LOG_ITEM_MAX);
-    const prev = Array.isArray(status.logs) ? (status.logs as unknown[]) : [];
-    status.logs = [...prev, one]
-      .map((x) => String(x).slice(0, LOG_ITEM_MAX))
-      .slice(-LOG_KEEP);
+    // 先截断再 map：原来 map 在 slice 之前，超大数组会被完整处理一遍（低权 agent
+    // 就能让面板做任意量的字符串转换）。
+    const prev = (Array.isArray(status.logs) ? (status.logs as unknown[]) : [])
+      .slice(-(LOG_KEEP - 1))
+      .map((x) => String(x).slice(0, LOG_ITEM_MAX));
+    status.logs = [...prev, one];
     status.last_log = one;
   }
 

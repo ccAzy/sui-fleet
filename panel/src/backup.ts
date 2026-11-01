@@ -141,18 +141,22 @@ export async function importBundle(
   if (aggKey !== undefined && !/^[0-9a-f]{16,64}$/.test(aggKey))
     throw new Error("备份里的 agg_key 格式非法");
 
-  const incomingEpoch = Number(metaMap.get("control_epoch") ?? 0);
-  if (incomingEpoch > 0) {
-    const localEpochRow = await all<{ value: string }>(
-      db,
-      "SELECT value FROM meta WHERE key = 'control_epoch'",
-    );
-    const localEpoch = Number(localEpochRow[0]?.value ?? 0) || 0;
-    if (incomingEpoch < localEpoch) {
-      // 不能悄悄覆盖：这正是 5.5-C 描述的脑裂入口。
-      // 归一化之后只有一个值，直接覆盖它（原来是遍历数组逐条改，语义等价但会漏改）。
-      metaMap.set("control_epoch", String(localEpoch));
-    }
+  // control_epoch 必须单调不减。这里的判断要给「0 / 负数 / 非有限值」同样的待遇 ——
+  // 原实现用 incomingEpoch > 0 做门槛，于是包里的 0、-1、NaN 直接跳过下限检查，
+  // 落库后读取方 `Number(x) || 0` 又把它当 0，等于把代次倒退到最旧。
+  const localEpochRow = await all<{ value: string }>(
+    db,
+    "SELECT value FROM meta WHERE key = 'control_epoch'",
+  );
+  const localEpoch = Math.max(0, Math.floor(Number(localEpochRow[0]?.value ?? 0) || 0));
+  if (metaMap.has("control_epoch")) {
+    const incomingRaw = Number(metaMap.get("control_epoch"));
+    const incoming = Number.isFinite(incomingRaw) ? Math.floor(incomingRaw) : -1;
+    // 只取 max：既挡住倒退，也挡住 0/负数/NaN
+    if (incoming < localEpoch) metaMap.set("control_epoch", String(localEpoch));
+  } else if (localEpoch > 0) {
+    // 包里没带这一项就等于 0 —— 同样不能让它把本地代次抹掉
+    metaMap.set("control_epoch", String(localEpoch));
   }
   const incomingUsers = Array.isArray((data.tables as any)?.users)
     ? ((data.tables as any).users as Array<Record<string, unknown>>)
@@ -199,13 +203,30 @@ export async function importBundle(
       .bind(s.key, s.value),
   );
   stmts.push(...secretStmts);
+  // meta 归一化后的唯一权威来源：clamp 过的 epoch、白名单过滤都在 metaMap 上，
+  // 插入必须用它，不能再读原始 rows（否则上面那段 clamp 就是死代码）。
+  const metaRows = [...metaMap.entries()]
+    .filter(([k]) => !LOCAL_SECRET_KEYS.includes(k))
+    .filter(([k]) => META_CARRY.includes(k))
+    .map(([key, value]) => ({ key, value }));
+
   for (const t of order) {
-    const rows = data.tables?.[t] ?? [];
-    if (!Array.isArray(rows)) throw new Error(`备份里的 ${t} 不是数组`);
-    const filtered =
-      t === "meta"
-        ? rows.filter((r) => !LOCAL_SECRET_KEYS.includes(String(r.key ?? "")))
-        : rows;
+    const rawRows = data.tables?.[t] ?? [];
+    if (!Array.isArray(rawRows)) throw new Error(`备份里的 ${t} 不是数组`);
+    let rows: Array<Record<string, unknown>>;
+    if (t === "meta") rows = metaRows;
+    else if (t === "tokens") {
+      // API token 是凭据，不能靠「恢复一份旧备份」复活（已删除的令牌会重新生效）。
+      // 恢复只恢复数据，凭据由运维重新签发。
+      rows = [];
+    } else if (t === "users") {
+      // session_epoch 不跟着快照走：导入后统一 +1 强制重登（见下方语句）。
+      rows = rawRows.map((r) => {
+        const { session_epoch: _se, ...rest } = r as Record<string, unknown>;
+        return rest;
+      });
+    } else rows = rawRows;
+    const filtered = rows;
     for (const row of filtered) {
       const allowed = validCols.get(t) ?? new Set<string>();
       // 只保留本表真实存在的列；多余的键直接丢弃（不静默建列、不拼进 SQL）
@@ -228,6 +249,22 @@ export async function importBundle(
   stmts.push(
     db.prepare("UPDATE nodes SET config_hash = '', hash_checked_at = 0"),
   );
+  // 恢复快照 = 恢复旧世界：此前被改密/登出吊销的会话必须继续失效。
+  // 表里若还没有这一列（极老的库）就跳过，登录路径的 ensureSessionEpoch 会补。
+  if ((validCols.get("users") ?? new Set()).has("session_epoch")) {
+    stmts.push(db.prepare("UPDATE users SET session_epoch = session_epoch + 1"));
+  }
+  // 导入本身要留痕：changes 表上面已被整表替换，所以这条写在最后。
+  stmts.push(
+    db
+      .prepare(
+        "INSERT INTO changes (node_id, ts, actor, kind, action, obj) VALUES ('', ?, 'system', 'panel', 'import', ?)",
+      )
+      .bind(
+        now(),
+        JSON.stringify({ imported: Object.keys(imported).length }),
+      ),
+  );
 
   // 本地秘密必须紧跟在删除语句之后回填（见下方执行段：这两类语句同属一个原子批）。
 
@@ -237,15 +274,16 @@ export async function importBundle(
     return { imported };
   }
   const headCount = rmStmts.length + secretStmts.length;
-  await batch(db, stmts.slice(0, headCount));
+  // 标记必须和「删表」同批落库：原来写在 head batch 之后，进程在两者之间死掉
+  // 就是「空库且没有半成品标记」，与文档描述的「先落标记」正好相反。
+  await batch(db, [
+    ...stmts.slice(0, headCount),
+    db
+      .prepare("INSERT OR REPLACE INTO meta (key, value) VALUES ('import_in_progress', ?)")
+      .bind(String(now())),
+  ]);
   const rest = stmts.slice(headCount);
 
-  await db
-    .prepare(
-      "INSERT OR REPLACE INTO meta (key, value) VALUES ('import_in_progress', ?)",
-    )
-    .bind(String(now()))
-    .run();
   try {
     for (let i = 0; i < rest.length; i += 40)
       await batch(db, rest.slice(i, i + 40));

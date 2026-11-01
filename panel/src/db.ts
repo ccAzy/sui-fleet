@@ -224,11 +224,17 @@ export async function sessionEpochOf(
       uid,
     );
     value = Number(row?.session_epoch ?? 0);
-  } catch {
-    // 老库还没补列、或数据库瞬时不可用：返回 -1 表示「无法判定」，
-    // 交给调用方放行并保持可用性（详见 http.ts currentUser 的处理与注释）。
-    // 注意这不是常态：ensureSessionEpoch 会在下一次登录时把列补上。
-    return -1;
+  } catch (e) {
+    const msg = String(e);
+    if (/no such column/i.test(msg)) {
+      // 缺列不是「无法判定」，就是 0：顺手补列，按 0 继续比对。
+      // 原来把它和「数据库读故障」合并成 -1，等于用吊销换可用性。
+      await ensureSessionEpoch(db).catch(() => undefined);
+      value = 0;
+    } else {
+      // 真正的读失败：返回 -1 表示无法判定，由调用方放行并保持可用性。
+      return -1;
+    }
   }
   epochCache.set(uid, { value, at: nowTs });
   return value;
@@ -239,6 +245,9 @@ export async function bumpSessionEpoch(
   db: D1Database,
   uid: number,
 ): Promise<void> {
+  // 必须先补列：老库上 UPDATE users SET session_epoch = ... 会抛 no such column，
+  // 于是「改密已提交、bump 失败返回 500」——密码变了但所有旧会话还活着。
+  await ensureSessionEpoch(db);
   await run(
     db,
     "UPDATE users SET session_epoch = session_epoch + 1 WHERE id = ?",

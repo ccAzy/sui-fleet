@@ -281,7 +281,7 @@ app.post("/api/login/otp", async (c) => {
   return await issueSession(c, user);
 });
 
-app.get("/api/logout", async (c) => {
+app.post("/api/logout", async (c) => {
   // 光删 cookie 不算登出：JWT 还在有效期内，谁复制过这枚 cookie 就还照样能用。
   // 面板没有会话表，最接近「只登出这个人」的做法是把该用户的会话代次 +1
   // —— 代价是同一账号在其他设备上的会话也一起失效（单管理员场景下这是想要的效果）。

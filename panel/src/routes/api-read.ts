@@ -102,7 +102,14 @@ export function registerApiRead(app: Hono<{ Bindings: Env }>) {
         .filter((cl) => idsOfClient(cl).includes(Number(ib.id)))
         .map((cl) => String(cl.name ?? "")),
     }));
-    return json(c, { inbounds: withUsers });
+    // 这个 handler 注册在循环注册之前，会先返回并终止链路 —— 循环里那份带脱敏的
+    // /api/inbounds 永远轮不到。脱敏必须在这里做，否则只读令牌仍能读到入站密码。
+    return json(
+      c,
+      c.get("tokenOnly" as never)
+        ? redactForToken({ inbounds: withUsers })
+        : { inbounds: withUsers },
+    );
   });
 
   app.get("/api/clients", async (c) => {
@@ -155,8 +162,9 @@ export function registerApiRead(app: Hono<{ Bindings: Env }>) {
     return json(c, { config: await getConfig(c.env.DB, node.id) });
   });
 
+  // 注意：inbounds 不在这里 —— 它有上面的独立 handler（要拼 users 名字），
+  // 同一个 method+path 重复注册时先注册者终止链路，第二份就是死代码。
   for (const kind of [
-    "inbounds",
     "outbounds",
     "endpoints",
     "services",
@@ -238,8 +246,17 @@ export function registerApiRead(app: Hono<{ Bindings: Env }>) {
     }
 
     const sbd = (status.sbd as Record<string, unknown>) ?? {};
+    // 令牌身份可以拿运行状态，但 logs / onlines / last_log 属于租户与运营数据：
+    // `/api/logs`、`/api/onlines` 本身不在白名单，不能从 `/api/status` 旁路带出来。
+    const visible = c.get("tokenOnly" as never)
+      ? Object.fromEntries(
+          Object.entries(status).filter(
+            ([k]) => !["logs", "last_log", "onlines"].includes(k),
+          ),
+        )
+      : status;
     return json(c, {
-      ...status,
+      ...visible,
       running: node.core_state === "running",
       // 内核运行态以面板记录的 core_state 为准（节点刚上报时 sbd 可能还没带全）
       sbd: {
@@ -328,8 +345,11 @@ export function registerApiRead(app: Hono<{ Bindings: Env }>) {
   });
 
   app.get("/api/changes", async (c) => {
+    // scope=all：跨节点读审计。删除节点、导入备份、仲裁切换写的行不属于任何
+    // 现存节点（node_id 是被删 id 或空串），按节点查永远看不到 —— 那条审计等于没写。
+    const scopeAll = (c.req.query("scope") ?? "") === "all";
     const node = await resolveNode(c.env.DB, c.req.header("X-Remote-Server"));
-    if (!node) return json(c, []);
+    if (!node && !scopeAll) return json(c, []);
     // k 有两个历史含义：后端当「时间戳下限」，前端 Changes.vue 当「对象类型过滤」。
     // 结果是 kind 过滤永远无效（parseInt("inbounds") → NaN → 0），每次都返回全部记录。
     // 现在：数字当 since，非数字当 kind；同时接受显式 kind=/since= 参数。
@@ -352,12 +372,14 @@ export function registerApiRead(app: Hono<{ Bindings: Env }>) {
       obj: string;
     }>(
       c.env.DB,
-      "SELECT id, ts, actor, kind, action, obj FROM changes WHERE node_id = ? AND ts >= ?" +
+      (scopeAll
+        ? "SELECT node_id, id, ts, actor, kind, action, obj FROM changes WHERE ts >= ?"
+        : "SELECT id, ts, actor, kind, action, obj FROM changes WHERE node_id = ? AND ts >= ?") +
         (actor ? " AND actor = ?" : "") +
         (kind ? " AND kind = ?" : "") +
         " ORDER BY id DESC LIMIT ?",
       ...[
-        node.id,
+        scopeAll ? 0 : node!.id,
         since,
         ...(actor ? [actor] : []),
         ...(kind ? [kind] : []),

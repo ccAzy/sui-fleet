@@ -548,6 +548,33 @@ check(
     txt[:200],
 )
 
+# /api/inbounds 有独立 handler（要先拼 users 名字），它注册在循环之前会先返回 ——
+# 脱敏必须在那里面做，否则只读令牌仍能读到入站密码。
+ss_in = {
+    "type": "shadowsocks",
+    "tag": "ss-e2e",
+    "listen": "127.0.0.1",
+    "listen_port": 8388,
+    "method": "aes-256-gcm",
+    "password": "E2E-INBOUND-PASSWORD-LEAK",
+    "users": [],
+}
+j(post("/api/save", form={"object": "inbounds", "action": "new", "data": json.dumps(ss_in)}))
+raw_in = json.dumps(j(get("/api/inbounds", token=mon)), ensure_ascii=False)
+check(
+    "只读令牌读 inbounds 不含明文密码（独立 handler 也要脱敏）",
+    "E2E-INBOUND-PASSWORD-LEAK" not in raw_in,
+    raw_in[:200],
+)
+
+# /api/status 不能把 logs / onlines 带给令牌身份（它们本身不在白名单）
+raw_st = json.dumps(j(get("/api/status", token=mon)), ensure_ascii=False)
+check(
+    "只读令牌读 status 不含 logs/onlines",
+    ('"logs"' not in raw_st) and ('"onlines"' not in raw_st),
+    raw_st[:200],
+)
+
 # B) 订阅链接必须自带作用域：去掉 client 不能再拿到同节点全部租户
 load = j(get("/api/load"))
 sub_uri = (load.get("obj") or {}).get("subURI") or ""
@@ -623,9 +650,13 @@ cj3 = http.cookiejar.CookieJar()
 op3 = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj3))
 _s, _b = op_call(op3, "/api/login", {"user": "admin", "pass": NEWPASS})
 check("第三会话登录成功", '"success":true' in _b.replace(" ", ""), _b[:120])
-op_call(op3, "/api/logout")
+op_call(op3, "/api/logout", {})
 _s, _b = op_call(op3, "/api/servers")
-check("登出后旧 cookie 失效（不只是删客户端 cookie）", '"success":true' not in _b.replace(" ", ""), _b[:160])
+check(
+    "登出后旧 cookie 失效（不只是删客户端 cookie）",
+    '"success":true' not in _b.replace(" ", ""),
+    _b[:160],
+)
 
 # 登出提升了会话代次，主会话也一起失效 —— 重新登录继续后面的用例
 cj.clear()

@@ -47,7 +47,9 @@ function _handleMsg(msg: any): void {
 }
 
 export const logout = async () => {
-  const response = await HttpUtils.get('api/logout')
+  // 登出会提升会话代次（等于吊销全设备会话），必须是有副作用的 POST，
+  // 不能是 GET —— 否则任意第三方页面一个 <a>/window.location 就能把管理员踢下线。
+  const response = await HttpUtils.post('api/logout', null)
   if(response.success){
     router.push('/login')
   }

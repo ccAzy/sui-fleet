@@ -65,6 +65,11 @@ const env = {
   // 手动触发 /__cron 的密钥（CF 定时走 scheduled 事件，不需要它）。
   // 不配就等同于关闭这个路由 —— fail closed。
   CRON_SECRET: process.env.CRON_SECRET,
+  // 反代形态决定怎么取客户端 IP。原来这个变量压根没从进程环境转发进来，
+  // 于是 clientIp() 永远走 "cf" 分支（没有 cf-ray → 全部落到 direct 一个桶），
+  // 单测里测的 TRUST_PROXY=1 在部署中无效。自建 Caddy/Nginx 时必须设成 1
+  // 且保证反代会**重写** X-Forwarded-For。
+  TRUST_PROXY: process.env.TRUST_PROXY,
 };
 
 // ---- 防脑裂：启动前对一次代次（epoch） ----

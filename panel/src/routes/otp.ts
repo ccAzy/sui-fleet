@@ -179,6 +179,14 @@ export function registerOtpAdmin(app: Hono<{ Bindings: Env }>) {
       "UPDATE users SET otp_on = 0, otp_secret = '', otp_last_step = 0, otp_recovery = '[]' WHERE id = ?",
       user.id,
     );
+    // 关闭 2FA 同样是安全状态变更：旧会话不该继续有效（此前只做了一半，
+    // 只有「启用」那次 bump 了，关闭这条路径旧 cookie 照样能用）。
+    await bumpSessionEpoch(c.env.DB, user.id);
+    await reissueSession(c, {
+      uid: user.id,
+      username: user.username,
+      mustChange: user.must_change === 1,
+    });
     return okMsg(c, "disabled");
   });
 

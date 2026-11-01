@@ -21,6 +21,7 @@ import {
   getConfig,
   loadPartial,
   deleteNode,
+  recomputeLinks,
   saveObject,
   seedNode,
 } from "../objects";
@@ -60,6 +61,7 @@ export function registerApiWrite(app: Hono<{ Bindings: Env }>) {
       const remark = str(d.remark);
       const existingId = str(d.id);
       if (action === "edit" && existingId) {
+        const before = await getNode(c.env.DB, existingId);
         await run(
           c.env.DB,
           "UPDATE nodes SET name = ?, address = ?, remark = ?, updated_at = ? WHERE id = ?",
@@ -69,6 +71,10 @@ export function registerApiWrite(app: Hono<{ Bindings: Env }>) {
           now(),
           existingId,
         );
+        // 改地址后必须重算链接：client.links 是**存下来的** URI 快照，
+        // 不重算的话订阅里会一直发旧主机，直到下次保存 inbound/client/tls。
+        if (before && before.address !== address)
+          await recomputeLinks(c.env.DB, existingId, baseUrl(c));
       } else {
         const id = Math.random().toString(36).slice(2, 8);
         const raw = crypto.getRandomValues(new Uint8Array(24));
@@ -90,6 +96,9 @@ export function registerApiWrite(app: Hono<{ Bindings: Env }>) {
           ts,
         );
         await seedNode(c.env.DB, id);
+        // 新节点建好后，默认节点的 60 秒 null 缓存必须失效，否则紧接着的
+        // /api/load、/api/save 仍会认为「没有节点」，建完要等一分钟才生效。
+        invalidateDefaultNode();
 
         // 明文 token 只在这里返回一次：节点侧只存 sha256，错过这次就找不回来。
         // 同时把 install_cmd 一起给前端，否则用户拿不到「粘一条命令就接入」的那条命令。
@@ -231,8 +240,7 @@ export function registerApiWrite(app: Hono<{ Bindings: Env }>) {
     if (!user) return json(c, null, new Error("Invalid login"));
     // 空密码 / 极短密码原先照收：一次手滑就能把面板改成空密码，
     // 而"首次登录必须改密"这道闸设置的初衷正是防止弱口令。
-    if (newPass.length < 8)
-      return json(c, null, new Error("新密码至少 8 位"));
+    if (newPass.length < 8) return json(c, null, new Error("新密码至少 8 位"));
     if (newPass === oldPass)
       return json(c, null, new Error("新密码不能与旧密码相同"));
     const { hashPassword } = await import("../auth");

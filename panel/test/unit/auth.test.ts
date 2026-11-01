@@ -67,7 +67,6 @@ describe("tokenIsValid", () => {
   });
 });
 
-
 describe("timingSafeEqual", () => {
   it("相同字符串为真", () => {
     expect(timingSafeEqual("abc123", "abc123")).toBe(true);
@@ -99,7 +98,10 @@ describe("verifyJWT：exp 必须是数字", () => {
   it("没有 exp 的令牌一律拒绝（原实现把它当成永不过期）", async () => {
     // 手工构造：payload 里只放 u/uid，不写 exp
     const enc = (o: unknown) =>
-      btoa(JSON.stringify(o)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+      btoa(JSON.stringify(o))
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=+$/, "");
     const data = `${enc({ alg: "HS256", typ: "JWT" })}.${enc({ u: "admin", uid: 1 })}`;
     const key = await crypto.subtle.importKey(
       "raw",
@@ -108,7 +110,11 @@ describe("verifyJWT：exp 必须是数字", () => {
       false,
       ["sign"],
     );
-    const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(data));
+    const sig = await crypto.subtle.sign(
+      "HMAC",
+      key,
+      new TextEncoder().encode(data),
+    );
     const b64 = btoa(String.fromCharCode(...new Uint8Array(sig)))
       .replace(/\+/g, "-")
       .replace(/\//g, "_")

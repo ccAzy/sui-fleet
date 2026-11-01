@@ -301,7 +301,7 @@ async function resolveIds(
 /** 重算某节点的全部 client.links（inbound 变更后调用）。
  *  s-ui 的约定：client.inbounds 是 id 数组，client.links 是 {remark,type,uri} 数组，
  *  其中 type=local 的由服务端按入站重算，external/sub 的原样保留。 */
-async function recomputeLinks(
+export async function recomputeLinks(
   db: D1Database,
   nodeId: string,
   fallbackHost: string,
