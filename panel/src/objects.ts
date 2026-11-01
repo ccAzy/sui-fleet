@@ -406,7 +406,18 @@ export async function saveObject(
   } else if ((OBJECT_KINDS as readonly string[]).includes(obj)) {
     const kind = obj as ObjectKind;
 
-    if (action === "del") {
+    // 前端批量操作发的是 addbulk / delbulk（ClientAddBulk.vue / ClientEditBulk.vue）。
+    // 原来只认 "del"，于是：
+    //   - delbulk（data 是 id 数组）落进 upsert 分支，数组被映射成空对象 → 每次「新建」一个空客户端，
+    //     目标一个都没删；
+    //   - addbulk（data 是对象数组）落进 upsert 分支，nextId 在 batch 执行前查库，
+    //     所有语句拿到同一个 id，最终只剩最后一个。
+    // 这里把动作归一成 del / edit，批量新增在下面按「本批次已占用 id」逐个分配。
+    const bulkDel = action === "delbulk" || action === "delete_bulk";
+    const bulkAdd = action === "addbulk";
+    const effAction = bulkDel ? "del" : bulkAdd ? "new" : action;
+
+    if (effAction === "del") {
       const ids = await resolveIds(db, nodeId, kind, data);
       for (const id of ids) {
         stmts.push(
@@ -464,6 +475,10 @@ export async function saveObject(
       }
     } else {
       const list = toArray(data).map(o);
+      // 批量新建时 nextId 是「查库 MAX+1」，而 INSERT 要到函数末尾才 batch 执行，
+      // 于是同一个请求里的 N 条都拿到同一个 id，ON CONFLICT DO UPDATE 互相覆盖，
+      // 最终只剩最后一条。这里在本批次内自己往后数，避免撞车。
+      let idCursor = 0;
       for (const raw of list) {
         // sing-box 不认 transport.type=tcp（那是 UI 概念）。前端默认发 {}，
         // 但外部调用/导入数据可能带 tcp，这里统一清掉，避免节点渲染时报错。
@@ -471,8 +486,15 @@ export async function saveObject(
         const tr = o(item.transport);
         if (s(tr.type) === "tcp") item.transport = {};
         const editId = num(item.id);
-        const isNew = action === "new" || editId <= 0;
-        const id = isNew ? await nextId(db, nodeId, kind) : editId;
+        const isNew = effAction === "new" || editId <= 0;
+        let id: number;
+        if (isNew) {
+          if (idCursor === 0) idCursor = await nextId(db, nodeId, kind);
+          else idCursor += 1;
+          id = idCursor;
+        } else {
+          id = editId;
+        }
         const tag = s(item.tag) || s(item.name);
         if (await tagTaken(db, nodeId, kind, tag, id)) {
           throw new Error(`duplicate tag: ${tag}`);

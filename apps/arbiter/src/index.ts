@@ -118,7 +118,17 @@ async function reportToPanel(
         signal: AbortSignal.timeout(5000),
       },
     );
-    return res.ok ? "已回写面板" : `回写面板失败 HTTP ${res.status}`;
+    // 面板的 /api/* 永远返回 HTTP 200 + {success:false}（鉴权失败、令牌错都是 200），
+    // 只看 res.ok 会把「没写进去」记成「已回写」。必须看信封。
+    if (!res.ok) return `回写面板失败 HTTP ${res.status}`;
+    try {
+      const body = (await res.json()) as { success?: boolean; msg?: string };
+      return body.success === false
+        ? `回写被拒：${body.msg ?? "unknown"}`
+        : "已回写面板";
+    } catch {
+      return "回写面板失败：响应不是 JSON";
+    }
   } catch (err) {
     return `回写面板异常：${err instanceof Error ? err.message : String(err)}`;
   }
@@ -143,7 +153,19 @@ async function tick(env: Env): Promise<void> {
   });
 
   if (decision.action === "switch") {
+    const dry = (env.DRY_RUN ?? "1") === "1";
     const dns = await switchDns(env, decision.to);
+    // dry-run 只观察：不写面板 epoch、不落 KV 状态。
+    // 否则「演练一次」就会把 epoch +1 写进主控，重启时真正的主控反而因代次落后被拒绝启动。
+    if (dry) {
+      await pushState(
+        env,
+        decision.state,
+        "would-switch",
+        `dry-run：本应切到 ${decision.to}（不动 DNS、不推进代次）`,
+      );
+      return;
+    }
     const panel = await reportToPanel(
       env,
       decision.state.epoch,

@@ -100,7 +100,10 @@ echo "database_id: $EXISTING_ID"
 
 # ---------------------------------------------------------------- 写配置
 say "写入 wrangler.local.toml"
-python - "$EXISTING_ID" "$DOMAIN" <<'PY'
+# 不能写死 python：多数发行版只有 python3，python 是 exit 127
+PY_BIN="$(command -v python3 || command -v python || true)"
+[ -n "$PY_BIN" ] || die "需要 python3（用于改写 wrangler.local.toml）"
+"$PY_BIN" - "$EXISTING_ID" "$DOMAIN" <<'PY'
 import re, sys, pathlib
 db_id, domain = sys.argv[1], sys.argv[2]
 p = pathlib.Path('wrangler.local.toml')
