@@ -1,0 +1,13 @@
+{
+  "name": "sui-arbiter",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "tsx --test test/*.test.ts",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "wrangler": "^4.154.0"
+  }
+}

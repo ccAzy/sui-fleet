@@ -28,7 +28,7 @@ trap cleanup EXIT
 echo "[$(date -Is)] 拉取备份 $PANEL_URL"
 curl -fsS --retry 3 --max-time 120 "$PANEL_URL/api/getdb?token=$BACKUP_TOKEN" -o "$bundle"
 
-size=$(wc -c < "$bundle")
+size=$(wc -c <"$bundle")
 if [ "$size" -lt 10000 ]; then
   echo "备份体积异常（$size 字节），中止" >&2
   exit 1

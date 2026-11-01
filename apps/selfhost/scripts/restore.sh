@@ -48,7 +48,10 @@ for i in $(seq 1 15); do
   sleep 1
   if body=$(curl -fsS --max-time 5 "$HEALTH_URL" 2>/dev/null); then
     case "$body" in
-      *'"success":true'*) healthy=1; break ;;
+    *'"success":true'*)
+      healthy=1
+      break
+      ;;
     esac
   fi
   echo "  等待就绪… ($i/15)"

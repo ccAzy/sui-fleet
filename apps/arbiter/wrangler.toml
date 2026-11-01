@@ -1,0 +1,25 @@
+# 顺位仲裁者：每分钟探测主控健康检查，按顺位切 DNS。
+# 部署：在 apps/arbiter 下 `npx wrangler deploy`
+name = "sui-arbiter"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+
+[triggers]
+crons = ["* * * * *"]
+
+# 顺位表（第一项视为当前主控）。改这里之后要重新 deploy。
+[vars]
+ORDER = "hk,jp"
+PROBE_URL = "https://panel.example.org/health"
+PANEL_URL = "https://panel.example.org"
+DRY_RUN = "1"
+THRESHOLD = "3"
+COOLDOWN_MS = "600000"
+
+[[kv_namespaces]]
+binding = "STATE"
+id = "0f108298edda42099b9c1575965177e5"
+
+# 真正切 DNS 时才需要（Dashboard 里用 `wrangler secret put` 配）：
+#   CF_API_TOKEN  —— Zone.DNS:Edit
+#   OPS_TOKEN     —— 与面板 meta.ops_token_hash 对应的原始令牌

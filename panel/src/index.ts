@@ -10,8 +10,9 @@ import {
   signJWT,
   verifyBackupToken,
   verifyJWT,
+  verifyOpsToken,
 } from "./auth";
-import { ensureOtpSchema, first, now, run, type Env, type UserRow } from "./db";
+import { all, batch, ensureOtpSchema, first, now, run, type Env, type UserRow } from "./db";
 import {
   MARKER_COOKIE,
   currentUser,
@@ -240,6 +241,87 @@ app.get("/api/logout", async (c) => {
   deleteCookie(c, COOKIE, { path: "/" });
   deleteCookie(c, MARKER_COOKIE, { path: "/" });
   return okMsg(c);
+});
+
+// ---------- 对外健康检查与仲裁者（P4） ----------
+//
+// /health 只回"服务活着 + 当前代次"，不含任何节点/用户信息，供仲裁者从公网探活。
+// 代次（epoch）是防脑裂的核心：谁被提升为主控，epoch 就 +1；落后代次的实例
+// 只允许以只读身份启动（见 apps/selfhost/README.md）。
+
+async function readControlState(db: Env["DB"]) {
+  const rows = await all<{ key: string; value: string }>(
+    db,
+    "SELECT key, value FROM meta WHERE key IN ('control_epoch','control_primary','control_order','control_switched_at')",
+  );
+  const m = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+  let order: string[] = [];
+  try {
+    order = JSON.parse(m.control_order ?? "[]") as string[];
+  } catch {
+    order = [];
+  }
+  return {
+    epoch: Number(m.control_epoch ?? 0) || 0,
+    primary: m.control_primary ?? "",
+    order,
+    switched_at: Number(m.control_switched_at ?? 0) || 0,
+  };
+}
+
+app.get("/health", async (c) => {
+  const st = await readControlState(c.env.DB);
+  return c.json({
+    ok: true,
+    service: "sui-panel",
+    epoch: st.epoch,
+    primary: st.primary,
+    ts: now(),
+  });
+});
+
+// 仲裁者读写：令牌走 ops token（与备份同一个），GET 看状态，POST 推进代次
+app.get("/api/arbiter", async (c) => {
+  const tk = c.req.query("token") ?? "";
+  if (!(await verifyOpsToken(c.env.DB, tk))) return json(c, null, new Error("unauthorized"));
+  return json(c, await readControlState(c.env.DB));
+});
+
+app.post("/api/arbiter", async (c) => {
+  const tk = c.req.query("token") ?? "";
+  if (!(await verifyOpsToken(c.env.DB, tk))) return json(c, null, new Error("unauthorized"));
+  const body = (await readBody(c)) as {
+    epoch?: number;
+    primary?: string;
+    order?: string[];
+    reason?: string;
+  };
+  const cur = await readControlState(c.env.DB);
+  const nextEpoch = Math.max(Number(body.epoch ?? cur.epoch), cur.epoch);
+  const stmts = [
+    c.env.DB.prepare("INSERT INTO meta (key,value) VALUES ('control_epoch',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(String(nextEpoch)),
+    c.env.DB.prepare("INSERT INTO meta (key,value) VALUES ('control_primary',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(String(body.primary ?? cur.primary)),
+    c.env.DB.prepare("INSERT INTO meta (key,value) VALUES ('control_switched_at',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(String(now())),
+  ];
+  if (Array.isArray(body.order)) {
+    stmts.push(
+      c.env.DB.prepare("INSERT INTO meta (key,value) VALUES ('control_order',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(
+        JSON.stringify(body.order),
+      ),
+    );
+  }
+  await batch(c.env.DB, stmts);
+  await run(
+    c.env.DB,
+    "INSERT INTO changes (node_id, ts, actor, kind, action, obj) VALUES (?, ?, ?, ?, ?, ?)",
+    "",
+    now(),
+    "arbiter",
+    "control",
+    "switch",
+    JSON.stringify({ from: cur.epoch, to: nextEpoch, primary: body.primary ?? cur.primary, reason: body.reason ?? "" }),
+  );
+  return json(c, await readControlState(c.env.DB));
 });
 
 // ---------- 需要登录的 /api ----------
