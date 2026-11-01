@@ -96,21 +96,47 @@ npx wrangler --config wrangler.local.toml secret put JWT_SECRET
 
 ### 2. 接入节点
 
-先在面板「Servers → Add Server」建节点，**token 只显示一次**，复制下来。然后在服务器上：
+节点二进制 **不在仓库里**（73 MB，编译进去的 sing-box 占大头）。先选一种拿到它：
+
+| 方式 | 命令 | 适用 |
+| --- | --- | --- |
+| 自行编译 | `cd node && bash build.sh`（需 Go 1.26.5 + gcc，CGO 要开） | 有 Go 环境 |
+| 面板分发 | 把二进制分片放到 `panel/frontend-dist/dl/`（见 `apps/selfhost/scripts/publish-agent.sh`） | 已有面板 |
+| 直接拷 | 从已有部署的 `/opt/sui-agent/bin/sui-agent` 复制 | 迁移 |
+
+拿到二进制后，在面板「Servers → Add Server」建节点（**token 只显示一次**），然后在服务器上：
 
 ```bash
-scp dist/sui-agent-linux-amd64 scripts/install-agent.sh root@你的服务器:/root/
+# 把二进制和安装脚本传上去（文件名保持一致，脚本默认找 ./sui-agent）
+scp sui-agent scripts/install-agent.sh root@你的服务器:/root/
 
 ssh root@你的服务器
 cd /root && bash install-agent.sh \
   --panel https://panel.你的域名 \
-  --token 刚才复制的token
+  --token 刚才复制的token \
+  --bin ./sui-agent
 ```
 
 脚本会建独立数据目录 `/opt/sui-agent`、写 systemd 服务、开机自启。
 
 > 服务器上**不需要** Node.js / npm / Docker / 单独装 sing-box——agent 是静态编译的 Go 二进制，
 > sing-box 已链接在里面。唯一要求是能出站访问面板域名。
+
+#### 怎么确认它真的通了
+
+三层，缺一层都会“看着在线但用不了”：
+
+```bash
+# 1) 进程在跑
+systemctl is-active sui-agent            # → active
+# 2) 内核起来了（这一步最容易被忽略）
+systemctl status sui-agent | grep -i 'sing-box started'
+ss -tlnp | grep -E '443|8443|其他入站端口'
+# 3) 面板侧能看到它在蹦
+#    面板 → Servers：状态点变绿、kernel_ver 有值、applied_rev == revision
+```
+
+经验：**「在线」只代表 agent 能上报，不代表数据面可用**。面板要看 `core_state` + 端口监听，不能只看 `last_seen`。
 
 ## 目录结构
 
@@ -122,7 +148,14 @@ panel/            Cloudflare Worker（Hono + D1 + 静态前端托管）
   wrangler.toml   ★ 占位配置（入库，供 Deploy 按钮读取）
   wrangler.local.toml  你的真实配置（gitignore）
   .dev.vars.example    本地 secret 模板（ADMIN_PASS / JWT_SECRET）
-  test/e2e.py     52 项端到端自检（需先起一个可登录实例；见 AUDIT-NOTES 的跑法）
+  test/e2e.py     52 项端到端自检（需先起一个可登录实例；跑法见下）
+
+apps/
+  arbiter/        仲裁者 Worker（探活、切 DNS、代次防脑裂）
+  selfhost/       自托管运行时（Node + node:sqlite，复用 panel/src 业务代码）
+    src/d1.ts       D1 兼容层（在 node:sqlite 上实现 prepare/bind/batch）
+    scripts/        promote（新机接管）/ deploy-code（日常改码）/ snapshot-pull / restore
+  ops/            可选：本机执行器，供面板一键调 promote.sh（默认不启用）
 
 frontend/         前端（Vue 3 + Vuetify），派生自 s-ui-frontend
 node/             节点程序（S-UI 分支，含 agent 子命令；sing-box 编译在内）
@@ -140,7 +173,8 @@ docs/preview/     截图
 | `DB` | D1 binding | 是 | 数据 |
 | `ADMIN_PASS` | Secret | **建议** | 首次建号密码；不设则 `admin/admin` 并强制改密 |
 | `ADMIN_USER` | Secret | 否 | 默认 `admin` |
-| `JWT_SECRET` | Secret | 否 | 不设会生成一次并存在 D1 `meta` 表 |
+| `JWT_SECRET` | Secret | **自托管必填** | Worker 下不设会生成一次并存进 D1 `meta`；**自托管缺它直接拒绝启动** |
+| `CRON_SECRET` | Secret | 否 | 手动触发 `POST /__cron` 的口令。不配 = 该路由关闭（Cloudflare 定时走 `scheduled`，不需要它） |
 | `PANEL_BASE` | Var | 否 | 订阅链接里用的地址 |
 
 登录方式是**用户名 + 密码**，不是 UUID/Token。地址 `https://面板域名/login`。
@@ -165,6 +199,46 @@ go build -tags "with_quic,with_grpc,with_utls,with_acme,with_gvisor,badlinkname,
 节点排障：`sui-agent agent --panel x --token y --dump-config` 会打印本地渲染出的 sing-box 配置。
 
 自检：`python panel/test/e2e.py http://127.0.0.1:8787`
+
+### e2e 怎么跑（首次实例）
+
+`panel/test/e2e.py` 需要**空库 + 可登录**的实例（任意运行时都行）：
+
+```bash
+# 1) 建空库
+node -e 'const {DatabaseSync}=require("node:sqlite");const fs=require("fs");
+          new DatabaseSync("/tmp/e2e.db").exec(fs.readFileSync("panel/schema.sql","utf8"))'
+
+# 2) 起自托管实例（端口 8799，独立库）
+cd apps/selfhost && SUI_DB=/tmp/e2e.db SUI_DIST=../../panel/frontend-dist \
+  PORT=8799 JWT_SECRET=e2e CRON_SECRET=test-cron-secret npm start &
+
+# 3) 跑
+cd panel && CRON_SECRET=test-cron-secret python3 test/e2e.py http://127.0.0.1:8799
+```
+
+测试会自己完成“首次强制改密”这一步；**每次跑要用新库**（跑完密码已被改掉）。
+
+## 自托管部署（apps/selfhost）
+
+不想依赖 Cloudflare 时，控制面可以跑在任何 Linux 上：Node ≥ 22.5（用到 `node:sqlite`）+ 一个目录。
+
+```bash
+cd apps/selfhost && npm ci
+
+# 首次：从一个已有面板拉一份完整备份并建库
+curl -fsSL "https://已有面板/api/getdb?token=<运维令牌>" -o /tmp/bundle.json
+npm run import-bundle -- /tmp/bundle.json ./data/sui.db
+
+# 跑起来（JWT_SECRET 必填）
+SUI_DB=./data/sui.db SUI_DIST=../../panel/frontend-dist \
+  JWT_SECRET=$(openssl rand -hex 32) npm start
+```
+
+日常改代码用 `scripts/deploy-code.sh`（只换代码/前端产物，**不碰数据库**，失败自动回滚）；
+新机器接管才用 `scripts/promote.sh`（会导入备份库，所以带了“本地库更新就跳过”的保护）。
+
+TLS：`scripts/enable-tls.sh` 装一个单文件 Caddy 反代到 8788；Cloudflare 后面用 Origin Certificate（zone 是 strict 时自签会被拒）。
 
 ## 与上游 s-ui 的差异
 

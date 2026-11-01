@@ -336,7 +336,14 @@ check("release 拒绝缺 sha256", bad1["success"] is False, bad1)
 bad2 = j(post("/api/release", form={"url": "http://example.com/x", "sha256": FAKE_SHA}))
 check("release 拒绝非 https", bad2["success"] is False, bad2)
 # 恢复成可用的更新源（上面两条被拒，配置应保持不变）
-post("/api/release", form={"url": "https://example.com/sui-agent", "sha256": FAKE_SHA, "version": "9.9.9"})
+post(
+    "/api/release",
+    form={
+        "url": "https://example.com/sui-agent",
+        "sha256": FAKE_SHA,
+        "version": "9.9.9",
+    },
+)
 rel = j(get("/api/release"))["obj"]
 check("release saved", rel["url"].endswith("/sui-agent"), rel)
 
