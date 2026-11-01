@@ -194,7 +194,8 @@ export async function loadFull(
     const ids = Array.isArray(c.inbounds) ? c.inbounds : [];
     for (const raw of ids) {
       const id = typeof raw === "number" ? raw : num(o(raw).id);
-      if (id > 0) nameOfInbound.set(id, [...(nameOfInbound.get(id) ?? []), s(c.name)]);
+      if (id > 0)
+        nameOfInbound.set(id, [...(nameOfInbound.get(id) ?? []), s(c.name)]);
     }
   }
   const inboundsForUi = hydrated.map((ib) => ({

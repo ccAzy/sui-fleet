@@ -145,14 +145,22 @@ export function registerSub(app: Hono<{ Bindings: Env }>) {
     let down = 0;
     let matchedClients = 0;
 
-    for (const node of nodes) {
-      if (!node.enabled) continue;
-      const clients = await all<{ data: string }>(
-        c.env.DB,
-        "SELECT data FROM objects WHERE node_id = ? AND kind = 'clients' ORDER BY obj_id",
-        node.id,
-      );
-      for (const r of clients) {
+    // 一次取回所有启用节点的客户端，而不是每个节点查一遍。
+    // 原来是 N+1：10 台节点 = 1 次查 meta + 1 次查 nodes + 10 次查 clients，
+    // 而客户端每次刷新订阅都会重跑这 12 次查询。
+    const enabled = nodes.filter((n) => n.enabled);
+    const nameById = new Map(enabled.map((n) => [n.id, n.name]));
+    const rows = enabled.length
+      ? await all<{ node_id: string; data: string }>(
+          c.env.DB,
+          `SELECT node_id, data FROM objects WHERE kind = 'clients' AND node_id IN (${enabled
+            .map(() => "?")
+            .join(", ")}) ORDER BY node_id, obj_id`,
+          ...enabled.map((n) => n.id),
+        )
+      : [];
+      for (const r of rows) {
+        const nodeName = nameById.get(r.node_id) ?? "";
         let cl: Record<string, unknown>;
         try {
           cl = JSON.parse(r.data) as Record<string, unknown>;
@@ -165,9 +173,8 @@ export function registerSub(app: Hono<{ Bindings: Env }>) {
         up += Number(cl.up ?? 0) || 0;
         down += Number(cl.down ?? 0) || 0;
         for (const uri of collectLinks(cl))
-          links.push(prefixRemark(uri, node.name));
+          links.push(prefixRemark(uri, nodeName));
       }
-    }
 
     if (links.length === 0) {
       return c.text(

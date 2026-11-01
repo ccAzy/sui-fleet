@@ -272,6 +272,9 @@ export default {
     pwCopied: "Panel opened — password copied, paste it to log in",
     empty: "No servers yet. Add your other panels here to open them in one click.",
   },
+  settings: {
+    selfUpdateHint: "Panel self-update: re-run wrangler deploy on Cloudflare; self-hosted uses apps/selfhost/scripts/deploy-code.sh",
+  },
   actions: {
     refresh: "Refresh",
     action: "Action",

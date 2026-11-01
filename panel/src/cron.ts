@@ -145,6 +145,18 @@ export async function cronTick(db: D1Database): Promise<void> {
         ts,
         n.id,
       );
+      // 同时写一条 changes：面板的 /api/load 只靠 changes 判断要不要刷新，
+      // 不写的话 UI 不会自动更新——用户看到的是"代理突然不通"，而不是"配额用完了"。
+      await run(
+        db,
+        "INSERT INTO changes (node_id, ts, actor, kind, action, obj) VALUES (?, ?, ?, ?, ?, ?)",
+        n.id,
+        ts,
+        "cron",
+        "clients",
+        "auto",
+        JSON.stringify({ changed: stmts.length }),
+      );
     }
   }
 
@@ -156,6 +168,9 @@ export async function cronTick(db: D1Database): Promise<void> {
     await run(db, "DELETE FROM changes WHERE ts < ?", ts - 14 * 86400);
     // 登录尝试只保留 7 天：这张表会被爆破写满，不清理会一直吃掉 D1 的行数与存储。
     await run(db, "DELETE FROM login_attempts WHERE ts < ?", ts - 7 * 86400);
+    // 指令表同样只增不减（每次重启/更新/批量操作都会写一行），
+    // 原来只有删节点时才清，长期运行会一直涨。保留 30 天足够回溯。
+    await run(db, "DELETE FROM commands WHERE created_at < ?", ts - 30 * 86400);
     await metaSet(db, "cleanup_at", String(ts));
   }
 }

@@ -12,18 +12,9 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-# 真实配置放 wrangler.local.toml（已被 .gitignore 忽略）；
-# wrangler.toml 是给 Deploy 按钮用的占位版，不要直接改。
-CFG="wrangler.local.toml"
-if [ ! -f "$CFG" ]; then
-  [ -f wrangler.toml ] || {
-    echo "缺少 wrangler.toml，无法初始化配置" >&2
-    exit 1
-  }
-  cp wrangler.toml "$CFG"
-  echo "已从 wrangler.toml 生成 $CFG（占位值会在下面被填成真实值）"
-fi
-
+# 参数先解析：--help 必须是只读的。
+# 原来「生成 wrangler.local.toml」写在参数解析之前，于是 `bash deploy.sh --help`
+# 也会先写一个文件到工作区——查文档不该有副作用。
 DOMAIN=""
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -41,6 +32,18 @@ while [ $# -gt 0 ]; do
     ;;
   esac
 done
+
+# 真实配置放 wrangler.local.toml（已被 .gitignore 忽略）；
+# wrangler.toml 是给 Deploy 按钮用的占位版，不要直接改。
+CFG="wrangler.local.toml"
+if [ ! -f "$CFG" ]; then
+  [ -f wrangler.toml ] || {
+    echo "缺少 wrangler.toml，无法初始化配置" >&2
+    exit 1
+  }
+  cp wrangler.toml "$CFG"
+  echo "已从 wrangler.toml 生成 $CFG（占位值会在下面被填成真实值）"
+fi
 
 say() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 warn() { printf '\033[33m%s\033[0m\n' "$*"; }

@@ -25,14 +25,13 @@
           {{ $t('actions.restartApp') }}
         </v-btn>
       </v-col>
-      <v-col cols="auto" v-if="updateInfo?.updateAvailable || updateRunning">
-        <!-- 点过一次就锁住:更新要跑一两分钟,期间再点会再起一份安装脚本 -->
-        <v-btn variant="outlined" color="success" @click="updatePanel" :loading="updating" :disabled="stateChange || updateRunning">
-          <template v-if="updateRunning">
-            <v-progress-circular indeterminate size="16" width="2" class="me-2"></v-progress-circular>{{ $t('actions.updating') }}
-          </template>
-          <template v-else>{{ $t('actions.updatePanel') }} {{ updateInfo.latestVersion }}</template>
-        </v-btn>
+      <!-- 面板自更新在这个形态下不存在：Worker 无法自替换，自托管由 deploy-code.sh 负责。
+           原来这里挂的是上游的更新按钮，但后端 /api/updateInfo 是桩、/api/updatePanel 不存在，
+           按钮要么永不显示、要么点了报 unknown data。不如直说怎么做。 -->
+      <v-col cols="auto">
+        <span class="text-medium-emphasis" style="font-size: 12px">
+          {{ $t('settings.selfUpdateHint') }}
+        </span>
       </v-col>
     </v-row>
     <v-row v-if="updateRunning || updateFailed" justify="center" style="margin-top: -6px; margin-bottom: 8px;">

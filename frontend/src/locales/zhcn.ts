@@ -272,6 +272,9 @@ export default {
     pwCopied: "面板已打开,密码已复制,粘贴即可登录",
     empty: "还没有服务器。把你的其他面板加进来,一键打开。",
   },
+  settings: {
+    selfUpdateHint: "面板自更新：Cloudflare 上重新执行 wrangler deploy；自托管用 apps/selfhost/scripts/deploy-code.sh",
+  },
   actions: {
     refresh: "刷新",
     action: "操作",
