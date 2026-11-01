@@ -198,12 +198,13 @@ async function tick(env: Env): Promise<void> {
     await pushState(env, decision.state, "exhausted", "顺位表里没有可用的备选");
     return;
   }
-  // 健康且无变化 → 什么都不写（这是配额防线的主路径）
-  const noteworthy =
-    decision.action === "switch" ||
-    decision.action === "exhausted" ||
-    decision.action === "would-switch";
-  if (!stateChanged(state, decision.state) && !noteworthy) return;
+  // 走到这里说明 action 只可能是 reset / wait（switch 与 exhausted 上面已经 return 了），
+  // 所以判据只有一条：状态有没有实质变化。
+  //   - 健康且 failures 已是 0（reset，无变化）→ 不写，这是配额防线的主路径
+  //   - 探活失败计数递增（wait）→ 写一次
+  //   - 恢复（failures 3→0）→ 写一次
+  // 被它挡住的是「每分钟无条件写 state+log+删 lastError = 4320 次/天」那套。
+  if (!stateChanged(state, decision.state)) return;
 
   await pushState(
     env,
@@ -223,15 +224,21 @@ export default {
         await env.STATE.delete("lastError");
       }
     } catch (err) {
-      // 没有 tail 的环境里靠这条把错误留在 KV，GET / 能直接看到
-      await env.STATE.put(
-        "lastError",
-        JSON.stringify({
-          at: new Date().toISOString(),
-          message: err instanceof Error ? err.message : String(err),
-          stack: err instanceof Error ? (err.stack ?? "").slice(0, 500) : "",
-        }),
-      );
+      // 没有 tail 的环境里靠这条把错误留在 KV，GET / 能直接看到。
+      // 但 KV 写本身也可能失败（例如当天写配额已耗尽 → 429），
+      // 那种情况下不能再抛出去，否则每个 tick 都会抛一次未捕获异常。
+      try {
+        await env.STATE.put(
+          "lastError",
+          JSON.stringify({
+            at: new Date().toISOString(),
+            message: err instanceof Error ? err.message : String(err),
+            stack: err instanceof Error ? (err.stack ?? "").slice(0, 500) : "",
+          }),
+        );
+      } catch {
+        // 写不进去就算了，别让一个配额问题升级成 crash loop
+      }
     }
   },
 

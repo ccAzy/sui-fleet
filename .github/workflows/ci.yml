@@ -84,6 +84,8 @@ jobs:
           node-version: 20
       - run: npm install --no-audit --no-fund
         working-directory: apps/arbiter
+      - run: npm run typecheck
+        working-directory: apps/arbiter
       - run: npm test
         working-directory: apps/arbiter
 
