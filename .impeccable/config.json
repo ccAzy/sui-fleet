@@ -1,5 +1,0 @@
-{
-  "detector": {
-    "extensions": [{ "ext": ".vue", "engine": "html" }]
-  }
-}
