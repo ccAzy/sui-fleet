@@ -2,12 +2,28 @@
 # 节点自更新验证：mock 面板下发 update_agent 指令，
 # 节点下载新二进制 → 校验 sha256 → 原子替换 → 重新执行自己。
 #
-# 用法： wsl -d Ubuntu-24.04 bash /mnt/c/.../agent/test-update.sh
-set -e
+# 用法： bash scripts/test-update.sh
+#   （需要在已构建出节点二进制的环境里跑：先执行 scripts/build-wsl.sh）
+set -eu
 
-BIN="$REPO/agent/dist/sui-agent-linux-amd64"
+# 仓库根 = 本脚本所在目录的上一级。以前这里写的是未定义的 $REPO，
+# 在 set -e 下不会报错，只会拼出 /agent/dist/... 这种不存在的绝对路径，
+# 于是这个「验证最高危升级链路」的脚本从来没真正跑通过。
+REPO="$(cd "$(dirname "$0")/.." && pwd)"
+
+# 节点源码目录是 node/（2026-10 由 agent/ 改名）；
+# build-wsl.sh 的产物落在仓库根的 dist/，不是 node/dist/。
+BIN="$REPO/dist/sui-agent-linux-amd64"
 PAYLOAD_SRC="$REPO/panel/test/pull-payload-wsl.json"
 MOCK="$REPO/panel/test/mock-panel.py"
+
+for f in "$BIN" "$PAYLOAD_SRC" "$MOCK"; do
+  if [ ! -f "$f" ]; then
+    echo "缺少必需文件：$f" >&2
+    echo "  二进制请先执行： bash scripts/build-wsl.sh" >&2
+    exit 1
+  fi
+done
 W="$HOME/agent-update-test"
 
 rm -rf "$W"

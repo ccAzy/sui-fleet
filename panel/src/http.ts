@@ -54,18 +54,35 @@ export async function currentUser(c: any): Promise<Session | null> {
 /**
  * 登录限流用的客户端地址。
  *
- * 不能只看 CF-Connecting-IP：自托管部署没有这个头，全站会挤成同一个 "local" 桶，
- * 任意人失败 8 次就把管理员锁在门外。这里按「Cloudflare 专有头 → 反代链 → 兜底」取值。
- * 注意：XFF 可被客户端伪造，所以它只用来分摊限流桶，不用于任何权限判断。
+ * 取值策略由 TRUST_PROXY 决定，默认是 "cf"：
+ *   cf（默认）—— 只有当请求同时带 CF-Connecting-IP 和 cf-ray 时才采信。
+ *                cf-ray 是 Cloudflare 边缘必加、且会覆盖客户端伪造的同名头，
+ *                所以「有 cf-ray」可以作为「确实从 CF 边缘进来」的证据。
+ *   1 / true  —— 采信 X-Forwarded-For 的第一跳。仅当自建反代会**重写**该头时才能开。
+ *   off       —— 完全不信任何头，统一落到 "direct" 桶。
+ *
+ * 为什么不能像以前那样无条件信 XFF：自托管直连时 XFF 是客户端随便填的，
+ * 每次换一个值就能让每个桶的计数都到不了阈值 → 无限次猜密码。
+ *
+ * 注意：即使 header 不可信也不会导致无限猜测 —— 登录处还有一道**全局**失败上限
+ * （不区分 IP），伪造 IP 只能改变分摊方式，不能突破总量。
  */
 export function clientIp(c: any): string {
+  const mode = String(c.env?.TRUST_PROXY ?? "cf").toLowerCase();
+  if (mode === "off") return "direct";
+
+  if (mode === "1" || mode === "true" || mode === "on") {
+    const xff = c.req.header("X-Forwarded-For");
+    if (xff) return xff.split(",")[0].trim();
+    const real = c.req.header("X-Real-IP");
+    if (real) return real;
+    return "direct";
+  }
+
+  // 默认 cf：边缘证据（cf-ray）与真实客户端地址必须同时存在
   const cf = c.req.header("CF-Connecting-IP");
-  if (cf) return cf;
-  const xff = c.req.header("X-Forwarded-For");
-  if (xff) return xff.split(",")[0].trim();
-  const real = c.req.header("X-Real-IP");
-  if (real) return real;
-  return "local";
+  if (cf && c.req.header("cf-ray")) return cf;
+  return "direct";
 }
 
 /** 选中的节点：X-Remote-Server 头优先，缺省落到第一个启用节点。 */

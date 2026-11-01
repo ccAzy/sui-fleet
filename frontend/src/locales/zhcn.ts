@@ -262,6 +262,7 @@ export default {
     enable: "启用",
     disable: "禁用",
     disabled: "已禁用",
+    delWarn: "删除后该节点的入站、出站、客户端、历史用量与待执行指令会一并清除，不可恢复。确认删除？",
     managing: "正在管理",
     test: "测试",
     testing: "测试中…",
@@ -431,6 +432,7 @@ export default {
     tun: "Tun 入站",
   },
   client: {
+    delWarn: "删除后会同时从该客户端的入站用户列表里移除，其订阅链接立即失效。确认删除？",
     name: "名称",
     desc: "描述",
     group: "组",

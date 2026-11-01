@@ -62,7 +62,9 @@
               @click:append="fetchFromUrl" />
           </v-window-item>
         </v-window>
-        <v-alert v-if="error" type="error" variant="text" v-html="error"></v-alert>
+        <!-- 不能用 v-html：error 里拼的是 e.message，而 fetchFromUrl 的 e.message
+             可能来自远端响应的解析异常（外部可控）。用文本渲染 + 保留换行。 -->
+        <v-alert v-if="error" type="error" variant="text" style="white-space: pre-wrap">{{ error }}</v-alert>
 
         <template v-if="parsed">
           <v-divider class="my-4" />

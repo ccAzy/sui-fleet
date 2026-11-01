@@ -137,6 +137,21 @@ app.post("/api/login", async (c) => {
       null,
       new Error("too many failed attempts, retry in a few minutes"),
     );
+  // 全局上限：不看 IP。
+  // 客户端地址来自请求头，自托管时可能被伪造；只用「按 IP 计数」的话，
+  // 攻击者每次换一个头就能绕开。这里加一道总量闸：5 分钟内全站最多 30 次失败。
+  // 正常人 30 次/5 分钟足够，暴力破解则被强制降速。
+  const globalRecent = await first<{ c: number }>(
+    c.env.DB,
+    "SELECT COUNT(*) as c FROM login_attempts WHERE ts > ? AND ok = 0",
+    ts - 300,
+  );
+  if ((globalRecent?.c ?? 0) >= 30)
+    return json(
+      c,
+      null,
+      new Error("too many failed attempts, retry in a few minutes"),
+    );
 
   const body = await readBody(c);
   await ensureAdmin(c.env.DB, c.env.ADMIN_USER, c.env.ADMIN_PASS);

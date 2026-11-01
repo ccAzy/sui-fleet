@@ -10,7 +10,7 @@
       <v-divider></v-divider>
       <v-card-text>
         <div class="del-name">{{ delModal.item?.name }}</div>
-        {{ $t('confirm') }}
+        <div class="del-warn">{{ $t('server.delWarn') }}</div>
         <v-checkbox v-model="delModal.wipe" :label="$t('server.wipeNodes')" density="compact" hide-details color="error" class="mt-2" />
       </v-card-text>
       <v-card-actions>
@@ -431,6 +431,12 @@ const delServer = async () => {
   padding: var(--s6) 0;
   color: var(--ink-3);
   font-size: var(--fs-sm);
+}
+
+.del-warn {
+  color: rgb(var(--v-theme-error));
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .del-name {

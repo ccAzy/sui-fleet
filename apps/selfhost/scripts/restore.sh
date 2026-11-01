@@ -17,7 +17,7 @@ SNAPSHOT="${1:?用法: restore.sh <备份.db> [--yes]}"
 ASSUME_YES=0
 for arg in "$@"; do
   case "$arg" in
-    -y | --yes) ASSUME_YES=1 ;;
+  -y | --yes) ASSUME_YES=1 ;;
   esac
 done
 DATA_DIR="${DATA_DIR:-/opt/sui-panel/data}"

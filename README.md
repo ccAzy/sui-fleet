@@ -97,12 +97,17 @@ npx wrangler --config wrangler.local.toml secret put JWT_SECRET
 
 ### 2. 接入节点
 
+> **部署面板之后必须做的一件事**：`panel/frontend-dist/dl/` 是 **gitignore 的**，
+> 一键部署（Deploy to Cloudflare）产出的面板里**没有节点二进制**，此时点「安装节点」会报
+> 「缺少分片清单」。先执行 `bash apps/selfhost/scripts/publish-agent.sh` 再装节点。
+> 这是首次部署最常见的失败点。
+
 节点二进制 **不在仓库里**（73 MB，编译进去的 sing-box 占大头）。先选一种拿到它：
 
 | 方式 | 命令 | 适用 |
 | --- | --- | --- |
 | 自行编译 | `cd node && bash build.sh`（需 Go 1.26.5 + gcc，CGO 要开） | 有 Go 环境 |
-| 面板分发 | 把二进制分片放到 `panel/frontend-dist/dl/`（见 `apps/selfhost/scripts/publish-agent.sh`） | 已有面板 |
+| 面板分发 | 在面板机器上执行 `bash apps/selfhost/scripts/publish-agent.sh`，它会把二进制切成 <25 MB 分片、生成 `.parts` 与 `.sha256` 并落到 `panel/frontend-dist/dl/` | 已有面板 |
 | 直接拷 | 从已有部署的 `/opt/sui-agent/bin/sui-agent` 复制 | 迁移 |
 
 拿到二进制后，在面板「Servers → Add Server」建节点。保存后弹窗会**直接给出一次性 token

@@ -262,6 +262,7 @@ export default {
     enable: "Enable",
     disable: "Disable",
     disabled: "disabled",
+    delWarn: "This removes the node's inbounds, outbounds, clients, usage history and pending commands. It cannot be undone.",
     managing: "Now managing",
     test: "Test",
     testing: "Testing…",
@@ -431,6 +432,7 @@ export default {
     tun: "Tun Inbound",
   },
   client: {
+    delWarn: "This also removes the client from its inbound user lists and invalidates its subscription links.",
     name: "Name",
     desc: "Description",
     group: "Group",

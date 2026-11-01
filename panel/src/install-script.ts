@@ -39,7 +39,20 @@ fetch_parts() { # fetch_parts <name> <dest>
   local name="$1" dest="$2"
   local count
   count=$(curl -fsSL --max-time 20 "$PANEL/dl/$name.parts" 2>/dev/null || echo "")
-  if [ -z "$count" ]; then echo "缺少分片清单：$name.parts" >&2; exit 1; fi
+  if [ -z "$count" ]; then
+    cat >&2 <<MSG
+缺少分片清单：$PANEL/dl/$name.parts
+
+这说明面板的 dl/ 目录里还没有节点二进制。一键部署（Deploy to Cloudflare）
+不会生成它 —— 需要在部署面板的那台机器上先执行：
+
+    bash apps/selfhost/scripts/publish-agent.sh
+
+（该脚本会把节点二进制切成 <25MB 分片、生成 .parts 与 .sha256，再发布到面板。）
+生产部署若把 /dl/ 挂在别处，请确认 $PANEL/dl/$name.parts 可访问。
+MSG
+    exit 1
+  fi
   : > "$dest"
   local i=0
   while [ "$i" -lt "$count" ]; do
@@ -54,8 +67,13 @@ fetch_parts() { # fetch_parts <name> <dest>
     want=$(cut -d' ' -f1 < "$dest.sha256")
     got=$(sha256sum "$dest" | cut -d' ' -f1)
     [ "$want" = "$got" ] || { echo "校验失败：$name" >&2; exit 1; }
+  elif [ "\${REQUIRE_SHA256:-0}" = "1" ]; then
+    # 想在首次安装时就强制校验的话传 REQUIRE_SHA256=1。
+    # 默认不强制：分片上传可能只完成一半，硬失败会让安装彻底做不了。
+    echo "要求校验但 $name 没有 .sha256，已中止（REQUIRE_SHA256=1）" >&2
+    exit 1
   else
-    echo "  提示：$name 没有 .sha256，跳过校验"
+    echo "  提示：$name 没有 .sha256，跳过校验（要强制校验请传 REQUIRE_SHA256=1）"
   fi
 }
 

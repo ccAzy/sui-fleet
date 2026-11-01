@@ -211,7 +211,7 @@
           </template>
           <v-card :title="$t('actions.del')" rounded="lg">
             <v-divider></v-divider>
-            <v-card-text>{{ $t('confirm') }}</v-card-text>
+            <v-card-text>{{ $t('client.delWarn') }}</v-card-text>
             <v-card-actions>
               <v-btn color="error" variant="flat" @click="delClient(item.id)">{{ $t('yes') }}</v-btn>
               <v-btn variant="text" class="confirm-cancel" @click="delOverlay[clients.findIndex(c => c.id == item.id)] = false">{{ $t('no') }}</v-btn>

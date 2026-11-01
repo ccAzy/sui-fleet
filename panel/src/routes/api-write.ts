@@ -369,6 +369,9 @@ export function registerApiWrite(app: Hono<{ Bindings: Env }>) {
     );
     await seedNode(c.env.DB, id);
     // 一键接入：把"装哪些东西、写哪个单元、用什么 token"全部编进一条命令
+    // 新建的第一台节点必须立刻成为「默认节点」：resolveNode 有 60 秒模块级缓存，
+    // 不主动失效的话，界面上会出现「加了节点 60 秒内还是提示没有节点」。
+    invalidateDefaultNode();
     const base = baseUrl(c);
     const install_cmd = `curl -fsSL ${base}/install.sh -o /tmp/sui.sh && sudo bash /tmp/sui.sh --token ${token}`;
     return json(c, { id, token, install_cmd });
@@ -431,6 +434,10 @@ export function registerApiWrite(app: Hono<{ Bindings: Env }>) {
     const id = c.req.param("id");
     await purgeNodeData(c.env.DB, id);
     await run(c.env.DB, "DELETE FROM nodes WHERE id = ?", id);
+    // 删掉的正好是「默认节点」时，缓存里还留着它 —— 60 秒内 GET /api/load 会继续
+    // 返回已删节点的数据，期间任何写操作都会落到不存在的 node_id 上；
+    // 而 schema 没有外键 + purgeNodeData 已经跑过 ⇒ 产生永远不会被清理的孤儿行。
+    invalidateDefaultNode();
     return okMsg(c);
   });
 
