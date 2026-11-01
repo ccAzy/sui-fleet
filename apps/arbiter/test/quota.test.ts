@@ -20,7 +20,10 @@ test("失败次数变化 → 要写", () => {
 });
 
 test("切换成功（epoch 变化）→ 要写", () => {
-  assert.equal(stateChanged(base, { ...base, epoch: 4, lastSwitchAt: 1_000 }), true);
+  assert.equal(
+    stateChanged(base, { ...base, epoch: 4, lastSwitchAt: 1_000 }),
+    true,
+  );
 });
 
 test("三次失败计数递进各自算一次变化", () => {
@@ -36,5 +39,8 @@ test("三次失败计数递进各自算一次变化", () => {
 });
 
 test("失败归零（恢复）也算变化，会被记录一次", () => {
-  assert.equal(stateChanged({ ...base, failures: 3 }, { ...base, failures: 0 }), true);
+  assert.equal(
+    stateChanged({ ...base, failures: 3 }, { ...base, failures: 0 }),
+    true,
+  );
 });

@@ -80,11 +80,18 @@ export async function cronTick(db: D1Database): Promise<void> {
         dirty = true;
       }
 
-      // 2b) 周期重置：把本轮用量归零并顺延，同时恢复启用
+      // 2b) 周期重置：把本轮用量归零并顺延，同时恢复启用。
+      //
+      // 关键：nextReset 为 0 也要进这个分支。上游 ResetClients 的条件就是
+      // `next_reset < dt`（0 也命中，然后补一个未来值），这里原来多写了一个
+      // `nextReset > 0`，而前端只在「延迟启动」路径里初始化 nextReset →
+      // 新建的 autoReset 客户端 nextReset 恒为 0 → **永远不重置**，
+      // 用量只增不减，最后被超额停用锁死。
+      // delayStart 为真的客户端由 2a 负责（从第一次产生流量开始计时），这里跳过。
       if (
         cur.autoReset === true &&
         resetDays > 0 &&
-        nextReset > 0 &&
+        cur.delayStart !== true &&
         nextReset <= ts
       ) {
         cur = {

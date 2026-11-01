@@ -184,11 +184,29 @@ export async function loadFull(
     listObjects(db, nodeId, "endpoints"),
     listObjects(db, nodeId, "services"),
   ]);
+  // 面板 UI 需要的是「这个入站上有哪些客户端（按名字）」，不是工程对象。
+  // 直接把 hydrateUsers 的对象数组给前端，列表里会渲染成 [object Object]。
+  // 注意：节点侧（pullPayload）仍然要对象形态，所以只在这里转换。
+  const hydrated = hydrateUsers(inboundsRaw, clients);
+  const nameOfInbound = new Map<number, string[]>();
+  for (const c of clients) {
+    if (c.enable === false) continue;
+    const ids = Array.isArray(c.inbounds) ? c.inbounds : [];
+    for (const raw of ids) {
+      const id = typeof raw === "number" ? raw : num(o(raw).id);
+      if (id > 0) nameOfInbound.set(id, [...(nameOfInbound.get(id) ?? []), s(c.name)]);
+    }
+  }
+  const inboundsForUi = hydrated.map((ib) => ({
+    ...ib,
+    users: nameOfInbound.get(num(ib.id)) ?? [],
+  }));
+
   return {
     config,
     clients,
     tls,
-    inbounds: hydrateUsers(inboundsRaw, clients),
+    inbounds: inboundsForUi,
     outbounds,
     endpoints,
     services,

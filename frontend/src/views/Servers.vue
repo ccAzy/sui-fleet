@@ -253,7 +253,7 @@ const delModal = ref<{ visible: boolean, item: any, index: number, wipe: boolean
   visible: false, item: null, index: -1, wipe: false,
 })
 
-type ServerStatus = { state: 'idle' | 'testing' | 'online' | 'offline', latency?: number, error?: string }
+type ServerStatus = { state: 'idle' | 'testing' | 'online' | 'offline', latency?: number, age?: number, error?: string }
 const statusMap = ref<Record<string, ServerStatus>>({})
 const st = (item: any): ServerStatus => statusMap.value[item.id] || { state: 'idle' }
 
@@ -267,13 +267,14 @@ const markState = (item: any) => {
 const stateText = (item: any) => {
   const s = st(item)
   if (s.state === 'testing') return ''
-  if (s.state === 'online') return `${s.latency} ms`
+  // 这个数字是「距上次上报多少秒」，不是网络延迟——面板从不反连节点。
+  // 原来拼成 `${latency} ms`，170 秒没上报会显示成 "170 ms"，纯属误导。
+  if (s.state === 'online') return `↑${s.age ?? s.latency}s`
   if (s.state === 'offline') return 'offline'
   return '—'
 }
 
-// Probe a server's reachability + token through the backend (it calls the
-// remote APIv2 and times the round-trip).
+// 刷新一次可达性：后端按 agent 最近上报时间判定，不反连节点。
 const testServer = async (item: any) => {
   statusMap.value = { ...statusMap.value, [item.id]: { state: 'testing' } }
   const r = await HttpUtils.get('api/testServer', { id: item.id })
@@ -281,7 +282,7 @@ const testServer = async (item: any) => {
   statusMap.value = {
     ...statusMap.value,
     [item.id]: o.online
-      ? { state: 'online', latency: o.latency }
+      ? { state: 'online', latency: o.age ?? o.latency, age: o.age ?? o.latency }
       : { state: 'offline', error: o.error },
   }
 }
