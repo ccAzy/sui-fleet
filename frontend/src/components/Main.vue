@@ -251,11 +251,11 @@ const reloadSys = async () => {
 let intervalId: ReturnType<typeof setInterval> | null = null
 
 const startTimer = () => {
-  // 2 秒一次会把 D1 rows_read 抬得很高（每次请求都要读节点行 + 内核/版本缓存），
-  // 首屏这些读数 5 秒刷新完全够用。
+  // 首页读数 10 秒刷新一次：Workers 免费版每天只有 10 万次请求，
+  // 这个轮询是最大的单个消耗项（5 秒 = 1.7 万次/天/标签页），10 秒直接减半。
   intervalId = setInterval(() => {
     reloadData()
-  }, 5000)
+  }, 10000)
 }
 
 const stopTimer = () => {
