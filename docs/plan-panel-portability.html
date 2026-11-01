@@ -44,8 +44,8 @@
 <div class="sheet">
 
   <h1>控制面可移植化 · 顺位接管 · 一键接入</h1>
-  <p class="sub">s-ui Cloud · 方案 v4 · 2026-11-01 · P0/P1 已完成，影子实例与线上输出一致</p>
-  <span class="draft">PLAN v4 — P2 待推进</span>
+  <p class="sub">s-ui Cloud · 方案 v5 · 2026-11-01 · P0/P1/P2 已完成（仅剩真实登录待你配合一次）</p>
+  <span class="draft">PLAN v5 — P3 可开工</span>
 
   <h2>零、已确认的前提</h2>
   <table>
@@ -270,9 +270,38 @@
     这说明 D1 shim 的语义（排序、JSON 函数、batch 事务）与线上完全对齐——P2 只需要验证带会话的写操作，不需要排查数据层。
   </div>
 
-  <h2>十、下一步（P2）</h2>
-  <p>P2 验证带会话的写路径：登录 + 2FA、节点增删、指令下发。其中登录需要你的密码与 2FA 验证码，
-  所以这一步会留一个“你配合输入一次”的环节；其余（改 inbound、改客户端、重启内核）由我用已导入的快照做回环验证。</p>
+  <h2>十、P2 完成：带会话的写路径也跑通了</h2>
+  <p class="decided">已完成（除“真实密码 + 2FA 登录”需你配合一次）· 全部在影子库上跑，未接触生产</p>
+
+  <p>测试方式：自托管实例用可控的 <code>JWT_SECRET</code> 签一个会话 cookie（仅影子实例，不适用于生产），
+  然后用真实 HTTP 接口跑完整用例。</p>
+
+  <table>
+    <thead><tr><th>用例</th><th>结果</th></tr></thead>
+    <tbody>
+      <tr><td>未登录写 <code>/api/save</code></td><td class="decided">被拒（<code>Invalid login</code>），与线上行为一致</td></tr>
+      <tr><td>会话读取 <code>/api/load</code></td><td class="decided">200，inbounds=5 clients=1</td></tr>
+      <tr><td>新建客户端</td><td class="decided"><code>success:true</code>，写库 + revision+1</td></tr>
+      <tr><td>客户端 links 生成</td><td class="decided">指定 inbounds 后 links=1，订阅能拉到 1 条</td></tr>
+      <tr><td>新建节点</td><td class="decided">返回 48 位一次性 token，节点行入库</td></tr>
+      <tr><td>指令下发 → agent pull → report</td><td class="decided">pull 收到 <code>restart_core</code>，report 回执后状态转 <code>done</code></td></tr>
+      <tr><td>改 inbound tag</td><td class="decided">对象更新、revision+1，且<b>客户端 links 自动重算</b>（remark 变为新 tag）</td></tr>
+      <tr><td>TOTP 算法</td><td class="decided">与独立 RFC 6238 实现输出完全一致（同一码），base32 解出 20 字节</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note">
+    “改 inbound → 客户端 links 重算”这一条特别值得验证：线上就因为这个机制与快照语义，
+    历史上出现过“改了入站但订阅还是旧参数”。在自托管版里它同样正确。
+  </div>
+
+  <h3>唯一待你配合的一步</h3>
+  <p>登录是“密码 + TOTP 二次验证”，密码在你手里。P2 结尾需要你在影子实例上真实登录一次（我提供地址，你输一次密码和验证码），
+  确认 <code>verifyPassword</code>（PBKDF2 10k 轮）与两步登录在 Node 上同样正常。其余全链路已用自签会话验证完毕。</p>
+
+  <h2>十一、下一步（P3）</h2>
+  <p>P3 是迁移与备份工具：表级导出、事务导入、行数校验、回滚脚本；每日把快照推到顺位 2（jp）。
+  这一步完全不需要你参与，做完后你就可以在任何时候把控制面搬到 hk / jp。</p>
 
   <footer>
     方案 v3 · 基于 2026-11-01 的代码与线上状态 · 相关：<code>docs/quota-audit-2026-11-01.html</code>、<code>MIGRATION-ALL-2026-10-29.md</code>。
