@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>s-ui Cloud · 控制面可移植化与顺位接管（方案 v3 · P0 已过）</title>
+<style>
+  :root{
+    --ink:#1c1b19; --ink-2:#5b5852; --ink-3:#8d897f;
+    --paper:#faf8f4; --rule:#e0dbd1; --accent:#8a6a3b;
+    --warn:#a5432f; --ok:#3f6b3a; --mono:ui-monospace,"Cascadia Mono",Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#efece6;color:var(--ink);
+    font-family:"Noto Serif SC","Songti SC",Georgia,serif;font-size:15px;line-height:1.72}
+  .sheet{max-width:940px;margin:28px auto 64px;background:var(--paper);padding:52px 60px 64px;
+    border:1px solid var(--rule);box-shadow:0 22px 50px -34px rgba(0,0,0,.35)}
+  h1{font-size:29px;line-height:1.3;margin:0 0 6px;font-weight:600;letter-spacing:-.01em}
+  .sub{color:var(--ink-2);font-size:13px;margin:0 0 8px}
+  .draft{display:inline-block;font-size:11px;letter-spacing:.08em;color:var(--accent);
+    border:1px solid currentColor;border-radius:2px;padding:1px 7px;margin-bottom:26px}
+  h2{font-size:18px;margin:42px 0 12px;font-weight:600}
+  h2::before{content:"";display:inline-block;width:14px;height:1px;background:var(--accent);
+    vertical-align:middle;margin-right:10px;transform:translateY(-3px)}
+  h3{font-size:15px;margin:24px 0 6px;font-weight:600}
+  p{margin:10px 0}
+  code{font-family:var(--mono);font-size:.86em;background:#f1ede5;padding:1px 5px;border-radius:2px}
+  pre{font-family:var(--mono);font-size:12.5px;background:#f4f0e8;border:1px solid var(--rule);
+    padding:12px 14px;border-radius:3px;overflow-x:auto;line-height:1.6}
+  table{width:100%;border-collapse:collapse;margin:14px 0 8px;font-size:13.5px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--rule);vertical-align:top}
+  th{font-weight:600;color:var(--ink-2);font-size:12px;letter-spacing:.06em;text-transform:uppercase;
+    border-bottom:1px solid var(--ink-3)}
+  .note{border-left:2px solid var(--accent);padding:8px 0 8px 14px;color:var(--ink-2);font-size:13.5px;margin:16px 0}
+  .warnbox{border-left:2px solid var(--warn);padding:8px 0 8px 14px;color:var(--ink-2);font-size:13.5px;margin:16px 0}
+  ul,ol{margin:8px 0 8px 22px;padding:0}
+  li{margin:5px 0}
+  .phase{border:1px solid var(--rule);border-radius:3px;padding:14px 16px;margin:14px 0;background:#fffdf9}
+  .phase h3{margin-top:0}
+  .decided{color:var(--ok);font-size:12px;letter-spacing:.06em}
+  footer{margin-top:44px;padding-top:14px;border-top:1px solid var(--rule);color:var(--ink-3);font-size:12px}
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <h1>控制面可移植化 · 顺位接管 · 一键接入</h1>
+  <p class="sub">s-ui Cloud · 方案 v3 · 2026-11-01 · 四条细节已敲定，P0 兼容性摸底已完成</p>
+  <span class="draft">PLAN v3 — 待 P1 起步</span>
+
+  <h2>零、已确认的前提</h2>
+  <table>
+    <thead><tr><th>问题</th><th>你的决定</th><th>对方案的影响</th></tr></thead>
+    <tbody>
+      <tr><td>使用者</td><td>只有你一个人</td><td>权限不做 RBAC 分档：<b>单一管理员 + 只读令牌 + 主控标记</b>，省掉 operator 层</td></tr>
+      <tr><td>Cloudflare</td><td>保留做 CDN 与隐藏源站</td><td>域名解析留在 CF；源站只放行 CF 回源；证书由 CF 承担</td></tr>
+      <tr><td>主控顺位</td><td>香港 → 日本 →（可继续加）</td><td>顺位表存在面板里可改；切换由外部仲裁者执行</td></tr>
+      <tr><td>接入新机</td><td>生成一条命令，粘上去执行</td><td>面板「添加服务器」直接给出一条带一次性 token 的命令</td></tr>
+    </tbody>
+  </table>
+
+  <h2>一、Cloudflare 保留与否：优缺点对照</h2>
+
+  <h3>保留（DNS 指向 CF，橙云代理，源站在 VPS）</h3>
+  <table>
+    <thead><tr><th>优点</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>隐藏源站 IP</td><td>扫描与攻击打在 CF 上，看不到你 VPS 的真实地址——这是最实际的一条</td></tr>
+      <tr><td>免费 DDoS / WAF 兜底</td><td>面板是公网登录页，被爆破与被小流量打到死是常见事故，CF 能挡第一层</td></tr>
+      <tr><td>证书零维护</td><td>CF 边缘证书自动续期；源站用 Cloudflare Origin Certificate，不用折腾 ACME</td></tr>
+      <tr><td>DNS 秒级切换源站</td><td>顺位接管就是改一条 A 记录，配合低 TTL 生效很快</td></tr>
+      <tr><td>不消耗 Workers 请求额度</td><td>只做代理时不调用 Worker，等于把控制面搬走后顺手解决了额度问题</td></tr>
+      <tr><td>可加访问限制</td><td>WAF 规则能按国家/ASN/路径限制，单人使用的面板可以直接锁到“只允许你的常用地”</td></tr>
+    </tbody>
+  </table>
+
+  <table>
+    <thead><tr><th>缺点</th><th>说明与缓解</th></tr></thead>
+    <tbody>
+      <tr><td>多一跳延迟</td><td>CF→源站加 10–40ms；面板是管理台，感知很小。<b>不影响代理流量</b>（节点直连不经过面板）</td></tr>
+      <tr><td>CF 仍是入口单点</td><td>CF 全站故障概率极低，但一旦发生面板进不去。缓解：保留一条“直连源站 IP+端口”的应急入口（仅自己知道）</td></tr>
+      <tr><td>必须正确配置源站防火墙</td><td>只放行 <code>cloudflare.com/ips</code> 段，否则隐藏 IP 形同虚设；进阶用 mTLS（Authenticated Origin Pull）</td></tr>
+      <tr><td>排障多一层</td><td>出问题要判断是 CF 规则/缓存还是源站。我们已踩过：opencode.ai 证书劫持、边缘仍接受 TLS 1.0</td></tr>
+      <tr><td>账号风险</td><td>这是你真正的顾虑（GitHub 被封过）。缓解：域名 DS/A 记录备份、zone 配置定期导出、开 2FA；CF 不会因“fork/自用”封号，风险性质与 GitHub 不同</td></tr>
+    </tbody>
+  </table>
+
+  <h3>不保留（VPS 直接对外）</h3>
+  <p><b>优点</b>：链路短、排障简单；没有 CF 账号/规则/额度这一层；上传与长连接无额外限制。<br>
+  <b>缺点</b>：源站 IP 暴露，被扫描/被 DDoS 就直接打到你机器；证书要自己上（到期忘续就全家掉）；没有就近加速；公网单 IP 的爆破压力全在自己身上。</p>
+
+  <div class="note">
+    <b>结论：保留 CF。</b>它带来的“隐藏 IP + 免费证书 + DDoS 兜底”对单人面板几乎是纯收益，代价只有一跳延迟和排障多一层。
+    真正的风险点是“CF 账号”，用备份与 2FA 对冲，而不是靠放弃 CDN 来对冲。
+  </div>
+
+  <h2>二、顺位接管：怎么让“一崩就上二”真的成立</h2>
+
+  <p>难点不在于“切 DNS”，而在于<b>谁来判定主控已死</b>。如果让每台候选机自己判断，两台会同时认为自己是主控——这就是脑裂，比不切换更糟。</p>
+
+  <h3>选定方案：Cloudflare Worker 当唯一仲裁者</h3>
+  <pre>每 60 秒：GET https://hk.example/health   （由 CF Worker 发起，只看这一个地址）
+
+连续失败 3 次（≈3 分钟）
+  → 读顺位表 [hk, jp, vn]
+  → 把 DNS 记录从 hk 改为顺位里第一台“自检通过”的候选机
+  → 同时写 epoch+1 到 D1（用于防脑裂）
+  → 给该候选机下发“提升为主控”的信号（它自己的 watchdog 轮询 D1 的 epoch）
+
+主控恢复后：不自动回切，只在面板上亮一条提示，由你点一下才切回</pre>
+
+  <p>为什么这样最稳：仲裁者只有一个（CF），它看到的是“外网视角”，不会被单机网络抖动骗到；顺位表、epoch、当前主控全部是数据库里的一行，可读可改可审计。</p>
+
+  <h3>防脑裂：epoch 代次</h3>
+  <p>每台候选机的控制面启动时读取 <code>meta.control_epoch</code> 与自己保存的副本比较：<b>自己落后就不允许以主控身份启动</b>，只能当只读镜像。这样“被降级的主控重启后抢回去”这条最常见的脑裂路径被堵死。</p>
+
+  <div class="warnbox">
+    <b>必须接受的取舍</b>：自动接管的判定是“连续 3 分钟不可达”，所以真实的切换窗口是 3–6 分钟，期间面板不可用（但代理流量不受任何影响）。
+    如果你的场景是“宁可手动也别切错”，把开关设成<b>人工确认</b>即可——方案里两者都保留，一个配置项切换。
+  </div>
+
+  <h3>顺位表长这样（面板可改，无需改代码）</h3>
+  <table>
+    <thead><tr><th>顺位</th><th>节点</th><th>角色</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>hk</td><td>主控（primary）</td><td>常驻运行控制面，对外域名指向它</td></tr>
+      <tr><td>2</td><td>jp</td><td>待机（standby）</td><td>每分钟同步一次数据，随时可被提升</td></tr>
+      <tr><td>3</td><td>vn</td><td>冷备（cold）</td><td>只有主控与待机都不可用时才轮到，数据靠每日备份</td></tr>
+    </tbody>
+  </table>
+
+  <h2>三、一键接入新机器</h2>
+  <p>面板「添加服务器」填个名字，直接给出一条命令（token 一次性、30 分钟有效、绑定该节点记录）：</p>
+  <pre>curl -fsSL https://panel.example.com/install.sh -o /tmp/sui.sh \
+  &amp;&amp; sha256sum /tmp/sui.sh \
+  &amp;&amp; bash /tmp/sui.sh --token ub_7Fk2…  --panel https://panel.example.com</pre>
+
+  <p>脚本做四件事，全部幂等（重复执行不会破坏已有环境）：</p>
+  <ol>
+    <li>检测发行版与架构，缺依赖则装（curl、systemd 必需项）</li>
+    <li>下载 agent 与内核（走面板静态分发，机房速度，不走你的家宽上行）</li>
+    <li>写 systemd 单元与 <code>/etc/sui-agent.env</code>，启动并等首轮心跳</li>
+    <li>回执给面板：成功则自动创建默认入站、生成订阅并回填到面板页面</li>
+  </ol>
+  <p>退役同理：面板里点“退役”，该节点从聚合订阅中移除、agent 停止上报，机器本身不做任何破坏性操作（你想留着跑别的随时可以）。</p>
+
+  <h2>四、实施阶段（v2）</h2>
+
+  <div class="phase">
+    <h3>P0 · 兼容性摸底 <span class="muted">（半天）</span></h3>
+    <p>逐条确认现有 SQL 在 SQLite 上的等价性，产出兼容矩阵（重点：<code>batch()</code> 语义、<code>meta.rows_read</code>、<code>json_extract</code>）。</p>
+  </div>
+
+  <div class="phase">
+    <h3>P1 · 运行时骨架 <span class="muted">（1 天）</span></h3>
+    <p>Node + better-sqlite3 + D1 兼容 shim + 静态 + 安全头 + node-cron；用生产快照只读跑通，响应与线上逐字段比对。</p>
+  </div>
+
+  <div class="phase">
+    <h3>P2 · 写路径与全功能 <span class="muted">（1 天）</span></h3>
+    <p>登录 / 2FA / 节点增删 / agent pull+report / 指令下发；现有 e2e 指向自托管实例跑绿。</p>
+  </div>
+
+  <div class="phase">
+    <h3>P3 · 迁移与备份工具 <span class="muted">（半天）</span></h3>
+    <p>表级导出、事务导入、行数校验、回滚脚本；每日把 SQLite 快照推到备用机（顺位 2）。</p>
+  </div>
+
+  <div class="phase">
+    <h3>P4 · 顺位接管与仲裁者 <span class="muted">（1.5 天）</span></h3>
+    <p>CF Worker 健康检查 + 顺位表 + epoch 防脑裂 + 面板里的“当前主控 / 手动切回”界面；两种模式（自动 / 人工确认）可配。</p>
+  </div>
+
+  <div class="phase">
+    <h3>P5 · 一键接入与退役 <span class="muted">（半天）</span></h3>
+    <p>install.sh 幂等脚本 + 面板生成命令 + 一次性 token + 退役流程。</p>
+  </div>
+
+  <div class="phase">
+    <h3>P6 · 演练与手册 <span class="muted">（半天 + 一次演练）</span></h3>
+    <p>在 hk↔jp 之间真实走一遍接管（先不切生产 DNS），产出切换手册、回滚步骤、脑裂演练结果。</p>
+  </div>
+
+  <h2>五、权限（单人版的简化）</h2>
+  <table>
+    <thead><tr><th>能力</th><th>管理员（你）</th><th>只读令牌</th></tr></thead>
+    <tbody>
+      <tr><td>登录面板、改配置、重启内核、删节点</td><td>✓</td><td>—</td></tr>
+      <tr><td>查看节点状态、订阅、日志</td><td>✓</td><td>✓（给监控/手机快捷看板用）</td></tr>
+      <tr><td>操作主控所在节点（停机/删除）</td><td>需二次确认</td><td>—</td></tr>
+    </tbody>
+  </table>
+  <p>额外加一条硬规则：<b>主控节点不能在没有指定继任者的情况下被停用</b>——面板直接拦住，避免“把自己管的那台关掉”。</p>
+
+  <h2>六、风险与对策（v2 更新）</h2>
+  <table>
+    <thead><tr><th>风险</th><th>对策</th></tr></thead>
+    <tbody>
+      <tr><td>脑裂（两台同时认为自己主控）</td><td>epoch 代次 + 仲裁者唯一；落后代次的控制面只读启动</td></tr>
+      <tr><td>顺位第二台数据落后</td><td>待机每分钟增量同步 + 每日全量快照；提升前比对 epoch 与行数</td></tr>
+      <tr><td>切换判定误判（抖动）</td><td>连续 3 次失败才切；默认不自动回切，由人决定</td></tr>
+      <tr><td>迁移窗口写入分叉</td><td>窗口内主控置只读；切换后旧主控降级为只读镜像</td></tr>
+      <tr><td>CF 账号或入口故障</td><td>保留一条直连应急入口；zone 配置与 DNS 定期导出</td></tr>
+      <tr><td>一键接入 token 泄露</td><td>一次性、30 分钟有效、绑定节点；脚本校验 SHA256</td></tr>
+    </tbody>
+  </table>
+
+  <h2>七、已敲定的四条细节</h2>
+  <table>
+    <thead><tr><th>项</th><th>决定</th><th>理由</th></tr></thead>
+    <tbody>
+      <tr><td>顺位范围</td><td><b>hk ↔ jp 双机接管</b>，vn / cc2 作冷备</td><td>只两台参与接管，脑裂面最小；其余靠每日备份顶替</td></tr>
+      <tr><td>待机同步</td><td><b>每分钟全量</b></td><td>库不到 1MB，全量比增量简单可靠，恢复时无需重放日志</td></tr>
+      <tr><td>自动切换</td><td><b>默认关（人工确认）</b></td><td>先跑顺一个月再切自动；误切比不切更麻烦</td></tr>
+      <tr><td>聚合订阅</td><td><b>并入 P5</b></td><td>与一键接入是同一件事的两半：加机器后客户端不用改配置</td></tr>
+    </tbody>
+  </table>
+
+  <h2>八、P0 完成：兼容性摸底结果</h2>
+  <p class="decided">已完成 · 只读 · 未改动任何线上内容</p>
+
+  <table>
+    <thead><tr><th>检查项</th><th>结果</th></tr></thead>
+    <tbody>
+      <tr><td>SQL 语句总量</td><td>约 75 条：SELECT 27、UPDATE 22、INSERT 15、DELETE 11、PRAGMA 1；全部是 SQLite 原生语法，<b>无一条需要改写</b></td></tr>
+      <tr><td>高级特性使用</td><td><code>ON CONFLICT ... DO UPDATE</code> 8 处（upsert）、<code>json_extract</code> 2 处、<code>PRAGMA table_info</code> 1 处、<code>batch()</code> 隐事务 1 处</td></tr>
+      <tr><td>未使用的特性</td><td>RETURNING、WITH、strftime、COLLATE、GLOB、LIKE、db.exec、withSession —— 全为零，减少了移植面</td></tr>
+      <tr><td>D1 API 调用面</td><td>直接 <code>db.prepare</code> 6 处、<code>db.batch</code> 1 处；其余全部走 <code>db.ts</code> 的 <code>all / first / run / batch</code> 四个包装</td></tr>
+      <tr><td>JSON1 支持</td><td>better-sqlite3 内置 JSON1，<code>json_extract</code> 无需额外编译选项</td></tr>
+    </tbody>
+  </table>
+
+  <h3>shim 必须抹平的 5 个差异（已定实现方式）</h3>
+  <table>
+    <thead><tr><th>#</th><th>差异</th><th>处理</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>D1 接口是异步的，better-sqlite3 是同步的</td><td>shim 内部同步执行，对外返回 Promise，调用方零改动</td></tr>
+      <tr><td>2</td><td><code>.all()</code>：D1 返回 <code>{results, meta}</code>，better-sqlite3 返回数组</td><td>统一包装成 D1 形状（<code>db.ts</code> 的 <code>all()</code> 取的是 <code>.results</code>）</td></tr>
+      <tr><td>3</td><td><code>.first()</code> 在 better-sqlite3 里叫 <code>.get()</code></td><td>shim 提供 <code>first()</code>，内部转发 <code>get()</code></td></tr>
+      <tr><td>4</td><td><code>.run()</code> 返回 <code>meta.changes / meta.last_row_id</code></td><td>映射 <code>changes / lastInsertRowid</code>，保留 <code>meta.last_row_id</code>（agent.ts 用到一处）</td></tr>
+      <tr><td>5</td><td><code>batch()</code> 在 D1 里隐式事务</td><td>shim 用显式事务包裹，返回同形状数组</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note">
+    <b>P0 结论：无障碍项。</b>移植工作量集中在运行时外壳（约 300 行 shim + 一个 Node 入口），业务代码不需要改。
+    这让 P1 的风险从“可能要改业务逻辑”降到“只需保证 shim 语义对齐”。
+  </div>
+
+  <h2>九、下一步</h2>
+  <p>进入 P1：在 <code>apps/selfhost/</code> 下起 Node 服务，用<b>生产 D1 的只读快照</b>跑通登录与订阅，逐字段比对响应。
+  这一步仍然<b>不碰生产、不改 DNS</b>，产出是一个可以随时启动、验证完就能关掉的影子实例。</p>
+
+  <footer>
+    方案 v3 · 基于 2026-11-01 的代码与线上状态 · 相关：<code>docs/quota-audit-2026-11-01.html</code>、<code>MIGRATION-ALL-2026-10-29.md</code>。
+    P0 已完成且无阻碍项；下一步 P1 在影子实例上跑通，不影响生产。
+  </footer>
+</div>
+</body>
+</html>

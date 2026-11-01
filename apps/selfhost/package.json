@@ -1,0 +1,18 @@
+{
+  "name": "sui-selfhost",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "把 s-ui Cloud 控制面从 Cloudflare Worker 搬到任意 Linux：Node 运行时 + SQLite（D1 兼容 shim）。业务代码与 panel/src 共用一份。",
+  "scripts": {
+    "start": "tsx src/server.ts",
+    "import": "tsx src/import-sql.ts",
+    "dev": "tsx watch src/server.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.14.0",
+    "hono": "^4.6.14",
+    "node-cron": "^3.0.3",
+    "tsx": "^4.19.2"
+  }
+}
