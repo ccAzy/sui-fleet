@@ -11,7 +11,15 @@
 #   4. 健康检查失败 → 自动回滚到刚归档的那一份并再次起服务。
 set -euo pipefail
 
-SNAPSHOT="${1:?用法: restore.sh <备份.db>}"
+SNAPSHOT="${1:?用法: restore.sh <备份.db> [--yes]}"
+# 恢复会停服务、替换整个数据库，属于不可逆操作。
+# 默认要求人工确认；无人值守（drill 脚本 / systemd）必须显式传 --yes。
+ASSUME_YES=0
+for arg in "$@"; do
+  case "$arg" in
+    -y | --yes) ASSUME_YES=1 ;;
+  esac
+done
 DATA_DIR="${DATA_DIR:-/opt/sui-panel/data}"
 # 默认跟随 snapshot-pull.sh 的产物名（standby.db）；老机器上手工恢复可传 DB=...
 DB="${DB:-$DATA_DIR/standby.db}"
@@ -22,6 +30,21 @@ HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:8788/health}"
 if [ ! -f "$SNAPSHOT" ]; then
   echo "找不到快照：$SNAPSHOT" >&2
   exit 1
+fi
+
+# 覆盖前把「要覆盖什么、用什么覆盖」摆出来，让人有反悔的机会
+if [ "$ASSUME_YES" -ne 1 ]; then
+  echo "即将用快照覆盖线上库："
+  echo "  快照：$SNAPSHOT（$(du -h "$SNAPSHOT" | cut -f1)，$(date -r "$SNAPSHOT" -Is 2>/dev/null || echo 修改时间未知)）"
+  echo "  目标：$DB"
+  echo "  服务：$SERVICE 会被停止，当前库会归档到 $ARCHIVE_DIR（不删除）"
+  echo
+  printf '确认恢复请输入 yes：'
+  read -r answer
+  if [ "$answer" != "yes" ]; then
+    echo "已取消，未做任何改动。" >&2
+    exit 1
+  fi
 fi
 
 mkdir -p "$ARCHIVE_DIR"

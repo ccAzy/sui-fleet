@@ -106,6 +106,15 @@ export async function importBundle(
   // 2) 预检 + 拼语句
   const imported: Record<string, number> = {};
   const stmts: ReturnType<typeof db.prepare>[] = [];
+
+  // 列名会直接拼进 SQL（列名无法参数化），所以必须对照真实表结构过滤。
+  // 备份是**外部输入**：换台机器导入别人的包时，行里可以带任意 key，
+  // 例如 {"a) VALUES(1); DROP TABLE users; --": 1} 就是一个注入点。
+  const validCols = new Map<string, Set<string>>();
+  for (const t of order) {
+    const info = await all<{ name: string }>(db, `PRAGMA table_info(${t})`);
+    validCols.set(t, new Set(info.map((r) => String(r.name))));
+  }
   for (const t of [...order].reverse())
     stmts.push(db.prepare(`DELETE FROM ${t}`));
   for (const t of order) {
@@ -116,7 +125,9 @@ export async function importBundle(
         ? rows.filter((r) => !LOCAL_SECRET_KEYS.includes(String(r.key ?? "")))
         : rows;
     for (const row of filtered) {
-      const cols = Object.keys(row);
+      const allowed = validCols.get(t) ?? new Set<string>();
+      // 只保留本表真实存在的列；多余的键直接丢弃（不静默建列、不拼进 SQL）
+      const cols = Object.keys(row).filter((c) => allowed.has(c));
       if (!cols.length) continue;
       const ph = cols.map(() => "?").join(", ");
       stmts.push(
