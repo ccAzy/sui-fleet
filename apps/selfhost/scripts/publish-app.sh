@@ -13,7 +13,7 @@ tar czf "$DEST/app-bundle.tar.gz" -C "$REPO" \
   panel/src panel/schema.sql panel/package.json panel/package-lock.json \
   panel/frontend-dist
 
-( cd "$DEST" && sha256sum app-bundle.tar.gz > app-bundle.tar.gz.sha256 )
+(cd "$DEST" && sha256sum app-bundle.tar.gz >app-bundle.tar.gz.sha256)
 ls -lh "$DEST/app-bundle.tar.gz" | awk '{print "  app-bundle.tar.gz", $5}'
 echo
 echo "下一步：cd panel && npx wrangler deploy --config wrangler.local.toml"

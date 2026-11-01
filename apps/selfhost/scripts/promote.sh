@@ -7,28 +7,55 @@
 # 幂等：重复执行只会更新代码与数据（旧库自动留 .bak），不会动已有 /etc/sui-panel.env。
 set -euo pipefail
 
-PRIMARY=""; OPS_TOKEN=""; DRY=0
-PORT="${PORT:-8788}"; DIR="${DIR:-/opt/sui-panel}"
+PRIMARY=""
+OPS_TOKEN=""
+DRY=0
+PORT="${PORT:-8788}"
+DIR="${DIR:-/opt/sui-panel}"
 while [ $# -gt 0 ]; do
   case "$1" in
-    --primary) PRIMARY="${2:-}"; shift 2 ;;
-    --token)   OPS_TOKEN="${2:-}"; shift 2 ;;
-    --dry-run) DRY=1; shift ;;
-    --port)    PORT="${2:-}"; shift 2 ;;
-    --dir)     DIR="${2:-}"; shift 2 ;;
-    *) echo "未知参数: $1" >&2; exit 2 ;;
+  --primary)
+    PRIMARY="${2:-}"
+    shift 2
+    ;;
+  --token)
+    OPS_TOKEN="${2:-}"
+    shift 2
+    ;;
+  --dry-run)
+    DRY=1
+    shift
+    ;;
+  --port)
+    PORT="${2:-}"
+    shift 2
+    ;;
+  --dir)
+    DIR="${2:-}"
+    shift 2
+    ;;
+  *)
+    echo "未知参数: $1" >&2
+    exit 2
+    ;;
   esac
 done
-[ -n "$PRIMARY" ] && [ -n "$OPS_TOKEN" ] || { echo "需要 --primary 与 --token（面板 → /api/getdb 用的运维令牌）" >&2; exit 2; }
+[ -n "$PRIMARY" ] && [ -n "$OPS_TOKEN" ] || {
+  echo "需要 --primary 与 --token（面板 → /api/getdb 用的运维令牌）" >&2
+  exit 2
+}
 
 step() { printf '\n==> %s\n' "$1"; }
-ok()   { printf '  OK   %s\n' "$1"; }
+ok() { printf '  OK   %s\n' "$1"; }
 warn() { printf '  WARN %s\n' "$1"; }
-die()  { printf '  FAIL %s\n' "$1" >&2; exit 1; }
+die() {
+  printf '  FAIL %s\n' "$1" >&2
+  exit 1
+}
 
 step "1/8 前置检查"
 . /etc/os-release 2>/dev/null || true
-case "$(uname -m)" in x86_64|amd64) A=x64 ;; aarch64|arm64) A=arm64 ;; *) die "架构 $(uname -m) 不受支持" ;; esac
+case "$(uname -m)" in x86_64 | amd64) A=x64 ;; aarch64 | arm64) A=arm64 ;; *) die "架构 $(uname -m) 不受支持" ;; esac
 command -v systemctl >/dev/null || die "没有 systemd"
 free_gb=$(df -BG / | tail -1 | awk '{gsub("G","",$4); print $4}')
 [ "${free_gb:-0}" -ge 2 ] || die "磁盘不足（${free_gb}G，需要 ≥2G）"
@@ -75,29 +102,29 @@ rm -f /tmp/app.tar.gz
 ok "已解包到 $DIR"
 
 step "4/8 安装依赖"
-( cd "$DIR/apps/selfhost" && npm install --no-audit --no-fund >/dev/null 2>&1 )
-( cd "$DIR/panel" && npm install --omit=dev --no-audit --no-fund >/dev/null 2>&1 )
+(cd "$DIR/apps/selfhost" && npm install --no-audit --no-fund >/dev/null 2>&1)
+(cd "$DIR/panel" && npm install --omit=dev --no-audit --no-fund >/dev/null 2>&1)
 ok "依赖就绪"
 
 step "5/8 拉最新库并导入"
 mkdir -p "$DIR/data"
 curl -fsSL --retry 3 --max-time 180 "$PRIMARY/api/getdb?token=$OPS_TOKEN" -o /tmp/bundle.json
-size=$(wc -c < /tmp/bundle.json)
+size=$(wc -c </tmp/bundle.json)
 [ "$size" -gt 10000 ] || die "备份体积异常（$size 字节），检查 token"
 [ -f "$DIR/data/sui.db" ] && cp "$DIR/data/sui.db" "$DIR/data/sui.db.bak-$(date +%Y%m%d-%H%M%S)"
-( cd "$DIR/apps/selfhost" && npm run --silent import-bundle -- /tmp/bundle.json "$DIR/data/sui.db" | tail -3 )
+(cd "$DIR/apps/selfhost" && npm run --silent import-bundle -- /tmp/bundle.json "$DIR/data/sui.db" | tail -3)
 rm -f /tmp/bundle.json
 ok "库已导入"
 
 step "6/8 配置与单元"
 if [ ! -f /etc/sui-panel.env ]; then
-  printf 'JWT_SECRET=%s\n' "$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')" > /etc/sui-panel.env
+  printf 'JWT_SECRET=%s\n' "$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')" >/etc/sui-panel.env
   chmod 600 /etc/sui-panel.env
   ok "已生成 /etc/sui-panel.env"
 else
   ok "沿用已有 /etc/sui-panel.env"
 fi
-cat > /etc/systemd/system/sui-panel.service <<UNIT
+cat >/etc/systemd/system/sui-panel.service <<UNIT
 [Unit]
 Description=s-ui Cloud 控制面（自托管）
 After=network-online.target
@@ -134,9 +161,15 @@ systemctl restart sui-panel
 for i in $(seq 1 20); do
   sleep 1
   if out=$(curl -fsS --max-time 3 "http://127.0.0.1:$PORT/health" 2>/dev/null); then
-    echo "$out" | grep -q '"ok":true' && { ok "health: $out"; break; }
+    echo "$out" | grep -q '"ok":true' && {
+      ok "health: $out"
+      break
+    }
   fi
-  [ "$i" = "20" ] && { journalctl -u sui-panel -n 15 --no-pager; die "服务未就绪"; }
+  [ "$i" = "20" ] && {
+    journalctl -u sui-panel -n 15 --no-pager
+    die "服务未就绪"
+  }
 done
 
 step "8/8 自检"
