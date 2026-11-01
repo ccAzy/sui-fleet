@@ -39,15 +39,32 @@ if (!existsSync(distDir)) {
 const db = SqliteD1.open(dbPath);
 const assets = createAssets(distDir);
 
+// 会话签名密钥必须显式配置：回退到一个仓库里写死的常量，等于把「伪造任意管理员会话」
+// 的能力公开（源码人人可见）。缺了就拒绝启动，而不是悄悄用一个公开值。
+const jwtSecret = process.env.JWT_SECRET ?? "";
+if (!jwtSecret) {
+  console.error(
+    [
+      "[sui-panel] 缺少 JWT_SECRET。请在 /etc/sui-panel.env 里设置一个随机值，例如：",
+      "  JWT_SECRET=$(openssl rand -hex 32)",
+      "没有它，任何人都能用源码里的默认密钥伪造管理员会话。",
+    ].join("\n"),
+  );
+  process.exit(1);
+}
+
 const env = {
   DB: db,
   ASSETS: assets,
-  JWT_SECRET: process.env.JWT_SECRET ?? "selfhost-dev-secret-change-me",
+  JWT_SECRET: jwtSecret,
   PANEL_BASE: panelBase,
   ADMIN_USER: process.env.ADMIN_USER,
   ADMIN_PASS: process.env.ADMIN_PASS,
   // 执行器令牌：只有自托管部署才有，Worker 上没有
   OPS_EXEC_TOKEN: process.env.OPS_EXEC_TOKEN,
+  // 手动触发 /__cron 的密钥（CF 定时走 scheduled 事件，不需要它）。
+  // 不配就等同于关闭这个路由 —— fail closed。
+  CRON_SECRET: process.env.CRON_SECRET,
 };
 
 // ---- 防脑裂：启动前对一次代次（epoch） ----

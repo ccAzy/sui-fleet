@@ -17,6 +17,11 @@ import urllib.parse
 import urllib.request
 
 BASE = sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:8787"
+# 面板是「多节点 + 当前节点」模型：不带 X-Remote-Server 的请求落到“第一个启用节点”。
+# 前端会把选中的节点存进 localStorage.currentServer 再随请求头发回来，e2e 也要照做，
+# 否则建完节点后读到的仍是空库里的默认节点状态。
+NSID = ""
+
 cj = http.cookiejar.CookieJar()
 opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
 
@@ -34,6 +39,8 @@ def post(path, form=None, js=None, headers=None, token=None):
         hdrs["Content-Type"] = "application/json"
     if token:
         hdrs["Authorization"] = "Bearer " + token
+    if NSID and "X-Remote-Server" not in hdrs and not path.startswith("/agent/"):
+        hdrs["X-Remote-Server"] = NSID
     if not url.startswith(("http://", "https://")):
         raise ValueError("only http(s) is allowed: " + url)
     req = urllib.request.Request(url, data=data, headers=hdrs)  # noqa: S310  # noqa: S310  # nosec B310 -- BASE 是本地常量
@@ -48,6 +55,8 @@ def get(path, token=None, headers=None):
     hdrs = dict(headers or {})
     if token:
         hdrs["Authorization"] = "Bearer " + token
+    if NSID and "X-Remote-Server" not in hdrs and not path.startswith("/api/servers"):
+        hdrs["X-Remote-Server"] = NSID
     req = urllib.request.Request(  # noqa: S310  # nosec B310
         url, headers=hdrs
     )
@@ -81,8 +90,19 @@ def _totp(secret, at=None):
     return str(num % 1000000).zfill(6)
 
 
+# e2e 用的管理员密码：每次跑随机生成，不落真实口令（也避免被当成硬编码凭据扫描出来）。
+# 新实例默认 admin/admin 会置 must_change=1，
+# 此时除白名单外所有接口都拒绝——所以下面会先把密码改掉再继续。
+PASS = "e2e-" + hashlib.sha256(str(time.time()).encode()).hexdigest()[:12]
+
 r = j(post("/api/login", form={"user": "admin", "pass": "admin"}))
 check("login", r["success"] is True, r)
+
+# 新实例默认 admin/admin 会置 must_change=1，此时除白名单外所有接口都拒绝。
+# e2e 必须先把密码改掉，否则后面第一条写请求就会被挡（这正是之前从没跑通的原因之一）。
+if (r.get("obj") or {}).get("must_change"):
+    r = j(post("/api/changePass", form={"oldPass": "admin", "newPass": PASS}))
+    check("首次登录强制改密", r["success"] is True, r)
 
 # 清掉上一次跑留下的节点，保证每次从干净状态验证
 existing = j(get("/api/servers"))["obj"]["servers"]
@@ -93,6 +113,7 @@ r = j(post("/api/nodes", form={"name": "HK-01", "address": "1.2.3.4", "remark": 
 check("create node", r["success"] and r["obj"].get("token"), r)
 nid = r["obj"]["id"]
 tok = r["obj"]["token"]
+NSID = nid  # 之后的业务请求都显式指向这个节点（与前端行为一致）
 
 inbound = {
     "type": "vless",
@@ -299,14 +320,23 @@ check(
 PULLED_REV = j(post("/agent/pull", js={"revision": PULLED_REV}, token=tok))["revision"]
 
 # ---- 节点更新指令链路 ----
+# sha256 现在是强制的 64 位 hex（自更新链是权限最高的一条，不允许“填了才校验”）
+FAKE_SHA = "a" * 64
 post(
     "/api/release",
     form={
         "url": "https://example.com/sui-agent",
-        "sha256": "deadbeef",
+        "sha256": FAKE_SHA,
         "version": "9.9.9",
     },
 )
+# 顺带验证新加的校验真的生效：缺 sha256 / 非 https 都必须被拒
+bad1 = j(post("/api/release", form={"url": "https://example.com/x", "version": "1"}))
+check("release 拒绝缺 sha256", bad1["success"] is False, bad1)
+bad2 = j(post("/api/release", form={"url": "http://example.com/x", "sha256": FAKE_SHA}))
+check("release 拒绝非 https", bad2["success"] is False, bad2)
+# 恢复成可用的更新源（上面两条被拒，配置应保持不变）
+post("/api/release", form={"url": "https://example.com/sui-agent", "sha256": FAKE_SHA, "version": "9.9.9"})
 rel = j(get("/api/release"))["obj"]
 check("release saved", rel["url"].endswith("/sui-agent"), rel)
 
@@ -417,7 +447,7 @@ check("2fa 发放 10 个恢复码", len(codes) == 10, str(len(codes)))
 
 get("/api/logout")
 cj.clear()
-r = j(post("/api/login", form={"user": "admin", "pass": "admin"}))
+r = j(post("/api/login", form={"user": "admin", "pass": PASS}))
 obj = r.get("obj") or {}
 check("2fa 登录要码", obj.get("need_otp") is True and bool(obj.get("ticket")), r)
 ticket = obj.get("ticket", "")
@@ -432,7 +462,7 @@ check("2fa 登录放行", r["success"] is True, r)
 # 防重放：同一 30 秒窗口内同一个码不能再用
 get("/api/logout")
 cj.clear()
-t2 = j(post("/api/login", form={"user": "admin", "pass": "admin"}))["obj"]["ticket"]
+t2 = j(post("/api/login", form={"user": "admin", "pass": PASS}))["obj"]["ticket"]
 r = j(post("/api/login/otp", form={"ticket": t2, "code": code}))
 check("2fa 同一码重放被拒", r["success"] is False, r)
 

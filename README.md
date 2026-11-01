@@ -122,7 +122,7 @@ panel/            Cloudflare Worker（Hono + D1 + 静态前端托管）
   wrangler.toml   ★ 占位配置（入库，供 Deploy 按钮读取）
   wrangler.local.toml  你的真实配置（gitignore）
   .dev.vars.example    本地 secret 模板（ADMIN_PASS / JWT_SECRET）
-  test/e2e.py     50 项端到端自检（需要先起一个可登录的实例）
+  test/e2e.py     52 项端到端自检（需先起一个可登录实例；见 AUDIT-NOTES 的跑法）
 
 frontend/         前端（Vue 3 + Vuetify），派生自 s-ui-frontend
 node/             节点程序（S-UI 分支，含 agent 子命令；sing-box 编译在内）
