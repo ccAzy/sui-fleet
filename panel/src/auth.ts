@@ -2,7 +2,17 @@
 import type { D1Database } from "@cloudflare/workers-types";
 import { first, run, now, type UserRow } from "./db";
 
-const ITER = 10_000;
+// Workers 免费版 CPU 上限 10ms，PBKDF2 迭代数直接决定登录会不会 500（实测 120k 就挂）。
+// 自托管跑在 Node 上没有这个限制。哈希串里带了迭代数，所以两边能互相验证；
+// 登录成功时按当前运行时的目标值顺手升格，不需要停机迁移。
+const ITER_WORKER = 10_000;
+const ITER_NODE = 600_000;
+
+/** 当前运行时的密码哈希目标迭代数。 */
+export function targetIterations(): number {
+  const g: { process?: { versions?: Record<string, string> } } = globalThis;
+  return typeof g.process?.versions?.node === "string" ? ITER_NODE : ITER_WORKER;
+}
 
 function b64(buf: ArrayBuffer): string {
   return btoa(String.fromCharCode(...new Uint8Array(buf)));
@@ -16,6 +26,7 @@ function unb64(s: string): Uint8Array<ArrayBuffer> {
 }
 
 export async function hashPassword(password: string): Promise<string> {
+  const ITER = targetIterations();
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const key = await crypto.subtle.importKey(
     "raw",
@@ -162,6 +173,15 @@ export async function login(
   const u = await getUser(db, username);
   if (!u) return null;
   if (!(await verifyPassword(password, u.password_hash))) return null;
+
+  // 渐进升格：老库里的 10k 哈希在自托管（目标 600k）登录成功后自动重算一次。
+  // 不改密码、不需要迁移脚本，用户无感。
+  const stored = parseInt(u.password_hash.split("$")[1] ?? "0", 10);
+  if (stored > 0 && stored < targetIterations()) {
+    const fresh = await hashPassword(password);
+    await run(db, "UPDATE users SET password_hash = ? WHERE id = ?", fresh, u.id);
+    u.password_hash = fresh;
+  }
   return u;
 }
 

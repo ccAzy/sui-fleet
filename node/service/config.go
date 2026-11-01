@@ -99,7 +99,9 @@ func (s *ConfigService) StartCore() error {
 	if time.Since(lastStartFailTime) < startCooldown {
 		logger.Info("start core cooldown ", startCooldown/time.Second, " seconds")
 		startCoreMu.Unlock()
-		return nil
+		// 不能返回 nil：调用方会把“因为冷却跳过”当成“启动成功”，
+		// 于是不再重试，节点就一直停在旧/空配置上。给一个明确的错误。
+		return common.NewError("start core skipped: in cooldown after a previous failure")
 	}
 	startCoreInProgress = true
 	startCoreMu.Unlock()
@@ -124,6 +126,13 @@ func (s *ConfigService) StartCore() error {
 	}
 	logger.Info("sing-box started")
 	return nil
+}
+
+// IsCoreRunning 报告内核当前是否真的在跑。
+// agent 每轮用它做存活守护：两轮 pull 之间内核崩掉时 revision 不会变、applied=false，
+// 没有这个检查就再也不会有人拉起它，节点表现为“在线但全端口不通”。
+func (s *ConfigService) IsCoreRunning() bool {
+	return corePtr != nil && corePtr.IsRunning()
 }
 
 func (s *ConfigService) RestartCore() error {

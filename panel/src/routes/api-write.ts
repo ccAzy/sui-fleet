@@ -308,15 +308,25 @@ export function registerApiWrite(app: Hono<{ Bindings: Env }>) {
   app.post("/api/release", async (c) => {
     const body = await c.req.parseBody();
     const url = String(body.url ?? "").trim();
-    const sha = String(body.sha256 ?? "").trim().toLowerCase();
+    const sha = String(body.sha256 ?? "")
+      .trim()
+      .toLowerCase();
     if (url && !/^https?:\/\//.test(url))
       return json(c, null, new Error("url 必须是 http(s) 地址"));
     // 自更新链是权限最高的一条：谁能改这个 URL，谁就能在所有节点上以 root 执行任意二进制。
     // 所以 sha256 必须是强制的信任锚，不能靠“填了才校验”。
     if (url && !/^[0-9a-f]{64}$/.test(sha))
-      return json(c, null, new Error("设置了更新地址就必须同时给 64 位 hex 的 sha256"));
+      return json(
+        c,
+        null,
+        new Error("设置了更新地址就必须同时给 64 位 hex 的 sha256"),
+      );
     if (url && url.startsWith("http://"))
-      return json(c, null, new Error("更新地址必须是 https（http 等于把二进制交给中间人）"));
+      return json(
+        c,
+        null,
+        new Error("更新地址必须是 https（http 等于把二进制交给中间人）"),
+      );
     await metaSet(c.env.DB, "agent_release_url", url);
     await metaSet(c.env.DB, "agent_release_sha256", sha);
     await metaSet(

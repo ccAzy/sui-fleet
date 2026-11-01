@@ -60,31 +60,21 @@ export async function exportBundle(
   return { kind: "sui-cf-backup", version: 1, exported_at: now(), tables };
 }
 
-/** 分批写入，避免单次 batch 语句过多。 */
-async function insertRows(
-  db: D1Database,
-  table: Table,
-  rows: Record<string, unknown>[],
-): Promise<void> {
-  const CHUNK = 40;
-  for (let i = 0; i < rows.length; i += CHUNK) {
-    const slice = rows.slice(i, i + CHUNK);
-    const stmts = slice.map((row) => {
-      const cols = Object.keys(row);
-      const placeholders = cols.map(() => "?").join(", ");
-      return db
-        .prepare(
-          `INSERT OR REPLACE INTO ${table} (${cols.join(", ")}) VALUES (${placeholders})`,
-        )
-        .bind(...cols.map((c) => row[c] as never));
-    });
-    if (stmts.length) await batch(db, stmts);
-  }
-}
+// 跟这台实例绑定的秘密：恢复时必须原样保留，否则备份令牌失效（待机快照停摆）、
+// 运维令牌失效（仲裁者再也写不进 epoch）、所有会话全掉。
+const LOCAL_SECRET_KEYS = ["jwt_secret", "ops_token_hash", "backup_token_hash"];
+
+/** 单次 batch 的语句上限：D1 的 batch 是事务性的，但语句太多会超限，所以分档。 */
+const ATOMIC_BATCH_MAX = 400;
 
 /**
- * 恢复：先清空再写入（整库覆盖）。
- * 顺序很重要——tokens 引用 users，objects/settings 引用 nodes，先插父表。
+ * 恢复：整库覆盖。
+ *
+ * 三条必须守住的约束（历史上都出过事）：
+ *   1. jwt_secret / ops_token_hash / backup_token_hash 不能被备份覆盖或删掉；
+ *   2. 能一次 batch 跑完就一次跑完 —— D1 的 batch 是事务，失败整体回滚；
+ *   3. 语句太多必须分块时，先落 import_in_progress 标记，恢复完再清，
+ *      半途失败时能一眼看出“这个库是半个”。
  */
 export async function importBundle(
   db: D1Database,
@@ -106,18 +96,63 @@ export async function importBundle(
     "commands",
     "meta",
   ];
-  const imported: Record<string, number> = {};
 
-  // 清空（逆序）
-  await batch(
+  // 1) 先读本地秘密（备份里就算带了也不认）
+  const localSecrets = await all<{ key: string; value: string }>(
     db,
-    [...order].reverse().map((t) => db.prepare(`DELETE FROM ${t}`)),
+    "SELECT key, value FROM meta WHERE key IN ('jwt_secret','ops_token_hash','backup_token_hash')",
   );
 
+  // 2) 预检 + 拼语句
+  const imported: Record<string, number> = {};
+  const stmts: ReturnType<typeof db.prepare>[] = [];
+  for (const t of [...order].reverse()) stmts.push(db.prepare(`DELETE FROM ${t}`));
   for (const t of order) {
     const rows = data.tables?.[t] ?? [];
-    await insertRows(db, t, rows);
-    imported[t] = rows.length;
+    if (!Array.isArray(rows)) throw new Error(`备份里的 ${t} 不是数组`);
+    const filtered =
+      t === "meta"
+        ? rows.filter((r) => !LOCAL_SECRET_KEYS.includes(String(r.key ?? "")))
+        : rows;
+    for (const row of filtered) {
+      const cols = Object.keys(row);
+      if (!cols.length) continue;
+      const ph = cols.map(() => "?").join(", ");
+      stmts.push(
+        db
+          .prepare(
+            `INSERT OR REPLACE INTO ${t} (${cols.join(", ")}) VALUES (${ph})`,
+          )
+          .bind(...cols.map((c) => row[c] as never)),
+      );
+    }
+    imported[t] = filtered.length;
   }
+  for (const s of localSecrets)
+    stmts.push(
+      db
+        .prepare("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)")
+        .bind(s.key, s.value),
+    );
+
+  // 3) 执行：小库单事务，大库分块 + 半成品标记
+  if (stmts.length <= ATOMIC_BATCH_MAX) {
+    await batch(db, stmts);
+    return { imported };
+  }
+
+  await db
+    .prepare("INSERT OR REPLACE INTO meta (key, value) VALUES ('import_in_progress', ?)")
+    .bind(String(now()))
+    .run();
+  try {
+    for (let i = 0; i < stmts.length; i += 40)
+      await batch(db, stmts.slice(i, i + 40));
+  } catch (e) {
+    throw new Error(
+      `导入在 ${stmts.length} 条语句中途失败（库可能是半成品，meta.import_in_progress 已置位）：${String(e)}`,
+    );
+  }
+  await db.prepare("DELETE FROM meta WHERE key = 'import_in_progress'").run();
   return { imported };
 }

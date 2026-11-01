@@ -13,9 +13,9 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strings"
 	"runtime/debug"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -41,19 +41,19 @@ import (
 const agentRevKey = "agent_revision"
 
 type agentPullResp struct {
-	OK        bool                       `json:"ok"`
-	Unchanged bool                       `json:"unchanged"`
-	Revision  int64                      `json:"revision"`
-	Node      struct{ ID, Name string }  `json:"node"`
-	Config    json.RawMessage            `json:"config"`
-	Settings  map[string]string          `json:"settings"`
-	Inbounds  []json.RawMessage          `json:"inbounds"`
-	Outbounds []json.RawMessage          `json:"outbounds"`
-	Endpoints []json.RawMessage          `json:"endpoints"`
-	Services  []json.RawMessage          `json:"services"`
-	TLS       []json.RawMessage          `json:"tls"`
-	Clients   []json.RawMessage          `json:"clients"`
-	Commands  []agentCommand             `json:"commands"`
+	OK        bool                      `json:"ok"`
+	Unchanged bool                      `json:"unchanged"`
+	Revision  int64                     `json:"revision"`
+	Node      struct{ ID, Name string } `json:"node"`
+	Config    json.RawMessage           `json:"config"`
+	Settings  map[string]string         `json:"settings"`
+	Inbounds  []json.RawMessage         `json:"inbounds"`
+	Outbounds []json.RawMessage         `json:"outbounds"`
+	Endpoints []json.RawMessage         `json:"endpoints"`
+	Services  []json.RawMessage         `json:"services"`
+	TLS       []json.RawMessage         `json:"tls"`
+	Clients   []json.RawMessage         `json:"clients"`
+	Commands  []agentCommand            `json:"commands"`
 }
 
 type agentCommand struct {
@@ -69,15 +69,15 @@ type trafficDelta struct {
 }
 
 type reportBody struct {
-	RevisionApplied int64                       `json:"revision_applied"`
-	AgentVersion    string                      `json:"agent_version"`
-	KernelVersion   string                      `json:"kernel_version"`
-	CoreState       string                      `json:"core_state"`
-	Uptime          int64                       `json:"uptime"`
-	Status          map[string]interface{}      `json:"status"`
-	Traffic         []trafficDelta              `json:"traffic"`
-	Commands        []map[string]interface{}    `json:"commands"`
-	LastLog         string                      `json:"last_log,omitempty"`
+	RevisionApplied int64                    `json:"revision_applied"`
+	AgentVersion    string                   `json:"agent_version"`
+	KernelVersion   string                   `json:"kernel_version"`
+	CoreState       string                   `json:"core_state"`
+	Uptime          int64                    `json:"uptime"`
+	Status          map[string]interface{}   `json:"status"`
+	Traffic         []trafficDelta           `json:"traffic"`
+	Commands        []map[string]interface{} `json:"commands"`
+	LastLog         string                   `json:"last_log,omitempty"`
 }
 
 type agent struct {
@@ -203,6 +203,14 @@ func (a *agent) cycle(withCore bool, force bool) {
 	if withCore && !a.coreStarted {
 		force = true
 	}
+	// 存活守护：内核在两轮之间崩了/被杀了，revision 没变、applied 为 false，
+	// 没有这一段就永远没人再拉起它（面板看着在线，实际全端口不通）。
+	if withCore && a.coreSvc != nil && !a.coreSvc.IsCoreRunning() {
+		a.mu.Lock()
+		a.coreStarted = false
+		a.mu.Unlock()
+		force = true
+	}
 	applied, cmds, err := a.pullOnce()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "agent: pull:", err)
@@ -224,6 +232,11 @@ func (a *agent) restartCore() error {
 		return nil
 	}
 	if err := a.coreSvc.RestartCore(); err != nil {
+		// 启动失败就别把 coreStarted 留着 true：留着的话下一轮只会在 revision 变化时重试，
+		// 而这个节点恰恰是“配置应用了但没起来”，需要每轮都重试。
+		a.mu.Lock()
+		a.coreStarted = false
+		a.mu.Unlock()
 		return err
 	}
 	a.mu.Lock()
