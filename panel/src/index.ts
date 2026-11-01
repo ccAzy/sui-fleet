@@ -29,6 +29,7 @@ import {
   okMsg,
   readBody,
   secretOf,
+  baseUrl,
 } from "./http";
 import { cronTick } from "./cron";
 import { hashRecovery, totpVerify } from "./otp";
@@ -36,6 +37,7 @@ import { registerOtpAdmin } from "./routes/otp";
 import { registerSub } from "./routes/sub";
 import { registerAgentApi } from "./routes/agent-api";
 import { registerApiRead } from "./routes/api-read";
+import { installScript } from "./install-script";
 import { registerApiWrite } from "./routes/api-write";
 
 type Ctx = { Bindings: Env };
@@ -251,6 +253,17 @@ app.get("/api/logout", async (c) => {
   deleteCookie(c, MARKER_COOKIE, { path: "/" });
   return okMsg(c);
 });
+
+// 一键接入脚本：公开、无状态，只吐 bash（token 由用户在执行时传入）
+app.get("/install.sh", (c) =>
+  new Response(installScript(baseUrl(c)), {
+    status: 200,
+    headers: {
+      "Content-Type": "text/x-shellscript; charset=utf-8",
+      "Cache-Control": "no-store",
+    },
+  }),
+);
 
 // ---------- 对外健康检查与仲裁者（P4） ----------
 //

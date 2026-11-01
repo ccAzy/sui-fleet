@@ -1,7 +1,7 @@
 import type { Hono } from "hono";
 import { setCookie } from "hono/cookie";
 import { COOKIE, login as doLogin, sha256, signJWT } from "../auth";
-import { json, okMsg, randHex, resolveNode, secretOf } from "../http";
+import { baseUrl, json, okMsg, randHex, resolveNode, secretOf } from "../http";
 import { getNode, listNodes, now, run, type Env } from "../db";
 import {
   getConfig,
@@ -278,7 +278,10 @@ export function registerApiWrite(app: Hono<{ Bindings: Env }>) {
       ts,
     );
     await seedNode(c.env.DB, id);
-    return json(c, { id, token });
+    // 一键接入：把"装哪些东西、写哪个单元、用什么 token"全部编进一条命令
+    const base = baseUrl(c);
+    const install_cmd = `curl -fsSL ${base}/install.sh -o /tmp/sui.sh && sudo bash /tmp/sui.sh --token ${token}`;
+    return json(c, { id, token, install_cmd });
   });
 
   app.post("/api/nodes/:id/delete", async (c) => {

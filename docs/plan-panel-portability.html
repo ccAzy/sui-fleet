@@ -44,8 +44,8 @@
 <div class="sheet">
 
   <h1>控制面可移植化 · 顺位接管 · 一键接入</h1>
-  <p class="sub">s-ui Cloud · 方案 v7 · 2026-11-01 · P0–P4 已完成（P4 处于 dry-run，需你提供 CF API 令牌才能真接管）</p>
-  <span class="draft">PLAN v7 — P4 dry-run 已在线</span>
+  <p class="sub">s-ui Cloud · 方案 v8 · 2026-11-01 · P0–P5 已完成（P4 dry-run 待你提供 CF API 令牌；P6 演练待排期）</p>
+  <span class="draft">PLAN v8 — P5 已上线</span>
 
   <h2>零、已确认的前提</h2>
   <table>
@@ -351,9 +351,31 @@ npx wrangler secret put ZONE_ID     --config wrangler.toml
 npx wrangler secret put RECORD_NAME --config wrangler.toml
 sed -i 's/^DRY_RUN = "1"/DRY_RUN = "0"/' wrangler.toml &amp;&amp; npx wrangler deploy --config wrangler.toml</pre>
 
-  <h2>十三、下一步（P5）</h2>
-  <p>P5 是一键接入与聚合订阅：面板里点「添加服务器」直接给出一条可粘贴命令；
-  聚合订阅让客户端只保存一个地址，加/退节点都不用重发链接。</p>
+  <h2>十三、P5 完成：一键接入 + 聚合订阅</h2>
+  <p class="decided">已上线生产 · 两项都已实测</p>
+
+  <table>
+    <thead><tr><th>能力</th><th>实现</th><th>实测</th></tr></thead>
+    <tbody>
+      <tr><td>聚合订阅</td><td><code>/sub/all?k=&lt;agg_key&gt;</code>：把所有启用节点的客户端链接合成一份，备注加节点名前缀</td><td>生产返回 50 条（10 台 × 5 入站）；错误 key 403；单节点订阅未受影响（仍 1208 字节）</td></tr>
+      <tr><td>一键接入脚本</td><td><code>GET /install.sh</code> 吐出 bash：识别架构 → 分片下载 agent → 校验 → 写 systemd → 启动 → 打印状态</td><td>生产 200 / 3672 字节，<code>bash -n</code> 通过</td></tr>
+      <tr><td>一键接入命令</td><td><code>POST /api/nodes</code> 直接返回 <code>install_cmd</code>（含一次性 token）</td><td>本地实测返回完整命令串</td></tr>
+      <tr><td>分片发布</td><td><code>scripts/publish-agent.sh</code>：gz 后按 24MB 切片 + <code>.parts</code> 计数 + <code>.sha256</code></td><td>2 片 / 25MB；拼接后 sha256 一致、<code>gunzip -t</code> 通过</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note">
+    <b>为什么要分片</b>：Cloudflare 静态资源单文件上限 25 MiB，agent 的 gz 约 25–33MB，单文件发布会被拒。
+    脚本里 <code>fetch_parts</code> 会读 <code>.parts</code> 循环下载再拼接，最后校验的是拼接后的整包。
+  </div>
+
+  <h3>聚合订阅的实际价值</h3>
+  <p>客户端只保存 <code>/sub/all</code> 一个地址：新增节点 → 刷新多几条；退役节点 → 刷新少几条。
+    换服务器、跑路、不续费，都不需要再给任何客户端重发链接——这正是你最初提的那个痛点。</p>
+
+  <h2>十四、下一步（P6）</h2>
+  <p>P6 是演练与手册：在 hk ↔ jp 之间真实走一遍接管（先不切生产 DNS），产出切换 checklist 与回滚步骤。
+    前置：你提供 Cloudflare API 令牌，把 P4 的 dry-run 切成实切。</p>
 
   <footer>
     方案 v3 · 基于 2026-11-01 的代码与线上状态 · 相关：<code>docs/quota-audit-2026-11-01.html</code>、<code>MIGRATION-ALL-2026-10-29.md</code>。

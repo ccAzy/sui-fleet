@@ -1,126 +1,239 @@
-// 订阅出口：/sub/:nodeId
+// 订阅出口：
+//   /sub/:nodeId   —— 单节点订阅（原有行为，保持兼容）
+//   /sub/all       —— 聚合订阅：一个地址包含所有启用节点的链接
 //
-// 从 index.ts 拆出来——这段最长也最容易改坏（兼容老前端拼错的 URL），
-// 单独一个文件后改动面收窄，改它不用再通读一千行入口。
+// 聚合订阅是"换服务器不用重发链接"的关键：客户端只保存 /sub/all 一个地址，
+// 加减节点后客户端刷新一次就自动增减条目。
 import type { Hono } from "hono";
-import { all, getNode, type Env } from "../db";
+import { all, getNode, listNodes, type Env } from "../db";
 import { buildClashConfig } from "../clash";
 import { buildSingboxOutbounds } from "../singbox";
 
+type SubFormat = "" | "clash" | "singbox";
+
+/** 解析订阅 query：兼容老前端把 `?format=xxx` 拼进 k / client 的畸形链接。 */
+function parseSubQuery(raw: {
+  k?: string;
+  client?: string;
+  type?: string;
+  format?: string;
+}) {
+  let key = (raw.k ?? "").trim();
+  let embedded = "";
+  const q1 = key.indexOf("?");
+  if (q1 >= 0) {
+    embedded = key.slice(q1 + 1);
+    key = key.slice(0, q1);
+  }
+
+  let clientFilter = (raw.client ?? "").trim();
+  const q2 = clientFilter.indexOf("?");
+  if (q2 >= 0) {
+    if (!embedded) embedded = clientFilter.slice(q2 + 1);
+    clientFilter = clientFilter.slice(0, q2).trim();
+  }
+
+  const embeddedParams = new URLSearchParams(embedded);
+  const fmt = (
+    raw.type ??
+    raw.format ??
+    embeddedParams.get("format") ??
+    ""
+  ).toLowerCase();
+
+  const subType: SubFormat =
+    fmt === "clash" || fmt === "mihomo"
+      ? "clash"
+      : fmt === "singbox" || fmt === "json"
+        ? "singbox"
+        : "";
+
+  return { key, clientFilter, subType };
+}
+
+/** 三种格式的统一渲染出口。 */
+function renderSubscription(
+  links: string[],
+  title: string,
+  headers: Record<string, string>,
+  subType: SubFormat,
+): Response {
+  if (subType === "clash") {
+    return new Response(buildClashConfig(links, title), {
+      status: 200,
+      headers: { ...headers, "Content-Type": "text/yaml; charset=utf-8" },
+    });
+  }
+  if (subType === "singbox") {
+    return new Response(JSON.stringify(buildSingboxOutbounds(links), null, 2), {
+      status: 200,
+      headers: { ...headers, "Content-Type": "application/json; charset=utf-8" },
+    });
+  }
+  const text = links.join(String.fromCharCode(10));
+  const payload = btoa(String.fromCharCode(...new TextEncoder().encode(text)));
+  return new Response(payload, {
+    status: 200,
+    headers: { ...headers, "Content-Type": "text/plain; charset=utf-8" },
+  });
+}
+
+/** 给链接的备注加上节点名前缀，避免多节点聚合后同名条目分不清。 */
+function prefixRemark(uri: string, nodeName: string): string {
+  const hash = uri.indexOf("#");
+  const base = hash >= 0 ? uri.slice(0, hash) : uri;
+  const remark = hash >= 0 ? decodeURIComponent(uri.slice(hash + 1)) : "";
+  return `${base}#${encodeURIComponent(`${nodeName} · ${remark || "node"}`)}`;
+}
+
+function clientHeaders(cl: Record<string, unknown> | null): Record<string, string> {
+  const up = Number(cl?.up ?? 0) || 0;
+  const down = Number(cl?.down ?? 0) || 0;
+  const total = Number(cl?.volume ?? 0) || 0;
+  const expire = Number(cl?.expiry ?? 0) || 0;
+  return {
+    "Profile-Update-Interval": "12",
+    "Subscription-Userinfo": `upload=${up}; download=${down}; total=${total}; expire=${expire}`,
+    "Cache-Control": "no-store",
+  };
+}
+
+function collectLinks(cl: Record<string, unknown>): string[] {
+  const out: string[] = [];
+  const ls = Array.isArray(cl.links) ? (cl.links as unknown[]) : [];
+  for (const l of ls) {
+    if (typeof l === "string") out.push(l);
+    else if (l && typeof l === "object") {
+      const uri = (l as Record<string, unknown>).uri;
+      if (typeof uri === "string" && uri) out.push(uri);
+    }
+  }
+  return out;
+}
+
 export function registerSub(app: Hono<{ Bindings: Env }>) {
+  // ---- 聚合订阅（必须注册在 /sub/:nodeId 之前，否则会被当成 nodeId="all"） ----
+  app.get("/sub/all", async (c) => {
+    const { key, clientFilter, subType } = parseSubQuery({
+      k: c.req.query("k"),
+      client: c.req.query("client"),
+      type: c.req.query("type"),
+      format: c.req.query("format"),
+    });
+
+    const row = await all<{ value: string }>(
+      c.env.DB,
+      "SELECT value FROM meta WHERE key = 'agg_key'",
+    );
+    const aggKey = row[0]?.value ?? "";
+    if (!aggKey) {
+      return c.text(
+        "aggregate subscription not configured: set meta.agg_key first",
+        403,
+      );
+    }
+    if (key !== aggKey) return c.text("forbidden", 403);
+
+    const nodes = await listNodes(c.env.DB);
+    const links: string[] = [];
+    let up = 0;
+    let down = 0;
+    let matchedClients = 0;
+
+    for (const node of nodes) {
+      if (!node.enabled) continue;
+      const clients = await all<{ data: string }>(
+        c.env.DB,
+        "SELECT data FROM objects WHERE node_id = ? AND kind = 'clients' ORDER BY obj_id",
+        node.id,
+      );
+      for (const r of clients) {
+        let cl: Record<string, unknown>;
+        try {
+          cl = JSON.parse(r.data) as Record<string, unknown>;
+        } catch {
+          continue;
+        }
+        if (cl.enable === false) continue;
+        if (clientFilter && String(cl.name ?? "") !== clientFilter) continue;
+        matchedClients++;
+        up += Number(cl.up ?? 0) || 0;
+        down += Number(cl.down ?? 0) || 0;
+        for (const uri of collectLinks(cl)) links.push(prefixRemark(uri, node.name));
+      }
+    }
+
+    if (links.length === 0) {
+      return c.text(
+        clientFilter ? `client not found: ${clientFilter}` : "no nodes available",
+        404,
+        { "Cache-Control": "no-store" },
+      );
+    }
+
+    return renderSubscription(
+      links,
+      "s-ui all",
+      {
+        ...clientHeaders(null),
+        // 聚合适配多节点不同配额：不冒充单客户端的 total/expire，只给已用流量
+        "Subscription-Userinfo": `upload=${up}; download=${down}; total=0; expire=0`,
+        "Profile-Title": encodeURIComponent("s-ui (all)"),
+      },
+      subType,
+    );
+  });
+
+  // ---- 单节点订阅（原有行为，保持不变） ----
   app.get("/sub/:nodeId", async (c) => {
     const node = await getNode(c.env.DB, c.req.param("nodeId"));
     if (!node || !node.enabled) return c.text("not found", 404);
     if (!node.sub_key) return c.text("forbidden", 403);
 
-    // 前端 QrCode.vue 一直把 client 名直接拼在 k 后面（`k=<sub_key><clientName>`），
-    // 而且 sing-box 那条还会再接一个 `?format=json` —— 于是出现形如
-    //   /sub/xxx?k=<sub_key>user-abc?format=clash
-    // 的畸形链接：第二个 ? 之后整段都算在 k 里。这里做三件事：
-    //   ① k 前缀匹配（多余部分当用户名过滤）② 把 k 里夹带的 ?query 拆出来解析
-    //   ③ 兼容 format= 作为 type= 的别名。
-    // 这样老链接与正确链接都能用。
-    let rawKey = c.req.query("k") ?? "";
-    let embeddedQuery = "";
-    const qIdx = rawKey.indexOf("?");
-    if (qIdx >= 0) {
-      embeddedQuery = rawKey.slice(qIdx + 1);
-      rawKey = rawKey.slice(0, qIdx);
-    }
+    const { key: rawKey, clientFilter: parsedClient, subType } = parseSubQuery({
+      k: c.req.query("k"),
+      client: c.req.query("client"),
+      type: c.req.query("type"),
+      format: c.req.query("format"),
+    });
 
-    let clientFilter = (c.req.query("client") ?? "").trim();
-    // 与 k 同理：老前端把 `?format=` 拼在 client 后面，整段会算进 client 值，
-    // 导致名字永远匹配不上、静默返回空订阅。这里拆出来。
-    const clientQ = clientFilter.indexOf("?");
-    if (clientQ >= 0) {
-      if (!embeddedQuery) embeddedQuery = clientFilter.slice(clientQ + 1);
-      clientFilter = clientFilter.slice(0, clientQ).trim();
-    }
+    // k 前缀匹配：老前端把 client 名直接拼在 k 后面（`k=<sub_key><clientName>`）
+    let clientFilter = parsedClient;
     if (rawKey !== node.sub_key) {
       if (!rawKey.startsWith(node.sub_key)) return c.text("forbidden", 403);
-      if (!clientFilter)
-        clientFilter = rawKey.slice(node.sub_key.length).trim();
+      if (!clientFilter) clientFilter = rawKey.slice(node.sub_key.length).trim();
     }
 
-    const embedded = new URLSearchParams(embeddedQuery);
     const clients = await all<{ data: string }>(
       c.env.DB,
       "SELECT data FROM objects WHERE node_id = ? AND kind = 'clients' ORDER BY obj_id",
       node.id,
     );
     const links: string[] = [];
-    // 订阅头需要 client 级的流量/配额（对齐原版 util.GetHeaders）
     let subClient: Record<string, unknown> | null = null;
-    for (const row of clients) {
+    for (const r of clients) {
       try {
-        const cl = JSON.parse(row.data) as Record<string, unknown>;
+        const cl = JSON.parse(r.data) as Record<string, unknown>;
         if (cl.enable === false) continue;
         if (clientFilter && String(cl.name ?? "") !== clientFilter) continue;
         if (!subClient) subClient = cl;
-        const ls = Array.isArray(cl.links) ? (cl.links as unknown[]) : [];
-        for (const l of ls) {
-          if (typeof l === "string") links.push(l);
-          else if (l && typeof l === "object") {
-            const uri = (l as Record<string, unknown>).uri;
-            if (typeof uri === "string" && uri) links.push(uri);
-          }
-        }
+        links.push(...collectLinks(cl));
       } catch (e) {
         console.warn("skip malformed client row", e);
       }
     }
-    // 订阅协议的标准响应头（原版 subHandler.addHeaders 也是这三个）：
-    // 客户端靠 Subscription-Userinfo 显示流量/到期，Profile-Update-Interval 决定自动更新间隔。
-    const up = Number(subClient?.up ?? 0) || 0;
-    const down = Number(subClient?.down ?? 0) || 0;
-    const total = Number(subClient?.volume ?? 0) || 0;
-    const expire = Number(subClient?.expiry ?? 0) || 0;
-    const subHeaders: Record<string, string> = {
-      "Profile-Title": encodeURIComponent(node.name || "s-ui"),
-      "Profile-Update-Interval": "12",
-      "Subscription-Userinfo": `upload=${up}; download=${down}; total=${total}; expire=${expire}`,
-      "Cache-Control": "no-store",
-    };
 
-    // 过滤后为空又确实指定了 client：说明名字对不上（拼错/已删除/被禁用）。
-    // 直接报 404 并带上名字，避免客户端拿到 200 + 空内容却无从排查。
     if (links.length === 0 && clientFilter) {
       return c.text(`client not found: ${clientFilter}`, 404, {
         "Cache-Control": "no-store",
       });
     }
 
-    // ?type=clash 输出 mihomo/Clash 可直接导入的 YAML；默认仍是 base64 链接列表
-    const subType = (
-      c.req.query("type") ??
-      c.req.query("format") ??
-      embedded.get("format") ??
-      ""
-    ).toLowerCase();
-    if (subType === "clash" || subType === "mihomo") {
-      return c.text(buildClashConfig(links, node.name), 200, {
-        ...subHeaders,
-        "Content-Type": "text/yaml; charset=utf-8",
-      });
-    }
-    if (subType === "singbox" || subType === "json") {
-      return c.body(
-        JSON.stringify(buildSingboxOutbounds(links), null, 2),
-        200,
-        {
-          ...subHeaders,
-          "Content-Type": "application/json; charset=utf-8",
-        },
-      );
-    }
-
-    const text = links.join(String.fromCharCode(10));
-    const payload = btoa(
-      String.fromCharCode(...new TextEncoder().encode(text)),
+    return renderSubscription(
+      links,
+      node.name || "s-ui",
+      { ...clientHeaders(subClient), "Profile-Title": encodeURIComponent(node.name || "s-ui") },
+      subType,
     );
-    return c.text(payload, 200, {
-      ...subHeaders,
-      "Content-Type": "text/plain; charset=utf-8",
-    });
   });
 }
