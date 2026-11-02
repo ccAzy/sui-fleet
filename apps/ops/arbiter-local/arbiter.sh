@@ -7,7 +7,7 @@ STATE=/opt/sui-arbiter/state.env
 LOG_TAG=sui-arbiter
 PROBE="https://sui.example.com/health"
 ORDER="hk,jp"
-declare -A IPS=( [hk]="192.0.2.10" [jp]="85.121.122.96" )
+declare -A IPS=([hk]="192.0.2.10" [jp]="85.121.122.96")
 THRESHOLD=3
 COOLDOWN=600
 DRY_RUN="${DRY_RUN:-1}"
@@ -16,7 +16,7 @@ ZONE_ID="69cdbbbcfd895b665caf28113c142dd5"
 RECORD="sui.example.com"
 CF_TOKEN_FILE=/opt/sui-arbiter/cf_token
 
-[ -f "$STATE" ] || printf "failures=0\nlast_switch=0\nprimary=hk\n" > "$STATE"
+[ -f "$STATE" ] || printf "failures=0\nlast_switch=0\nprimary=hk\n" >"$STATE"
 # shellcheck disable=SC1090  # 状态文件由本脚本写成 key=value，直接 source
 . "$STATE"
 now=$(date +%s)
@@ -34,9 +34,12 @@ if [ "$failures" -ge "$THRESHOLD" ] && [ $((now - last_switch)) -ge "$COOLDOWN" 
   # 顺位表里取当前主控之后的第一台
   next=""
   hit=0
-  IFS=',' read -ra arr <<< "$ORDER"
+  IFS=',' read -ra arr <<<"$ORDER"
   for n in "${arr[@]}"; do
-    if [ "$hit" = "1" ]; then next="$n"; break; fi
+    if [ "$hit" = "1" ]; then
+      next="$n"
+      break
+    fi
     [ "$n" = "$primary" ] && hit=1
   done
   [ -z "$next" ] && next="${arr[0]}"
@@ -77,4 +80,4 @@ if [ "$failures" -ge "$THRESHOLD" ] && [ $((now - last_switch)) -ge "$COOLDOWN" 
   fi
 fi
 
-printf "failures=%s\nlast_switch=%s\nprimary=%s\n" "$failures" "$last_switch" "$primary" > "$STATE"
+printf "failures=%s\nlast_switch=%s\nprimary=%s\n" "$failures" "$last_switch" "$primary" >"$STATE"
