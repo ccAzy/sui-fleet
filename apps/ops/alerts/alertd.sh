@@ -12,22 +12,26 @@
 # 一个都没配时只写日志，并在日志里明确标注「渠道未配置」。
 set -u
 
-DB="${DB:-/opt/sui-panel/data/sui.db}"
-HEALTH="${HEALTH:-http://127.0.0.1:8788/health}"
 STATE=/var/lib/sui-alert/state.env
 LOG=/var/log/sui-alerts.log
 ENVFILE=/etc/sui-alert.env
 NODE="/opt/node/bin/node"
 
-OFFLINE_SECONDS="${OFFLINE_SECONDS:-300}"   # 节点失联多久算异常
-COOLDOWN="${COOLDOWN:-1800}"                # 同一告警的最短重复间隔
-DISK_PCT="${DISK_PCT:-90}"
-
-mkdir -p "$(dirname "$STATE")"
-[ -f "$STATE" ] || : > "$STATE"
+# 先读配置文件，再套默认值：显式传进来的环境变量优先，不会被配置文件覆盖
+# （否则想临时指一个坏地址做故障注入都做不到）。
 [ -f "$ENVFILE" ] && . "$ENVFILE"
 
-log() { printf '%s %s\n' "$(date -Is)" "$*" >> "$LOG"; }
+DB="${DB:-/opt/sui-panel/data/sui.db}"
+HEALTH="${HEALTH:-http://127.0.0.1:8788/health}"
+OFFLINE_SECONDS="${OFFLINE_SECONDS:-300}" # 节点失联多久算异常
+COOLDOWN="${COOLDOWN:-1800}"              # 同一告警的最短重复间隔
+DISK_PCT="${DISK_PCT:-90}"
+HEARTBEAT_HOUR="${HEARTBEAT_HOUR:-9}"
+
+mkdir -p "$(dirname "$STATE")"
+[ -f "$STATE" ] || : >"$STATE"
+
+log() { printf '%s %s\n' "$(date -Is)" "$*" >>"$LOG"; }
 
 send() { # send <级别> <正文>
   local level="$1" text="$2" sent=0
@@ -59,7 +63,7 @@ fire() { # fire <key> <级别> <正文>
   if [ $((now - last)) -lt "$COOLDOWN" ]; then return; fi
   send "$level" "$text"
   sed -i "/^${key}=/d" "$STATE" 2>/dev/null || true
-  printf '%s=%s\n' "$key" "$now" >> "$STATE"
+  printf '%s=%s\n' "$key" "$now" >>"$STATE"
 }
 
 # 1) 面板自身
@@ -88,11 +92,10 @@ if [ -r "$DB" ] && command -v "$NODE" >/dev/null 2>&1; then
     else
       sed -i "/^node_offline_${id}=/d;/^node_core_${id}=/d" "$STATE" 2>/dev/null || true
     fi
-  done <<< "$REPORT"
+  done <<<"$REPORT"
 fi
 
 # 2.5) 每日心跳：没有异常时也要能证明"监控还活着"，否则静默既可能是太平也可能是守护死了
-HEARTBEAT_HOUR="${HEARTBEAT_HOUR:-9}"
 last_hb=$(grep -m1 "^last_heartbeat=" "$STATE" 2>/dev/null | cut -d= -f2)
 last_hb=${last_hb:-0}
 now_ts=$(date +%s)
@@ -100,7 +103,7 @@ if [ "$(date +%H)" -eq "$HEARTBEAT_HOUR" ] && [ $((now_ts - last_hb)) -gt 72000 
   summary=$(printf '%s' "${REPORT:-}" | awk -F'|' 'NF>=4{n++; if($3=="running") r++} END{printf "%d 个启用节点，%d 个运行中", n+0, r+0}')
   send INFO "每日心跳：面板正常，${summary}"
   sed -i "/^last_heartbeat=/d" "$STATE" 2>/dev/null || true
-  echo "last_heartbeat=$now_ts" >> "$STATE"
+  echo "last_heartbeat=$now_ts" >>"$STATE"
 fi
 
 # 3) 磁盘
