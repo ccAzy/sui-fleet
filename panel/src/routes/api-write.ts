@@ -17,6 +17,7 @@ import {
   run,
   type Env,
 } from "../db";
+import { ImportBundleSchema, SaveEnvelope, tryDecode } from "../schema";
 import {
   getConfig,
   loadPartial,
@@ -155,6 +156,15 @@ export function registerApiWrite(app: Hono<{ Bindings: Env }>) {
     const body = await c.req.parseBody();
     const obj = String(body.object ?? "");
     const action = String(body.action ?? "");
+    // 信封先过 schema：object 拼错时立刻返回明确错误，而不是落进 saveObject 的
+    // "unknown object" 分支（那里已经执行了一半的副作用）。
+    const envelope = tryDecode(SaveEnvelope, { object: obj, action });
+    if (!envelope.ok)
+      return json(
+        c,
+        null,
+        new Error(`非法请求：${envelope.issues.slice(0, 2).join("; ")}`),
+      );
     let data: unknown = {};
     try {
       data = JSON.parse(String(body.data ?? "{}"));
@@ -322,6 +332,16 @@ export function registerApiWrite(app: Hono<{ Bindings: Env }>) {
         ),
       );
     }
+
+    // 外形先过 schema：tables 必须是「表名 → 行数组」。
+    // 逐表的列名校验在 backup.ts 里做（要对照 PRAGMA，schema 表达不了）。
+    const shape = tryDecode(ImportBundleSchema, data);
+    if (!shape.ok)
+      return json(
+        c,
+        null,
+        new Error(`备份文件结构不对：${shape.issues.slice(0, 3).join("; ")}`),
+      );
 
     try {
       return json(c, await importBundle(c.env.DB, data));

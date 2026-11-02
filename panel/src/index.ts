@@ -47,6 +47,7 @@ import { registerOps } from "./routes/ops";
 import { registerSubInfo } from "./routes/sub-info";
 import { installScript } from "./install-script";
 import { registerApiWrite } from "./routes/api-write";
+import { rateLimited, unauthorized } from "./errors";
 
 type Ctx = { Bindings: Env };
 
@@ -145,11 +146,7 @@ async function loginRateLimited(
     ts - 300,
   );
   if ((recent?.c ?? 0) >= 8)
-    return json(
-      c,
-      null,
-      new Error("too many failed attempts, retry in a few minutes"),
-    );
+    return json(c, null, rateLimited());
   // 全局上限：不看 IP。客户端地址来自请求头，自托管时可能被伪造；
   // 只用「按 IP 计数」的话，攻击者每次换一个头就能绕开。
   const globalRecent = await first<{ c: number }>(
@@ -158,11 +155,7 @@ async function loginRateLimited(
     now() - 300,
   );
   if ((globalRecent?.c ?? 0) >= 30)
-    return json(
-      c,
-      null,
-      new Error("too many failed attempts, retry in a few minutes"),
-    );
+    return json(c, null, rateLimited());
   return null;
 }
 
@@ -487,7 +480,7 @@ app.use("/api/*", async (c, next) => {
   }
 
   const session = await currentUser(c);
-  if (!session) return json(c, null, new Error("Invalid login"));
+  if (!session) return json(c, null, unauthorized());
   const action = c.req.path.split("/").pop() ?? "";
   if (
     session.mustChange &&

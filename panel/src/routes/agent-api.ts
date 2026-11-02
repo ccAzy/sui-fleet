@@ -4,6 +4,7 @@
 // 从 index.ts 拆出来后，改节点协议不用碰面板的业务路由。
 import type { Hono } from "hono";
 import type { Env, NodeRow } from "../db";
+import { AgentReportBody, tryDecode } from "../schema";
 import {
   authAgent,
   handleReport,
@@ -43,16 +44,24 @@ export function registerAgentApi(app: Hono<{ Bindings: Env }>) {
   app.post("/agent/report", async (c) => {
     const node = await agentNode(c);
     if (!node) return c.json({ ok: false, error: "unauthorized" }, 401);
-    const body = (await c.req.json().catch(() => ({}))) as ReportBody;
+    const raw = await c.req.json().catch(() => ({}));
+    // 先按「已解析的领域值」收下：之后 handleReport 里就不必再 typeof 一遍。
+    // 注意顺序：先截断 traffic，再校验，避免 2 万条的正常上报被判成非法。
+    const MAX_TRAFFIC_TOTAL = 10_000;
+    if (raw && Array.isArray(raw.traffic) && raw.traffic.length > MAX_TRAFFIC_TOTAL)
+      raw.traffic = raw.traffic.slice(0, MAX_TRAFFIC_TOTAL);
+    const decoded = tryDecode(AgentReportBody, raw);
+    if (!decoded.ok)
+      return c.json(
+        { ok: false, error: `report 校验失败：${decoded.issues.slice(0, 3).join("; ")}` },
+        400,
+      );
+    // SAFETY: AgentReportBody 的字段是 ReportBody 的子集（status/traffic/commands 同形），
+    // decode 只做收窄不做转换，所以断言成立；新增字段时两边要同步。
+    const body = decoded.data as unknown as ReportBody;
     // 单次上报的流量条目数必须封顶：handleReport 对每条 traffic 追加 INSERT，
     // 并对每个命中 tag 再 UPDATE 一次，写放大约 2N。agent token 属于低权主体，
     // 不能让一次请求就能推动任意多的 D1 写（免费档 10 万/天是全库共享的）。
-    // 不再用 413 拒收：agent 的计数器是 swap 后发送的，任何非 200 都会让那批增量
-    // 永久丢失。超量时接收并截断到绝对上限（现实规模是"本轮有流量的客户端数"，
-    // 单节点个位数到十位数；10000 是防滥用的天花板，不是正常路径）。
-    const MAX_TRAFFIC_TOTAL = 10_000;
-    if (Array.isArray(body.traffic) && body.traffic.length > MAX_TRAFFIC_TOTAL)
-      body.traffic = body.traffic.slice(0, MAX_TRAFFIC_TOTAL);
     await handleReport(
       c.env.DB,
       node,

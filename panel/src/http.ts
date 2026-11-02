@@ -2,6 +2,7 @@
 // 从 index.ts 抽出来，避免路由模块反向 import 入口（那会成环）。
 import { getCookie, setCookie } from "hono/cookie";
 import { COOKIE, isSessionPayload, signJWT, verifyJWT } from "./auth";
+import { isAppError } from "./errors";
 import {
   first,
   getNode,
@@ -167,11 +168,17 @@ export async function resolveNode(
 
 let defaultNodeCache: { at: number; node: NodeRow | null } | null = null;
 
-/** s-ui 的响应约定：永远 200 + { success, msg, obj }。 */
+/**
+ * s-ui 的响应约定：永远 200 + { success, msg, obj }。
+ *
+ * 失败时额外带一个 `code`（仅当错误是 AppError）：它是稳定契约，
+ * 前端可以按 code 分支，而不是去匹配 `msg` 里的中文句子。
+ */
 export const json = (c: any, obj: unknown, error?: unknown) =>
   c.json({
     success: !error,
     msg: error ? String((error as Error)?.message ?? error) : "",
+    ...(isAppError(error) ? { code: error.code } : {}),
     obj: obj ?? null,
   });
 
