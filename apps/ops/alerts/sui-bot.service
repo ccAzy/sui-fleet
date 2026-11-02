@@ -1,0 +1,11 @@
+[Unit]
+Description=TG 命令机器人（只读查询）
+After=network-online.target sui-panel.service
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/sui-alert.env
+ExecStart=/opt/sui-alert/bot.sh
+Restart=always
+RestartSec=5
+User=sui
