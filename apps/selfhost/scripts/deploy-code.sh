@@ -37,6 +37,10 @@ scp -q -P "$SSH_PORT" -i "$SSH_KEY" -o StrictHostKeyChecking=no -o UserKnownHost
 # 远端脚本单独写成文件再执行：避免 heredoc 里 \$ 转义、CRLF 之类的坑
 cat >"$tmp/remote.sh" <<'REMOTE_SH'
 set -euo pipefail
+# 远端脚本通过 ssh 执行，非登录 shell 的 PATH 里没有 /opt/node/bin，
+# npm/node 会"找不到命令"。显式补齐，否则依赖安装会静默失败（实测踩过一次）。
+export PATH="/opt/node/bin:$PATH"
+
 STAMP=$(date +%Y%m%d-%H%M%S)
 BK=/opt/sui-panel/backup/code-$STAMP
 mkdir -p /opt/sui-panel/backup "$BK"
@@ -59,7 +63,14 @@ if [ -n "$CUR" ]; then
   done
   echo "  入口包已收敛到 $CUR"
 fi
-( cd /opt/sui-panel/apps/selfhost && npm install --no-audit --no-fund >/dev/null 2>&1 ) || true
+# 依赖必须跟着代码走：只同步源码而不同步 node_modules，新增一个依赖就会让面板起不来
+# （实测：加了 zod 之后 /health 一直失败，靠回滚才发现）。
+# 两个包都要装：apps/selfhost 是运行入口，panel 是被它 import 的业务代码。
+for pkg in panel apps/selfhost; do
+  if ! ( cd "/opt/sui-panel/$pkg" && npm install --no-audit --no-fund --prefer-offline >/dev/null 2>&1 ); then
+    echo "  警告：$pkg 依赖安装失败，稍后启动可能报 MODULE_NOT_FOUND" >&2
+  fi
+done
 
 systemctl restart sui-panel
 for i in $(seq 1 15); do
