@@ -36,13 +36,13 @@
             <v-row>
               <v-col style="text-align: center;">
                 <v-chip>{{ $t('setting.jsonSub') }}</v-chip><br />
-                <QrcodeVue :value="clientSub + '&format=json'" :size="size" @click="copyToClipboard(clientSub + '&format=json')" :margin="1" style="border-radius: 1rem; cursor: copy;" />
+                <QrcodeVue :value="jsonSub" :size="size" @click="copyToClipboard(jsonSub)" :margin="1" style="border-radius: 1rem; cursor: copy;" />
               </v-col>
             </v-row>
             <v-row>
               <v-col style="text-align: center;">
                 <v-chip>{{ $t('setting.clashSub') }}</v-chip><br />
-                <QrcodeVue :value="clientSub + '&format=clash'" :size="size" @click="copyToClipboard(clientSub + '&format=clash')" :margin="1" style="border-radius: 1rem; cursor: copy;" />
+                <QrcodeVue :value="clashSub" :size="size" @click="copyToClipboard(clashSub)" :margin="1" style="border-radius: 1rem; cursor: copy;" />
               </v-col>
             </v-row>
             <v-row>
@@ -69,6 +69,7 @@
 <script lang="ts">
 import QrcodeVue from 'qrcode.vue'
 import Data from '@/store/modules/data'
+import { clientSubUrl, withQuery } from '@/plugins/subUrl'
 import Clipboard from 'clipboard'
 import { i18n } from '@/locales'
 import { push } from 'notivue'
@@ -125,16 +126,20 @@ export default {
       // subURI 形如 `.../sub/<id>?k=<sub_key>`。sub_key 是**节点级**的，
       // client= 只是过滤参数 —— 去掉它就能拿到同节点所有人的链接。
       // 所以优先发 `?t=<sub_token>`：令牌自带作用域，链接本身就是凭据。
-      const base = Data().subURI
-      const node = base.replace(/\?.*$/, '')
-      const tok = (this.client as any).sub_token
-      if (tok) return `${node}?t=${tok}`
-      // 老客户端还没补令牌时退回过滤写法（cron 会补 sub_token）
-      const name = this.client.name
-      return name ? `${base}&client=${encodeURIComponent(name)}` : base
+      // 两种部署的 subURI 形状不同（面板带 ?k=，Go 单机不带查询串），
+      // 查询参数一律走 clientSubUrl/withQuery，不要手写 `&client=`。
+      const c = this.client as any
+      return clientSubUrl(Data().subURI, c.sub_token, c.name)
+    },
+    // 模板里不能直接调外部函数，所以把带格式的地址做成 computed
+    jsonSub() {
+      return withQuery(this.clientSub, "format", "json")
+    },
+    clashSub() {
+      return withQuery(this.clientSub, "format", "clash")
     },
     singbox() {
-      const url = this.clientSub + "&type=json"
+      const url = withQuery(this.clientSub, "type", "json")
       return "sing-box://import-remote-profile?url=" +  encodeURIComponent(url) + "#" + this.client.name
     },
     clientLinks() {

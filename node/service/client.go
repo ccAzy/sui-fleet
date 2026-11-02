@@ -103,6 +103,22 @@ func (s *ClientService) Save(tx *gorm.DB, act string, data json.RawMessage, host
 		if err != nil {
 			return nil, err
 		}
+		// 批量分支同样要保证令牌：addbulk 生成，editbulk 保留旧值
+		// （gorm Save 会写全字段，前端没带令牌就会把已发出去链接打废）。
+		for _, c := range clients {
+			if c.SubToken != "" {
+				continue
+			}
+			if act == "editbulk" && c.Id != 0 {
+				var old model.Client
+				if e := tx.Model(&model.Client{}).Select("sub_token").Where("id = ?", c.Id).First(&old).Error; e == nil {
+					c.SubToken = old.SubToken
+				}
+			}
+			if c.SubToken == "" {
+				c.SubToken = database.RandomSubToken()
+			}
+		}
 		err = tx.Save(clients).Error
 		if err != nil {
 			return nil, err
@@ -126,6 +142,22 @@ func (s *ClientService) Save(tx *gorm.DB, act string, data json.RawMessage, host
 			err = s.updateLinksWithFixedInbounds(tx, clients, hostname)
 			if err != nil {
 				return nil, err
+			}
+		}
+		// 批量分支同样要保证令牌：addbulk 生成，editbulk 保留旧值
+		// （gorm Save 会写全字段，前端没带令牌就会把已发出去链接打废）。
+		for _, c := range clients {
+			if c.SubToken != "" {
+				continue
+			}
+			if act == "editbulk" && c.Id != 0 {
+				var old model.Client
+				if e := tx.Model(&model.Client{}).Select("sub_token").Where("id = ?", c.Id).First(&old).Error; e == nil {
+					c.SubToken = old.SubToken
+				}
+			}
+			if c.SubToken == "" {
+				c.SubToken = database.RandomSubToken()
 			}
 		}
 		err = tx.Save(clients).Error

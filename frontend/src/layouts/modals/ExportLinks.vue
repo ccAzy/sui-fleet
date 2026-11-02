@@ -80,6 +80,7 @@
 <script lang="ts">
 import QrcodeVue from 'qrcode.vue'
 import Data from '@/store/modules/data'
+import { clientSubUrl } from '@/plugins/subUrl'
 import HttpUtils from '@/plugins/httputil'
 import Clipboard from 'clipboard'
 import { i18n } from '@/locales'
@@ -125,14 +126,11 @@ export default {
       this.count = 0
 
       // Subscription URLs: one per client (covers all its protocols, auto-updates).
-      const subBase = Data().subURI
-      const subNode = subBase.replace(/\?.*$/, '')
       // 优先 `?t=<sub_token>`：作用域写在令牌里，去掉参数也拿不到别人的链接。
+      // 拼接走 clientSubUrl：Go 单机模式的 subURI 不带查询串，手写 `&client=` 会落进路径。
       this.subList = Data().clients.map((c: any) => ({
         name: c.name,
-        uri: c.sub_token
-          ? `${subNode}?t=${c.sub_token}`
-          : `${subBase}&client=${encodeURIComponent(c.name)}`,
+        uri: clientSubUrl(Data().subURI, c.sub_token, c.name),
       }))
 
       // All share links: one request fetches full client rows (with links).
