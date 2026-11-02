@@ -9,14 +9,15 @@ SRC="${1:-$(cd "$(dirname "$0")/../node" && pwd)}"
 WORK="${WORK:-$HOME/build/sui-agent}"
 OUT_DIR="${OUT_DIR:-$(cd "$(dirname "$0")/.." && pwd)/dist}"
 
-
-
 # go.mod 要求 go 1.26.5；用 1.27 编译会在 go-json-experiment/json 上炸。
 # 显式挑一个 1.26.x 的 go：历史上这个脚本因为 PATH 里的 go 不存在而"静默产出 0 字节"，
 # 所以这里逐个探测并打印实际用的版本，找不到就直接退出。
 GO_BIN=""
 for d in "$HOME/tools/go126/bin" /tmp/go1265/bin "$HOME/tools/go/bin"; do
-  if [ -x "$d/go" ] && "$d/go" version | grep -q "go1\.26"; then GO_BIN="$d"; break; fi
+  if [ -x "$d/go" ] && "$d/go" version | grep -q "go1\.26"; then
+    GO_BIN="$d"
+    break
+  fi
 done
 if [ -z "$GO_BIN" ]; then
   echo "错误：找不到 go 1.26.x（找过 ~/tools/go126/bin、/tmp/go1265/bin、~/tools/go/bin）" >&2
@@ -35,7 +36,10 @@ echo "==> 使用 $GO_BIN ($($GO_BIN/go version))"
 export GOFLAGS=-mod=mod
 find_cache() {
   for c in "$GOMODCACHE" /mnt/c/Users/*/go/pkg/mod "$HOME/go/pkg/mod"; do
-    [ -n "$c" ] && [ -d "$c/github.com/sagernet" ] && { echo "$c"; return 0; }
+    [ -n "$c" ] && [ -d "$c/github.com/sagernet" ] && {
+      echo "$c"
+      return 0
+    }
   done
   return 1
 }

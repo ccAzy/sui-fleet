@@ -85,6 +85,15 @@ if [ -r "$DB" ] && command -v "$NODE" >/dev/null 2>&1; then
   ' "$DB" 2>/dev/null)
   while IFS='|' read -r id name state age; do
     [ -z "${id:-}" ] && continue
+    # id 来自数据库，而数据库可能来自一份导入的备份 —— 它会被拼进 sed 表达式
+    # (`/^node_offline_${id}=/d`) 和状态文件键名。别让一个精心构造的 id 在告警机
+    # 上执行命令（sed 的 e 命令、或注入分隔符跳出正则）。只认 [A-Za-z0-9_-]。
+    case "$id" in
+      *[!A-Za-z0-9_-]*)
+        log "SKIP 非法节点 id（含非法字符），不参与告警: $(printf '%q' "$id")"
+        continue
+        ;;
+    esac
     if [ "${age:-0}" -gt "$OFFLINE_SECONDS" ]; then
       fire "node_offline_${id}" CRIT "节点 ${name}（${id}）已失联 ${age}s"
     elif [ "${state:-}" != "running" ]; then

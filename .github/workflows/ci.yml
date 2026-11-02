@@ -40,6 +40,47 @@ jobs:
         run: npx wrangler deploy --dry-run --outdir dist
         working-directory: panel
 
+  node:
+    name: 节点 agent（Go 构建 + 单测）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: node/go.mod
+          cache-dependency-path: node/go.sum
+      # 以前这里只 build 不 test：agent_test.go 写了也从来没跑过，
+      # 「clients 变更必须重启内核」那条回归正是因此漏掉的。
+      - name: 单元测试
+        run: go test ./cmd -count=1
+        working-directory: node
+      - name: 构建 sui-agent
+        working-directory: node
+        env:
+          CGO_ENABLED: "1"
+        run: |
+          # 标签串太长，拆两行拼：单行版超过 80 列，yaml 行宽检查会拦
+          TAGS="with_quic,with_grpc,with_utls,with_acme,with_gvisor,"
+          TAGS="${TAGS}badlinkname,tfogo_checklinkname0,with_tailscale"
+          LD="-w -s -checklinkname=0"
+          go build -tags "$TAGS" -ldflags "$LD" -o /tmp/sui-agent .
+          ls -lh /tmp/sui-agent
+
+  selfhost:
+    name: 自托管壳（类型检查 + 单测）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+        working-directory: apps/selfhost
+      - run: npm run typecheck
+        working-directory: apps/selfhost
+      - run: npm test
+        working-directory: apps/selfhost
+
   frontend:
     name: 前端（构建）
     runs-on: ubuntu-latest
@@ -65,28 +106,6 @@ jobs:
             exit 1
           fi
 
-  node:
-    name: 节点（Go 构建 linux/amd64）
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: node/go.mod
-          cache-dependency-path: node/go.sum
-      - name: 构建 sui-agent
-        working-directory: node
-        env:
-          CGO_ENABLED: "1"
-        run: |
-          # 标签串太长，拆成两行拼：单行版超过 80 列，CI 的 markdown/yaml 行宽检查会拦
-          TAGS="with_quic,with_grpc,with_utls,with_acme,with_gvisor,"
-          TAGS="${TAGS}badlinkname,tfogo_checklinkname0,with_tailscale"
-          go build -tags "$TAGS" \
-            -ldflags '-w -s -checklinkname=0' \
-            -o /tmp/sui-agent .
-          ls -lh /tmp/sui-agent
-
   arbiter:
     name: 仲裁者（单测）
     runs-on: ubuntu-latest
@@ -101,17 +120,3 @@ jobs:
         working-directory: apps/arbiter
       - run: npm test
         working-directory: apps/arbiter
-
-  selfhost:
-    name: 自托管运行时（类型检查）
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - run: npm install --no-audit --no-fund
-        working-directory: apps/selfhost
-      - name: tsc（同时校验 panel/src，两个运行时共用一份业务代码）
-        run: npx tsc --noEmit -p tsconfig.json
-        working-directory: apps/selfhost

@@ -114,8 +114,10 @@ type agent struct {
 
 func agentCmd(args []string) {
 	fs := flag.NewFlagSet("agent", flag.ExitOnError)
-	panel := fs.String("panel", os.Getenv("SUI_PANEL"), "panel base url, e.g. https://panel.example.com")
-	token := fs.String("token", os.Getenv("SUI_AGENT_TOKEN"), "agent token issued by the panel")
+	// 环境变量优先，命令行参数其次。生产 unit 里不要在 ExecStart 写 --token：
+	// unit 文件/进程 argv 对本地任何用户可读，凭据只该待在 0600 的 EnvironmentFile 里。
+	panel := fs.String("panel", envFirst("SUI_AGENT_PANEL", "SUI_PANEL"), "panel base url, e.g. https://panel.example.com")
+	token := fs.String("token", envFirst("SUI_AGENT_TOKEN", "SUI_TOKEN"), "agent token issued by the panel")
 	interval := fs.Int("interval", 30, "pull/report interval in seconds")
 	noCore := fs.Bool("no-core", false, "only sync data, do not start sing-box (debug)")
 	dumpCfg := fs.Bool("dump-config", false, "print the rendered sing-box config from local db and exit")
@@ -878,6 +880,16 @@ func coreConfigSig(pr *agentPullResp) string {
 		h.Write([]byte{0})
 	}
 	return hex.EncodeToString(h.Sum(nil))
+}
+
+// envFirst 返回第一个非空的环境变量值。用于兼容历史命名（SUI_AGENT_* 与 SUI_*）。
+func envFirst(keys ...string) string {
+	for _, k := range keys {
+		if v := os.Getenv(k); v != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 func loadCoreSig() string {

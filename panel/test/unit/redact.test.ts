@@ -69,3 +69,32 @@ describe("redactForToken", () => {
     expect(out.Private_Key).toBe("SECRET");
   });
 });
+
+// 第 6 轮审计：WARP 的 access_token/license_key 与 ACME 的 api_token/access_key_secret
+// 曾整串出现在只读令牌的响应和 changes 日志里。这条测试把它们钉住。
+describe("redactForToken 覆盖 WARP 与 ACME 凭据", () => {
+  it("WARP 凭据被替换", () => {
+    const out = redactForToken({
+      type: "warp",
+      access_token: "AT-SECRET",
+      license_key: "LIC-SECRET",
+      device_id: "keep-me",
+    }) as Record<string, unknown>;
+    expect(out.access_token).not.toBe("AT-SECRET");
+    expect(out.license_key).not.toBe("LIC-SECRET");
+    expect(out.device_id).toBe("keep-me");
+  });
+
+  it("ACME 凭据被替换", () => {
+    const out = redactForToken({
+      api_token: "T-SECRET",
+      access_key_secret: "AKS-SECRET",
+      security_token: "ST-SECRET",
+      provider: "aliyun",
+    }) as Record<string, unknown>;
+    expect(out.api_token).not.toBe("T-SECRET");
+    expect(out.access_key_secret).not.toBe("AKS-SECRET");
+    expect(out.security_token).not.toBe("ST-SECRET");
+    expect(out.provider).toBe("aliyun");
+  });
+});

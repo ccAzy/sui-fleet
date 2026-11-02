@@ -124,7 +124,10 @@ Wants=network-online.target
 WorkingDirectory=/opt/sui-agent
 EnvironmentFile=/etc/sui-agent.env
 Environment=SUI_DB_FOLDER=/opt/sui-agent/db
-ExecStart=/opt/sui-agent/bin/sui-agent agent --panel $PANEL --token $TOKEN --interval 60
+# 不要把 --panel/--token 写进 ExecStart：unit 文件是 0644，任何本地用户都能
+# 看到 argv；这两个值由 agent 从 EnvironmentFile（0600）的 SUI_PANEL /
+# SUI_AGENT_TOKEN 读取。
+ExecStart=/opt/sui-agent/bin/sui-agent agent --interval 60
 Restart=always
 RestartSec=5
 LimitNOFILE=1048576

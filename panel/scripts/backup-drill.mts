@@ -69,7 +69,10 @@ const count = async (db: any, t: string) => {
 };
 
 for (const t of TABLES) {
-  if (t === "tokens") {
+  // commands 与 tokens 一样属于"按设计不还原"：
+  // commands 是下发给节点、由 agent 以 root 执行的队列；恢复备份等于复活一批
+  // 可能早已作废的 root 指令。恢复后需要执行的命令重新下发。
+  if (t === "commands" || t === "tokens") {
     // 导入策略明确不还原 API token（凭据复活风险），这里只标注不算失败
     const after = await count(workDb, t);
     console.log(`  ${t.padEnd(9)} 源=${String(await count(srcDb, t)).padStart(4)} 恢复=${String(after).padStart(4)}  （按设计不还原）`);

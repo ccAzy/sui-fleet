@@ -110,7 +110,11 @@ export async function importBundle(
     "settings",
     "changes",
     "usage",
-    "commands",
+    // 注意：不导入 commands。
+    // commands 是「下发给节点、由 agent 以 root 执行」的队列，属于瞬时指令不是状态。
+    // 备份里原样带回来，等于给了一条绕开 /api/release 校验的 root 命令通道：
+    // 任何人只要能导入一份备份，就能在 10 台节点上执行任意命令。
+    // 导出保留（出事时可取证），导入一律丢弃，需要执行的命令重新下发。
     "meta",
   ];
 
@@ -189,6 +193,22 @@ export async function importBundle(
     db,
     "SELECT key, value FROM meta WHERE key IN ('jwt_secret','ops_token_hash','backup_token_hash')",
   );
+  // 节点凭据同理：token_hash / sub_key 是轮换过的。恢复一份旧备份不该把
+  // 已经作废的 agent token 和订阅令牌重新变成有效凭证（正好是“被偷后轮换”的场景）。
+  // 已存在的节点 id 一律保留当前值；备份里的新节点才用备份值。
+  const localNodes = await all<{
+    id: string;
+    token_hash: string;
+    sub_key: string;
+  }>(db, "SELECT id, token_hash, sub_key FROM nodes");
+  const localNodeSecrets = new Map(localNodes.map((n) => [String(n.id), n]));
+  // 聚合订阅钥（agg_key）是全局凭据：导入备份不应把现网那把换掉，
+  // 否则所有已发出的聚合订阅链接集体失效，或者把旧钥重新复活。
+  const localAgg = await all<{ value: string }>(
+    db,
+    "SELECT value FROM meta WHERE key = 'agg_key'",
+  );
+  const hasLocalAgg = localAgg.length > 0;
 
   // 2) 预检 + 拼语句
   const imported: Record<string, number> = {};
@@ -220,6 +240,7 @@ export async function importBundle(
   const metaRows = [...metaMap.entries()]
     .filter(([k]) => !LOCAL_SECRET_KEYS.includes(k))
     .filter(([k]) => META_CARRY.includes(k))
+    .filter(([k]) => !(k === "agg_key" && hasLocalAgg))
     .map(([key, value]) => ({ key, value }));
 
   for (const t of order) {
@@ -236,6 +257,17 @@ export async function importBundle(
       rows = rawRows.map((r) => {
         const { session_epoch: _se, ...rest } = r as Record<string, unknown>;
         return rest;
+      });
+    } else if (t === "nodes") {
+      // 凭据用现网的：恢复备份不能把轮换掉的 agent token / 订阅令牌复活。
+      rows = rawRows.map((r) => {
+        const row = { ...(r as Record<string, unknown>) };
+        const cur = localNodeSecrets.get(String(row.id ?? ""));
+        if (cur) {
+          row.token_hash = cur.token_hash;
+          row.sub_key = cur.sub_key;
+        }
+        return row;
       });
     } else rows = rawRows;
     const filtered = rows;

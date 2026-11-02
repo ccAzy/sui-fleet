@@ -34,6 +34,20 @@ const SECRET_KEYS = new Set([
   "sub_token",
   "jwt_secret",
   "secret",
+  // 第 6 轮审计补：这些是 WARP(Cloudflare) 与 ACME(DNS-01) 的凭据键，
+  // 之前漏在名单外 —— /api/outbounds 能把 WARP 的 access_token/license_key
+  // 整串读出来，changes 日志里的 ACME api_token/access_key_secret 也一样。
+  "access_token",
+  "refresh_token",
+  "license_key",
+  "api_token",
+  "api_key",
+  "auth_token",
+  "client_secret",
+  "access_key_secret",
+  "security_token",
+  "secret_key",
+  "session_token",
 ]);
 
 /**

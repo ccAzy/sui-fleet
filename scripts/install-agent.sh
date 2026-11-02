@@ -100,7 +100,8 @@ Type=simple
 WorkingDirectory=$DIR
 EnvironmentFile=/etc/sui-agent.env
 Environment=SUI_DB_FOLDER=$DIR/db
-ExecStart=$DIR/bin/sui-agent agent --panel \$SUI_AGENT_PANEL --token \$SUI_AGENT_TOKEN --interval 30
+# 凭据只放 EnvironmentFile(0600)，不进 unit 的 argv（unit 是 0644）
+ExecStart=$DIR/bin/sui-agent agent --interval 30
 Restart=always
 RestartSec=5
 LimitNOFILE=1048576

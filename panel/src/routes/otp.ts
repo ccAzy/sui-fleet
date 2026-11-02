@@ -14,6 +14,7 @@ import {
   type UserRow,
 } from "../db";
 import { json, okMsg, readBody, reissueSession } from "../http";
+import { rateLimited } from "../errors";
 import {
   hashRecovery,
   newRecoveryCodes,
@@ -35,6 +36,40 @@ async function revokeSessions(c: any, user: UserRow): Promise<void> {
     username: user.username,
     mustChange: user.must_change === 1,
   });
+}
+
+
+// 2FA 的校验端点必须限流。
+//
+// 为什么：拿到会话的攻击者可以对 6 位码在线爆破（100 万组合、30 秒一换，
+// 不限流时几分钟能试上万次；恢复码只有 10 个、每码 8 位也很容易被试光）。
+// 只有 /api/login* 有限流是不够的，因为攻击者此时已经有会话了。
+//
+// 复用 login_attempts 表，用 "otp:<uid>" 当 ip 键：同一用户 5 分钟内错 5 次即拒。
+const OTP_FAIL_LIMIT = 5;
+const OTP_FAIL_WINDOW = 300;
+
+async function otpRateLimited(
+  c: any,
+  uid: number,
+): Promise<Response | null> {
+  const row = await first<{ c: number }>(
+    c.env.DB,
+    "SELECT COUNT(*) as c FROM login_attempts WHERE ip = ? AND ts > ? AND ok = 0",
+    `otp:${uid}`,
+    now() - OTP_FAIL_WINDOW,
+  );
+  if ((row?.c ?? 0) >= OTP_FAIL_LIMIT) return json(c, null, rateLimited());
+  return null;
+}
+
+async function recordOtpFailure(c: any, uid: number): Promise<void> {
+  await run(
+    c.env.DB,
+    "INSERT INTO login_attempts (ip, ts, ok) VALUES (?, ?, 0)",
+    `otp:${uid}`,
+    now(),
+  );
 }
 
 async function me(c: any): Promise<UserRow | null> {
@@ -125,15 +160,19 @@ export function registerOtpAdmin(app: Hono<{ Bindings: Env }>) {
     const user = await me(c);
     if (!user) return json(c, null, new Error("Invalid login"));
     if (!user.otp_secret) return json(c, null, new Error("请先生成密钥"));
+    const limited = await otpRateLimited(c, user.id);
+    if (limited) return limited;
     const body = await readBody(c);
     const code = String(body.code ?? "");
     const step = await totpVerify(user.otp_secret, code, 0);
-    if (!step)
+    if (!step) {
+      await recordOtpFailure(c, user.id);
       return json(
         c,
         null,
         new Error("验证码不正确（检查手机时间是否自动同步）"),
       );
+    }
 
     const codes = newRecoveryCodes(10);
     const hashed: string[] = [];
@@ -159,9 +198,13 @@ export function registerOtpAdmin(app: Hono<{ Bindings: Env }>) {
     const user = await me(c);
     if (!user) return json(c, null, new Error("Invalid login"));
     if (user.otp_on !== 1) return json(c, null, new Error("二次验证未开启"));
+    const limited = await otpRateLimited(c, user.id);
+    if (limited) return limited;
     const body = await readBody(c);
-    if (!(await checkProof(c.env.DB, user, String(body.code ?? ""))))
+    if (!(await checkProof(c.env.DB, user, String(body.code ?? "")))) {
+      await recordOtpFailure(c, user.id);
       return json(c, null, new Error("验证码不正确"));
+    }
 
     const codes = newRecoveryCodes(10);
     const hashed: string[] = [];
@@ -180,9 +223,13 @@ export function registerOtpAdmin(app: Hono<{ Bindings: Env }>) {
     const user = await me(c);
     if (!user) return json(c, null, new Error("Invalid login"));
     if (user.otp_on !== 1) return okMsg(c, "already off");
+    const limited = await otpRateLimited(c, user.id);
+    if (limited) return limited;
     const body = await readBody(c);
-    if (!(await checkProof(c.env.DB, user, String(body.code ?? ""))))
+    if (!(await checkProof(c.env.DB, user, String(body.code ?? "")))) {
+      await recordOtpFailure(c, user.id);
       return json(c, null, new Error("验证码不正确"));
+    }
 
     await run(
       c.env.DB,
