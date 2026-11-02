@@ -92,13 +92,16 @@ function renderSubscription(
   }
   if (subType === "singbox") {
     // 返回完整配置对象（不是裸数组）：标准 remote profile 期望可加载的配置。
-    return new Response(JSON.stringify(buildSingboxConfig(links, title), null, 2), {
-      status: 200,
-      headers: {
-        ...headers,
-        "Content-Type": "application/json; charset=utf-8",
+    return new Response(
+      JSON.stringify(buildSingboxConfig(links, title), null, 2),
+      {
+        status: 200,
+        headers: {
+          ...headers,
+          "Content-Type": "application/json; charset=utf-8",
+        },
       },
-    });
+    );
   }
   const text = links.join(String.fromCharCode(10));
   const payload = btoa(String.fromCharCode(...new TextEncoder().encode(text)));

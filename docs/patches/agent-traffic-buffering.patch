@@ -1,0 +1,227 @@
+diff --git a/node/cmd/agent.go b/node/cmd/agent.go
+index 7dd16e0..4bc37ae 100644
+--- a/node/cmd/agent.go
++++ b/node/cmd/agent.go
+@@ -104,6 +104,11 @@ type agent struct {
+ 
+ 	// 收到 update_agent 并成功替换二进制后，上报完回执就重启自己
+ 	restartSelf bool
++
++	// 待上报的流量增量。collectTraffic 取数时内核计数器已经被 swap(0) 清零，
++	// 所以只要上报没被面板收下（网络错误、5xx、限流），这批增量就永久丢了。
++	// 攒在这里、成功后再清，并落库以便进程重启也不丢。
++	pending map[string]*trafficDelta
+ }
+ 
+ func agentCmd(args []string) {
+@@ -144,6 +149,7 @@ func agentCmd(args []string) {
+ 	}
+ 	a.rev = loadLocalRevision()
+ 	a.hash = loadLocalHash()
++	a.pending = loadPendingTraffic()
+ 
+ 	if *dumpCfg {
+ 		svc := service.NewConfigService(core.NewCore())
+@@ -280,9 +286,15 @@ func (a *agent) pullOnce() (bool, []map[string]interface{}, error) {
+ 	if pr.Unchanged {
+ 		return false, results, nil
+ 	}
++	// 只有「内核配置」变了才需要重启：settings 变更（面板侧设置页）也会触发一次下发，
++	// 但那些字段不影响 sing-box，重启只会白断一次连接。
++	sig := coreConfigSig(&pr)
++	prevSig := loadCoreSig()
+ 	if err := a.apply(&pr); err != nil {
+ 		return false, results, fmt.Errorf("apply config: %w", err)
+ 	}
++	saveCoreSig(sig)
++	changed := sig != prevSig
+ 
+ 	a.mu.Lock()
+ 	a.rev = pr.Revision
+@@ -290,8 +302,12 @@ func (a *agent) pullOnce() (bool, []map[string]interface{}, error) {
+ 	a.mu.Unlock()
+ 	saveLocalRevision(pr.Revision)
+ 	saveLocalHash(pr.Hash)
+-	fmt.Printf("agent: applied revision %d (inbounds=%d clients=%d)\n", pr.Revision, len(pr.Inbounds), len(pr.Clients))
+-	return true, results, nil
++	if changed {
++		fmt.Printf("agent: applied revision %d (inbounds=%d clients=%d)\n", pr.Revision, len(pr.Inbounds), len(pr.Clients))
++	} else {
++		fmt.Printf("agent: applied revision %d (core config unchanged, skip restart)\n", pr.Revision)
++	}
++	return changed, results, nil
+ }
+ 
+ // apply 全量替换本地配置并落盘。s-ui 的 model 自带拆列逻辑，
+@@ -461,7 +477,9 @@ func (a *agent) reportOnce(cmdResults []map[string]interface{}) error {
+ 	}
+ 	status["onlines"] = collectOnlines()
+ 
+-	traffic := collectTraffic()
++	// 先并入待上报集合：collectTraffic 已经把内核计数器清零了，
++	// 从这里开始任何失败都不能再让这批数据消失。
++	a.absorbTraffic(collectTraffic())
+ 
+ 	coreState := "stopped"
+ 	if c := service.CoreInstance(); c != nil {
+@@ -479,7 +497,7 @@ func (a *agent) reportOnce(cmdResults []map[string]interface{}) error {
+ 		CoreState:       coreState,
+ 		Uptime:          int64(time.Since(a.started).Seconds()),
+ 		Status:          status,
+-		Traffic:         traffic,
++		Traffic:         a.snapshotTraffic(),
+ 		Commands:        cmdResults,
+ 	}
+ 	if coreState != "running" {
+@@ -489,8 +507,12 @@ func (a *agent) reportOnce(cmdResults []map[string]interface{}) error {
+ 	}
+ 
+ 	payload, _ := json.Marshal(body)
+-	_, err := a.do("POST", "/agent/report", payload)
+-	return err
++	if _, err := a.do("POST", "/agent/report", payload); err != nil {
++		return err
++	}
++	// 面板确实收下了才清空；失败则留到下轮继续带（服务端按 tag 累加，不会重复计）。
++	a.clearTraffic()
++	return nil
+ }
+ 
+ // collectTraffic 取内核计数器增量（GetStats 内部会 swap(0)），按客户端聚合。
+@@ -729,6 +751,136 @@ func loadLocalRevision() int64 {
+ 	return v
+ }
+ 
++const agentPendingTrafficKey = "agent_pending_traffic"
++const agentCoreSigKey = "agent_core_sig"
++
++// 单次上报的流量条目上限（面板侧也有限制；这里先截，避免请求体无界）。
++const maxTrafficEntries = 5000
++
++func loadPendingTraffic() map[string]*trafficDelta {
++	out := map[string]*trafficDelta{}
++	var s model.Setting
++	if err := database.GetDB().Where("key = ?", agentPendingTrafficKey).First(&s).Error; err != nil {
++		return out
++	}
++	var list []trafficDelta
++	if err := json.Unmarshal([]byte(s.Value), &list); err != nil {
++		return out
++	}
++	for _, d := range list {
++		if d.Tag == "" {
++			continue
++		}
++		acc, ok := out[d.Tag]
++		if !ok {
++			acc = &trafficDelta{Tag: d.Tag}
++			out[d.Tag] = acc
++		}
++		acc.Up += d.Up
++		acc.Down += d.Down
++	}
++	return out
++}
++
++func savePendingTraffic(m map[string]*trafficDelta) {
++	list := make([]trafficDelta, 0, len(m))
++	for _, d := range m {
++		if d.Up == 0 && d.Down == 0 {
++			continue
++		}
++		list = append(list, *d)
++	}
++	raw, err := json.Marshal(list)
++	if err != nil {
++		return
++	}
++	db := database.GetDB()
++	var s model.Setting
++	if err := db.Where("key = ?", agentPendingTrafficKey).First(&s).Error; err != nil {
++		_ = db.Create(&model.Setting{Key: agentPendingTrafficKey, Value: string(raw)}).Error
++		return
++	}
++	_ = db.Model(&model.Setting{}).Where("key = ?", agentPendingTrafficKey).Update("value", string(raw)).Error
++}
++
++// absorbTraffic 把本轮从内核取到的增量并进待上报集合（按 tag 累加）。
++func (a *agent) absorbTraffic(list []trafficDelta) {
++	a.mu.Lock()
++	defer a.mu.Unlock()
++	if a.pending == nil {
++		a.pending = map[string]*trafficDelta{}
++	}
++	for _, d := range list {
++		if d.Tag == "" {
++			continue
++		}
++		acc, ok := a.pending[d.Tag]
++		if !ok {
++			acc = &trafficDelta{Tag: d.Tag}
++			a.pending[d.Tag] = acc
++		}
++		acc.Up += d.Up
++		acc.Down += d.Down
++	}
++}
++
++// snapshotTraffic 取一份可用于上报的拷贝（不清空）。
++func (a *agent) snapshotTraffic() []trafficDelta {
++	a.mu.Lock()
++	defer a.mu.Unlock()
++	out := make([]trafficDelta, 0, len(a.pending))
++	for _, d := range a.pending {
++		if d.Up == 0 && d.Down == 0 {
++			continue
++		}
++		out = append(out, *d)
++		if len(out) >= maxTrafficEntries {
++			break
++		}
++	}
++	return out
++}
++
++// clearTraffic 只在面板确实收下（2xx）之后调用。
++func (a *agent) clearTraffic() {
++	a.mu.Lock()
++	a.pending = map[string]*trafficDelta{}
++	a.mu.Unlock()
++	savePendingTraffic(map[string]*trafficDelta{})
++}
++
++// coreConfigSig 只覆盖「内核配置」：settings 变化不需要重启 sing-box。
++func coreConfigSig(pr *agentPullResp) string {
++	h := sha256.New()
++	h.Write(pr.Config)
++	h.Write([]byte{0})
++	for _, group := range [][]json.RawMessage{pr.TLS, pr.Inbounds, pr.Outbounds, pr.Endpoints, pr.Services} {
++		for _, b := range group {
++			h.Write(b)
++			h.Write([]byte{0})
++		}
++	}
++	return hex.EncodeToString(h.Sum(nil))
++}
++
++func loadCoreSig() string {
++	var s model.Setting
++	if err := database.GetDB().Where("key = ?", agentCoreSigKey).First(&s).Error; err != nil {
++		return ""
++	}
++	return s.Value
++}
++
++func saveCoreSig(sig string) {
++	db := database.GetDB()
++	var s model.Setting
++	if err := db.Where("key = ?", agentCoreSigKey).First(&s).Error; err != nil {
++		_ = db.Create(&model.Setting{Key: agentCoreSigKey, Value: sig}).Error
++		return
++	}
++	_ = db.Model(&model.Setting{}).Where("key = ?", agentCoreSigKey).Update("value", sig).Error
++}
++
+ func loadLocalHash() string {
+ 	var s model.Setting
+ 	if err := database.GetDB().Where("key = ?", agentHashKey).First(&s).Error; err != nil {
