@@ -1,4 +1,3 @@
-// 繁體中文（臺灣）。207 個缺失鍵由 zh-CN 經 OpenCC s2twp 轉換補齊，其餘為人工譯文。
 export default {
   "success": "成功",
   "failed": "失敗",
@@ -99,7 +98,16 @@ export default {
       "title": "使用量與統計",
       "totalUsage": "總用量"
     },
-    "emptyHint": "這張體檢單還沒選讀數——挑幾項你想盯著的。"
+    "emptyHint": "這張體檢單還沒選讀數——挑幾項你想盯著的。",
+    "trend": {
+      "title": "近",
+      "unit": " 天流量",
+      "empty": "還沒有用量記錄——節點上報之後才會出現。",
+      "top": "流量最多",
+      "watch": "需要處理",
+      "expired": "已到期",
+      "dleft": " 天後到期"
+    }
   },
   "objects": {
     "inbound": "入站",

@@ -148,6 +148,9 @@
             </div>
           </section>
         </div>
+
+        <!-- 历史：近 7 天流量（按天聚合）+ 谁在吃流量 + 需要处理的客户端 -->
+        <TrafficTrend ref="trend" />
       </template>
     </div>
   </div>
@@ -159,6 +162,7 @@ import { HumanReadable } from '@/plugins/utils'
 import Data from '@/store/modules/data'
 import Gauge from '@/components/tiles/Gauge.vue'
 import History from '@/components/tiles/History.vue'
+import TrafficTrend from '@/components/tiles/TrafficTrend.vue'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { i18n, locale } from '@/locales'
 import LogVue from '@/layouts/modals/Logs.vue'
@@ -166,6 +170,7 @@ import Backup from '@/layouts/modals/Backup.vue'
 import UsageStats from '@/layouts/modals/UsageStats.vue'
 
 const loading = ref(false)
+const trend = ref<InstanceType<typeof TrafficTrend> | null>(null)
 const menu = ref(false)
 const menuItems = [
   { title: i18n.global.t('main.gauges'), value: [

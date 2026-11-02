@@ -451,6 +451,61 @@ export function registerApiRead(app: Hono<{ Bindings: Env }>) {
     return json(c, out);
   });
 
+  // 用量汇总：给面板首页的「近 N 天流量 + Top 客户端 + 需要关注的客户端」用。
+  // 数据源是 usage 表（每个上报周期一行，保留 30 天），按天聚合后再算 Top。
+  app.get("/api/usage-summary", async (c) => {
+    const node = await resolveNode(c.env.DB, c.req.header("X-Remote-Server"));
+    if (!node) return json(c, { days: [], top: [], watch: [] });
+    const days = Math.min(Math.max(parseInt(c.req.query("days") ?? "7", 10) || 7, 1), 30);
+    const since = now() - days * 86400;
+
+    const dailyRows = await all<{ d: string; up: number; down: number }>(
+      c.env.DB,
+      "SELECT date(ts, 'unixepoch', 'localtime') AS d, " +
+        "COALESCE(SUM(up),0) AS up, COALESCE(SUM(down),0) AS down " +
+        "FROM usage WHERE node_id = ? AND ts > ? GROUP BY d ORDER BY d ASC",
+      node.id,
+      since,
+    );
+    const topRows = await all<{ tag: string; up: number; down: number }>(
+      c.env.DB,
+      "SELECT tag, COALESCE(SUM(up),0) AS up, COALESCE(SUM(down),0) AS down " +
+        "FROM usage WHERE node_id = ? AND ts > ? AND tag <> '' " +
+        "GROUP BY tag ORDER BY (SUM(up) + SUM(down)) DESC LIMIT 5",
+      node.id,
+      since,
+    );
+
+    // 需要关注：即将到期（7 天内）或已用超额/临界的客户端
+    const clients = await listObjects(c.env.DB, node.id, "clients");
+    const nowTs = now();
+    const watch = clients
+      .map((cl) => {
+        const c2 = cl as Record<string, unknown>;
+        const volume = Number(c2.volume) || 0;
+        const used = (Number(c2.up) || 0) + (Number(c2.down) || 0);
+        const expiry = Number(c2.expiry) || 0;
+        return {
+          name: String(c2.name ?? ""),
+          enabled: c2.enable !== false,
+          used,
+          volume,
+          pct: volume > 0 ? Math.min(100, Math.round((used / volume) * 100)) : 0,
+          expiry,
+          daysLeft: expiry > 0 ? Math.ceil((expiry - nowTs) / 86400) : 0,
+        };
+      })
+      .filter((x) => x.enabled)
+      .filter(
+        (x) =>
+          (x.volume > 0 && x.pct >= 85) || (x.expiry > 0 && x.daysLeft <= 7),
+      )
+      .sort((a, b) => b.pct - a.pct || a.daysLeft - b.daysLeft)
+      .slice(0, 5);
+
+    return json(c, { days: dailyRows, top: topRows, watch });
+  });
+
   app.get("/api/updateInfo", async (c) =>
     json(c, { current: "cf-0.1.0", latest: "cf-0.1.0" }),
   );

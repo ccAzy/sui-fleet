@@ -98,7 +98,16 @@ export default {
       "title": "Sử dụng và số lượng",
       "totalUsage": "Tổng sử dụng"
     },
-    "emptyHint": "Trang này còn trống — chọn những chỉ số bạn muốn theo dõi."
+    "emptyHint": "Trang này còn trống — chọn những chỉ số bạn muốn theo dõi.",
+    "trend": {
+      "title": "Lưu lượng",
+      "unit": " ngày",
+      "empty": "Chưa có dữ liệu — sẽ hiện sau khi node báo cáo.",
+      "top": "Dùng nhiều nhất",
+      "watch": "Cần xử lý",
+      "expired": "đã hết hạn",
+      "dleft": " ngày còn lại"
+    }
   },
   "objects": {
     "inbound": "Đầu Vào",
