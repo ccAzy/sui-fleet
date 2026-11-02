@@ -8,6 +8,7 @@ import type { Hono } from "hono";
 import { all, getNode, listNodes, type Env } from "../db";
 import { buildClashConfig, linkToProxy } from "../clash";
 import { buildSingboxConfig, linkToOutbound } from "../singbox";
+import { clientIp } from "../http";
 
 type SubFormat = "" | "clash" | "singbox";
 
@@ -194,15 +195,27 @@ function collectLinks(cl: Record<string, unknown>): string[] {
 // 但自托管（我们自己的部署）就是单进程，效果正确。
 const SUB_RATE_LIMIT = 60; // 每 IP 每分钟
 const SUB_RATE_WINDOW_MS = 60_000;
+const SUB_RATE_MAX_KEYS = 65_536;
 const subHits = new Map<string, { n: number; reset: number }>();
 
 function subClientKey(c: any): string {
-  const cf = c.req.header("CF-Connecting-IP");
-  if (cf) return cf;
-  // Caddy/反代会补 XFF；取第一跳作为客户端地址
-  const xff = c.req.header("X-Forwarded-For");
-  if (xff) return String(xff).split(",")[0].trim();
-  return "unknown";
+  // 用 http.ts 的 clientIp()：它要求 cf-ray 与 CF-Connecting-IP 同时存在，
+  // 自托管（没配 TRUST_PROXY）时一律返回 "direct"。原来无条件信 CF 头，
+  // 攻击者每个请求换一个值就能永不触发限速 —— 等于没限。
+  const ip = clientIp(c);
+  return maskIp(ip);
+}
+
+/**
+ * IPv6 归到 /64：换地址零成本，不聚合的话一个 /64 就能绕过限速。
+ * 这不是精确的 /64 计算，但对我们只需要"同一个前缀落进同一个桶"够用。
+ */
+function maskIp(ip: string): string {
+  if (!ip.includes(":")) return ip;
+  const parts = ip.split("::");
+  const head = (parts[0] || "").split(":").filter(Boolean).slice(0, 4);
+  while (head.length < 4) head.push("0");
+  return `${head.join(":")}::/64`;
 }
 
 function subRateLimited(c: any): boolean {
@@ -211,12 +224,21 @@ function subRateLimited(c: any): boolean {
   const cur = subHits.get(key);
   if (!cur || nowMs > cur.reset) {
     // 顺带清理，避免 Map 无界增长（每次最多清 256 条过期项）
-    if (subHits.size > 4096) {
+    // 硬上限：原来只有"过期才清"，而 key 曾经可伪造 → 无界增长。
+    // 超过上限先清过期项，仍超就淘汰一批（宁可短期放宽，也不要 OOM）。
+    if (subHits.size >= SUB_RATE_MAX_KEYS) {
       let n = 0;
       for (const [k, v] of subHits) {
         if (nowMs > v.reset) {
           subHits.delete(k);
-          if (++n >= 256) break;
+          if (++n >= 4096) break;
+        }
+      }
+      if (subHits.size >= SUB_RATE_MAX_KEYS) {
+        let m = 0;
+        for (const k of subHits.keys()) {
+          subHits.delete(k);
+          if (++m >= 4096) break;
         }
       }
     }

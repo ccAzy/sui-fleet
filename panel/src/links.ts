@@ -362,7 +362,7 @@ export function genLinks(
         const frag = a.remark ? `#${encodeURIComponent(a.remark)}` : "";
         links.push(`socks5://${userinfo(u, p)}@${hostPort}${frag}`);
         links.push(
-          `${a.tls ? "https" : "http"}://${u}:${p}@${hostPort}${frag}`,
+          `${a.tls ? "https" : "http"}://${userinfo(u, p)}@${hostPort}${frag}`,
         );
         break;
       }

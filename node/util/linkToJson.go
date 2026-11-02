@@ -11,7 +11,43 @@ import (
 	"github.com/alireza0/s-ui/util/common"
 )
 
+
+// normalizeSSLink 修 "ss://" 链接里 base64 userinfo 含 "/" 的问题。
+//
+// SIP002 允许 base64 里出现 "/"，而 URL 解析器会把第一个 "/" 当成路径分隔符：
+//   ss://YWVzLTEyOC1nY206cGFzcw==@h:443   → 正常
+//   ss://ab/cd==@h:443                    → Host="ab"、Path="/cd==@h:443"，节点被丢弃
+// 处理办法：把 authority 段（最后一个 @ 之前）里的 "/" 预先转义成 %2F，
+// url.Parse 解出来还是原来的 base64，后续 ss() 逻辑不用改。
+func normalizeSSLink(uri string) string {
+	schemeEnd := strings.Index(uri, "://")
+	if schemeEnd < 0 {
+		return uri
+	}
+	lower := strings.ToLower(uri[:schemeEnd])
+	if lower != "ss" && lower != "shadowsocks" {
+		return uri
+	}
+	rest := uri[schemeEnd+3:]
+	cut := len(rest)
+	if i := strings.IndexAny(rest, "?#"); i >= 0 {
+		cut = i
+	}
+	head := rest[:cut]
+	at := strings.LastIndex(head, "@")
+	if at < 0 {
+		return uri
+	}
+	userinfoPart := head[:at]
+	if !strings.Contains(userinfoPart, "/") {
+		return uri
+	}
+	fixed := strings.ReplaceAll(userinfoPart, "/", "%2F")
+	return uri[:schemeEnd+3] + fixed + head[at:] + rest[cut:]
+}
+
 func GetOutbound(uri string, i int) (*map[string]interface{}, string, error) {
+	uri = normalizeSSLink(uri)
 	u, err := url.Parse(uri)
 	if err == nil {
 		switch u.Scheme {

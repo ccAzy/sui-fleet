@@ -42,7 +42,8 @@ func TestAddParamsDoesNotPanicOnBadURI(t *testing.T) {
 			t.Fatalf("addParams 不该 panic: %v", r)
 		}
 	}()
-	out := addParams("vless://x@h:443?bad=%zz", []LinkParam{{Key: "type", Value: "tcp"}}, "备注")
+	// 非法转义必须出现在 authority/path 才会让 url.Parse 报错（query 不校验）
+	out := addParams("vless://x%zz@h:443", []LinkParam{{Key: "type", Value: "tcp"}}, "备注")
 	if out == "" {
 		t.Fatal("退化路径也要返回可用字符串")
 	}

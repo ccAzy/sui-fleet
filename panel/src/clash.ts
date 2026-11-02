@@ -56,6 +56,27 @@ const applyAlpn = (p: Proxy, q: URLSearchParams) => {
   if (v) p.alpn = String(v).split(",").filter(Boolean);
 };
 
+
+/**
+ * sip002 的 base64 userinfo 可能含 `/`，而 URL 解析器会把第一个 `/` 当路径分隔：
+ * `ss://ab/cd==@h:443` → host 变成 `ab`，节点直接丢失。
+ * 把 authority 段（最后一个 @ 之前）里的 `/` 预先转义，解析回来还是原 base64。
+ */
+function normalizeSSLink(uri: string): string {
+  const m = /^(ss|shadowsocks):\/\//i.exec(uri);
+  if (!m) return uri;
+  const rest = uri.slice(m[0].length);
+  let cut = rest.length;
+  const q = rest.search(/[?#]/);
+  if (q >= 0) cut = q;
+  const head = rest.slice(0, cut);
+  const at = head.lastIndexOf("@");
+  if (at < 0) return uri;
+  const userinfo0 = head.slice(0, at);
+  if (!userinfo0.includes("/")) return uri;
+  return `${m[0]}${userinfo0.split("/").join("%2F")}${head.slice(at)}${rest.slice(cut)}`;
+}
+
 export function linkToProxy(uri: string): Proxy | null {
   try {
     if (uri.startsWith("vmess://")) {
@@ -85,7 +106,7 @@ export function linkToProxy(uri: string): Proxy | null {
       return proxy;
     }
 
-    const u = new URL(uri);
+    const u = new URL(normalizeSSLink(uri));
     const q = u.searchParams;
     const { host, port } = splitHostPort(u.host);
     const name = nameOf(u, host);

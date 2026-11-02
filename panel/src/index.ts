@@ -53,8 +53,6 @@ type Ctx = { Bindings: Env };
 
 const app = new Hono<Ctx>();
 
-registerSub(app);
-registerAgentApi(app);
 
 // 安全响应头：对所有响应生效（含静态 HTML——它以前完全裸奔，
 // 因为 run_worker_first 只覆盖 /api /agent /sub，页面由 Assets 直接吐出）。
@@ -92,6 +90,12 @@ app.use("*", async (c, next) => {
   await next();
   for (const [k, v] of Object.entries(SECURITY_HEADERS)) c.header(k, v);
 });
+
+// 路由注册必须在安全头中间件**之后**：Hono 按注册顺序执行，/sub 与 /agent 的
+// handler 写回响应后不会再走后面注册的中间件 —— 原来这两类响应完全没有
+// CSP/HSTS/X-Content-Type-Options 等头（实测缺失，不只是理论问题）。
+registerSub(app);
+registerAgentApi(app);
 
 /** 发正式会话 cookie（密码登录与二次验证后共用） */
 async function issueSession(c: any, user: UserRow) {

@@ -1,6 +1,8 @@
 package sub
 
 import (
+	"strings"
+
 	"github.com/alireza0/s-ui/database"
 	"github.com/alireza0/s-ui/logger"
 	"github.com/alireza0/s-ui/service"
@@ -52,7 +54,9 @@ func subFail(c *gin.Context, err error) {
 		c.String(404, "Not Found")
 		return
 	}
-	logger.Error(err)
+	if err != nil {
+		logger.Error(err)
+	}
 	c.String(500, "Internal Error")
 }
 
@@ -66,14 +70,22 @@ func (s *SubHandler) subs(c *gin.Context) {
 		c.String(400, "Bad Request")
 		return
 	}
-	// 面板侧约定用 `type=`（singbox/json/clash），Go 侧历史上只认 `format=`。
-	// 前端是同一份产物，所以两个参数都要认，否则单机模式的二维码是坏的。
-	format, isFormat := c.GetQuery("format")
-	if !isFormat {
-		if t := c.Query("type"); t != "" {
-			format, isFormat = t, true
-		}
+	// 面板与前端用 `type=`，Go 历史上只认 `format=`。两边统一成：
+	//   type 优先（与面板一致）→ format → 缺省
+	// 并统一小写 + 别名（mihomo→clash、sing-box→singbox），否则
+	// `?type=JSON` 这种大小写差异会直接 400。
+	raw := c.Query("type")
+	if raw == "" {
+		raw = c.Query("format")
 	}
+	format := strings.ToLower(strings.TrimSpace(raw))
+	switch format {
+	case "sing-box":
+		format = "singbox"
+	case "mihomo":
+		format = "clash"
+	}
+	isFormat := format != ""
 	if isFormat {
 		switch format {
 		case "json":
