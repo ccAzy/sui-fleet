@@ -28,6 +28,34 @@ function nameOf(u: URL, fallback: string): string {
 }
 
 /** 单条分享链接 → Clash proxy。不认识就返回 null。 */
+/**
+ * 下面三个小工具只做「同一个字段的取值 + 赋默认名」。
+ *
+ * 注意：必须在**原来的位置**调用，不能合并成一次调用——Clash 的 YAML 是按对象
+ * 属性插入顺序输出的，挪动位置会让订阅内容对不上（特征化快照会立刻发现）。
+ */
+const applySni = (
+  p: Proxy,
+  q: URLSearchParams,
+  key: "sni" | "servername" = "sni",
+) => {
+  const v = q.get("sni");
+  if (v) p[key] = v;
+};
+
+const applyInsecure = (
+  p: Proxy,
+  q: URLSearchParams,
+  param: "insecure" | "allowInsecure" = "insecure",
+) => {
+  if (q.get(param) === "1") p["skip-cert-verify"] = true;
+};
+
+const applyAlpn = (p: Proxy, q: URLSearchParams) => {
+  const v = q.get("alpn");
+  if (v) p.alpn = String(v).split(",").filter(Boolean);
+};
+
 export function linkToProxy(uri: string): Proxy | null {
   try {
     if (uri.startsWith("vmess://")) {
@@ -83,16 +111,15 @@ export function linkToProxy(uri: string): Proxy | null {
               "public-key": pbk,
               ...(sid ? { "short-id": sid } : {}),
             };
-          if (q.get("sni")) proxy.servername = q.get("sni");
+          applySni(proxy, q, "servername");
         } else if (security === "tls") {
           proxy.tls = true;
-          if (q.get("sni")) proxy.servername = q.get("sni");
-          if (q.get("allowInsecure") === "1") proxy["skip-cert-verify"] = true;
+          applySni(proxy, q, "servername");
+          applyInsecure(proxy, q, "allowInsecure");
           if (q.get("fp")) proxy["client-fingerprint"] = q.get("fp");
         }
         if (q.get("flow")) proxy.flow = q.get("flow");
-        if (q.get("alpn"))
-          proxy.alpn = String(q.get("alpn")).split(",").filter(Boolean);
+        applyAlpn(proxy, q);
         applyTransport(
           proxy,
           q.get("type") ?? "tcp",
@@ -111,10 +138,9 @@ export function linkToProxy(uri: string): Proxy | null {
           password: decodeURIComponent(u.username),
           udp: true,
         };
-        if (q.get("sni")) proxy.sni = q.get("sni");
-        if (q.get("allowInsecure") === "1") proxy["skip-cert-verify"] = true;
-        if (q.get("alpn"))
-          proxy.alpn = String(q.get("alpn")).split(",").filter(Boolean);
+        applySni(proxy, q);
+        applyInsecure(proxy, q, "allowInsecure");
+        applyAlpn(proxy, q);
         applyTransport(
           proxy,
           q.get("type") ?? "tcp",
@@ -147,16 +173,15 @@ export function linkToProxy(uri: string): Proxy | null {
           password: decodeURIComponent(u.username),
           udp: true,
         };
-        if (q.get("sni")) proxy.sni = q.get("sni");
-        if (q.get("insecure") === "1") proxy["skip-cert-verify"] = true;
+        applySni(proxy, q);
+        applyInsecure(proxy, q);
         if (q.get("obfs")) proxy.obfs = q.get("obfs");
         if (q.get("obfs-password"))
           proxy["obfs-password"] = q.get("obfs-password");
         if (q.get("upmbps")) proxy.up = q.get("upmbps");
         if (q.get("downmbps")) proxy.down = q.get("downmbps");
         if (q.get("mport")) proxy.ports = q.get("mport");
-        if (q.get("alpn"))
-          proxy.alpn = String(q.get("alpn")).split(",").filter(Boolean);
+        applyAlpn(proxy, q);
         return proxy;
       }
       case "tuic": {
@@ -169,12 +194,11 @@ export function linkToProxy(uri: string): Proxy | null {
           password: decodeURIComponent(u.password),
           udp: true,
         };
-        if (q.get("sni")) proxy.sni = q.get("sni");
-        if (q.get("alpn"))
-          proxy.alpn = String(q.get("alpn")).split(",").filter(Boolean);
+        applySni(proxy, q);
+        applyAlpn(proxy, q);
         if (q.get("congestion_control"))
           proxy["congestion-controller"] = q.get("congestion_control");
-        if (q.get("insecure") === "1") proxy["skip-cert-verify"] = true;
+        applyInsecure(proxy, q);
         return proxy;
       }
       case "anytls": {
@@ -186,8 +210,8 @@ export function linkToProxy(uri: string): Proxy | null {
           password: decodeURIComponent(u.username),
           udp: true,
         };
-        if (q.get("sni")) proxy.sni = q.get("sni");
-        if (q.get("insecure") === "1") proxy["skip-cert-verify"] = true;
+        applySni(proxy, q);
+        applyInsecure(proxy, q);
         return proxy;
       }
       case "socks5":
@@ -225,7 +249,7 @@ export function linkToProxy(uri: string): Proxy | null {
         const scheme = u.protocol.replace(":", "");
         if (scheme === "https" || q.get("tls") === "1") {
           proxy.tls = true;
-          if (q.get("sni")) proxy.servername = q.get("sni");
+          applySni(proxy, q, "servername");
         }
         return proxy;
       }

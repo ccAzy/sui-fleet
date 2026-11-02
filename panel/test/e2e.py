@@ -80,6 +80,18 @@ def check(name, cond, detail=""):
 # ---- 二次验证（TOTP）所需 ----
 
 
+def _align_totp_window(slack=4):
+    """离窗口结束不足 slack 秒时，等到下一个窗口再取码。
+
+    2FA 用例会连着用多个码；如果某一步刚好跨过 30 秒边界，服务端的防重放
+    （otp_last_step）会把"下一个码"当成同一窗口的重放而拒绝——表现为偶发 FAIL。
+    这不是产品 bug，是测试自己的时序问题。
+    """
+    left = 30 - (time.time() % 30)
+    if left < slack:
+        time.sleep(left + 0.5)
+
+
 def _totp(secret, at=None):
     pad = "=" * ((8 - len(secret) % 8) % 8)
     key = base64.b32decode(secret + pad)
@@ -490,6 +502,7 @@ ticket = obj.get("ticket", "")
 r = j(post("/api/login/otp", form={"ticket": ticket, "code": "000000"}))
 check("2fa 登录错码被拒", r["success"] is False, r)
 
+_align_totp_window()
 code = _totp(secret)
 r = j(post("/api/login/otp", form={"ticket": ticket, "code": code}))
 check("2fa 登录放行", r["success"] is True, r)
