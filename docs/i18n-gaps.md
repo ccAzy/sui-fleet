@@ -9,12 +9,15 @@
 | en（基准） | 740 | 0 | 100% |
 | zh-Hans（zhcn） | 740 | 0 | 100% |
 | zh-Hant（zhtw） | 740 | 0 | 100% |
-| fa（波斯语） | 533 | 207 | 72% |
-| vi（越南语） | 533 | 207 | 72% |
-| ru（俄语） | 534 | 207 | 72% |
+| fa（波斯语） | 740 | 0 | 100% |
+| vi（越南语） | 740 | 0 | 100% |
+| ru（俄语） | 741 | 0 | 100% |
 
-缺失的 207 个键集中在本轮新增的 `default.quickTemplate.*`、`default.audit.*`
-等条目（见 `npm run i18n:missing` 的前几行示例）。
+2026-11-02 补齐：fa / vi / ru 各补 207 个键（quickTemplate.*、relay.*、exportLinks.*、
+server.*、actions.*、login.*、setting.security.*、setting.wallpaper.* 等），
+zh-Hant 同时补齐 207 个键（由 zh-CN 经 OpenCC s2twp 转换）。
 
-补齐属于翻译工作，不是代码缺陷：结构、回落、Key 对齐都是对的。
+补的是**机器翻译初稿**，用法正确但措辞可能生硬；建议母语使用者抽查后再上线营销页面。
 补的时候只改对应 locale 文件，不要动 `en.ts`（它是基准）。
+
+加了新文案后跑 `npm run i18n:missing` 看是否又出现缺口。
