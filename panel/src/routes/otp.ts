@@ -22,6 +22,21 @@ import {
   totpVerify,
 } from "../otp";
 
+/**
+ * 安全状态变更（启用/关闭 2FA）之后：吊销此前签发的一切会话，再给当前这条补签。
+ *
+ * 两处调用必须完全一致 —— 上一轮就是只给「启用」加了 bump、漏了「关闭」，
+ * 关闭 2FA 后旧 cookie 照样能用。抽成一个函数，以后加新渠道只改这里。
+ */
+async function revokeSessions(c: any, user: UserRow): Promise<void> {
+  await bumpSessionEpoch(c.env.DB, user.id);
+  await reissueSession(c, {
+    uid: user.id,
+    username: user.username,
+    mustChange: user.must_change === 1,
+  });
+}
+
 async function me(c: any): Promise<UserRow | null> {
   const name = c.get("user" as never) as string | undefined;
   if (!name) return null;
@@ -135,12 +150,7 @@ export function registerOtpAdmin(app: Hono<{ Bindings: Env }>) {
     );
     // 启用 2FA 是安全状态变更：此前签发的会话一律作废（否则「刚加上 2FA，
     // 攻击者手里的旧 cookie 还照用」），当前这条补签新代次。
-    await bumpSessionEpoch(c.env.DB, user.id);
-    await reissueSession(c, {
-      uid: user.id,
-      username: user.username,
-      mustChange: user.must_change === 1,
-    });
+    await revokeSessions(c, user);
     // 恢复码只在这里明文出现一次
     return json(c, { recovery: codes });
   });
@@ -181,12 +191,7 @@ export function registerOtpAdmin(app: Hono<{ Bindings: Env }>) {
     );
     // 关闭 2FA 同样是安全状态变更：旧会话不该继续有效（此前只做了一半，
     // 只有「启用」那次 bump 了，关闭这条路径旧 cookie 照样能用）。
-    await bumpSessionEpoch(c.env.DB, user.id);
-    await reissueSession(c, {
-      uid: user.id,
-      username: user.username,
-      mustChange: user.must_change === 1,
-    });
+    await revokeSessions(c, user);
     return okMsg(c, "disabled");
   });
 
