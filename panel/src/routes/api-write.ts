@@ -26,6 +26,7 @@ import {
   saveObject,
   seedNode,
 } from "../objects";
+import { sanitizeObjectData } from "../schema";
 import { enqueueCommand } from "../agent";
 import { metaGet, metaSet } from "../kernel";
 import { exportBundle, importBundle, type Bundle } from "../backup";
@@ -170,6 +171,17 @@ export function registerApiWrite(app: Hono<{ Bindings: Env }>) {
       data = JSON.parse(String(body.data ?? "{}"));
     } catch {
       return json(c, null, new Error("invalid data json"));
+    }
+
+    // 对象内容做结构体检（端口范围/原型污染键/尺寸上限）。
+    // 少了这一步，一个非法端口会一路传到节点，渲染出的内核配置不合法 → 节点断流，
+    // 而面板显示"保存成功"。
+    if (obj !== "servers") {
+      try {
+        data = sanitizeObjectData(data);
+      } catch (e) {
+        return json(c, null, e);
+      }
     }
 
     if (obj === "servers") {

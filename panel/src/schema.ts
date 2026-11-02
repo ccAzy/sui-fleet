@@ -93,3 +93,59 @@ export const ImportBundleSchema = z.object({
   exported_at: z.union([z.string(), z.number()]).optional(),
   tables: z.record(z.string(), z.array(z.unknown())),
 });
+
+// ---- 对象数据的结构体检 --------------------------------------------------
+//
+// `/api/save` 的对象内容此前只校验了信封（object/action 对不对），data 原样入库。
+// 后果：一个 `"port": "abc"` 或 `"listen": "__proto__"` 之类的值会一路传到节点，
+// 渲染出的 sing-box 配置非法 → 内核起不来 → 整个节点断流，而面板显示"保存成功"。
+//
+// 这里不做业务级校验（每个协议的字段太多且随内核版本变化），只做三类体检：
+//  1) 结构：必须是普通对象，禁止原型污染键，限深度与条目数；
+//  2) 尺寸：字符串/数组/总字节封顶，防止一次保存把库塞爆；
+//  3) 端口：凡是名字像端口的键，必须是 1..65535 的整数。
+const PORT_KEY = /^(port|listen_port|server_port|dest_port|source_port|mport|obfs_port|target_port)$/;
+const MAX_DEPTH = 8;
+const MAX_ITEMS = 2000;
+const MAX_STR = 8192;
+const MAX_JSON_BYTES = 256 * 1024;
+const BANNED = new Set(["__proto__", "prototype", "constructor"]);
+
+function walk(v: unknown, depth: number, path: string): void {
+  if (depth > MAX_DEPTH) throw new ValidationError("对象内容", [`${path} 嵌套过深`]);
+  if (typeof v === "string") {
+    if (v.length > MAX_STR) throw new ValidationError("对象内容", [`${path} 字符串过长`]);
+    return;
+  }
+  if (typeof v === "number" && !Number.isFinite(v))
+    throw new ValidationError("对象内容", [`${path} 不是有限数字`]);
+  if (Array.isArray(v)) {
+    if (v.length > MAX_ITEMS) throw new ValidationError("对象内容", [`${path} 数组过长`]);
+    v.forEach((x, i) => walk(x, depth + 1, `${path}[${i}]`));
+    return;
+  }
+  if (v && typeof v === "object") {
+    const entries = Object.entries(v as Record<string, unknown>);
+    if (entries.length > MAX_ITEMS) throw new ValidationError("对象内容", [`${path} 字段过多`]);
+    for (const [k, x] of entries) {
+      if (BANNED.has(k)) throw new ValidationError("对象内容", [`${path}.${k} 是非法键`]);
+      if (PORT_KEY.test(k)) {
+        const n = typeof x === "string" ? Number(x) : x;
+        if (!Number.isInteger(n) || (n as number) < 1 || (n as number) > 65535)
+          throw new ValidationError("对象内容", [`${path}.${k} 端口必须是 1..65535 的整数`]);
+      }
+      walk(x, depth + 1, `${path}.${k}`);
+    }
+  }
+}
+
+/** 校验并归一化 /api/save 的对象内容。非法时抛 ValidationError（→ 400）。 */
+export function sanitizeObjectData(input: unknown): Record<string, unknown> {
+  if (input === null || typeof input !== "object" || Array.isArray(input))
+    throw new ValidationError("对象内容", ["必须是 JSON 对象"]);
+  const bytes = JSON.stringify(input).length;
+  if (bytes > MAX_JSON_BYTES)
+    throw new ValidationError("对象内容", [`对象内容过大（${bytes} 字节）`]);
+  walk(input, 0, "data");
+  return input as Record<string, unknown>;
+}

@@ -5,6 +5,7 @@ import {
   SaveEnvelope,
   ValidationError,
   decode,
+  sanitizeObjectData,
   tryDecode,
 } from "../../src/schema";
 
@@ -103,5 +104,45 @@ describe("AgentReportBody 的 revision 兼容", () => {
   it("老 agent 只发 revision 也收", () => {
     const r = decode(AgentReportBody, { revision: 7 });
     expect(r.revision).toBe(7);
+  });
+});
+
+// /api/save 的对象内容此前完全不校验：一个非法端口能一路传到节点，
+// 渲染出的 sing-box 配置不合法 → 内核起不来 → 节点断流，而面板显示"保存成功"。
+describe("sanitizeObjectData", () => {
+  it("正常对象原样通过", () => {
+    const d = { tag: "vless-in", listen_port: 443, users: [{ name: "a" }] };
+    expect(sanitizeObjectData(d)).toEqual(d);
+  });
+
+  it("端口越界被拒", () => {
+    expect(() => sanitizeObjectData({ port: 70000 })).toThrow(/端口/);
+    expect(() => sanitizeObjectData({ port: "abc" })).toThrow(/端口/);
+    expect(() => sanitizeObjectData({ port: 0 })).toThrow(/端口/);
+  });
+
+  it("嵌套里的非法端口也能抓到", () => {
+    expect(() => sanitizeObjectData({ a: { b: [{ listen_port: -1 }] } })).toThrow(
+      /端口/,
+    );
+  });
+
+  it("原型污染键被拒", () => {
+    const payload = JSON.parse('{"__proto__":{"admin":true}}');
+    expect(() => sanitizeObjectData(payload)).toThrow(/非法键/);
+  });
+
+  it("非对象根被拒", () => {
+    expect(() => sanitizeObjectData([])).toThrow();
+    expect(() => sanitizeObjectData("x")).toThrow();
+    expect(() => sanitizeObjectData(null)).toThrow();
+  });
+
+  it("超长字符串被拒", () => {
+    expect(() => sanitizeObjectData({ sni: "a".repeat(9000) })).toThrow(/过长/);
+  });
+
+  it("NaN 被拒", () => {
+    expect(() => sanitizeObjectData({ n: Number.NaN })).toThrow(/有限/);
   });
 });
