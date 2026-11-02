@@ -28,6 +28,25 @@ function b64(text: string): string {
   return btoa(bin);
 }
 
+
+/**
+ * userinfo 段按 RFC 3986 编码。
+ *
+ * 手写 `${password}@` 的问题是：密码里只要有 @ : / # ? %，链接就会被截断
+ * 或者指向别的主机（实测 `trojan://p#x@1.2.3.4:443` 的主机会变成 `p`）。
+ */
+export function userinfo(user: string, pass?: string): string {
+  const u = encodeURIComponent(user);
+  if (pass === undefined || pass === "") return u;
+  return `${u}:${encodeURIComponent(pass)}`;
+}
+
+/** host:port；IPv6 字面量要加方括号，否则 `2001:db8::1:443` 无法解析。 */
+export function hostPortOf(server: string, port: number | string): string {
+  const h = server.trim().replace(/^\[|\]$/g, "");
+  return h.includes(":") ? `[${h}]:${port}` : `${h}:${port}`;
+}
+
 function withParams(
   uri: string,
   params: Array<[string, string]>,
@@ -37,7 +56,10 @@ function withParams(
   const parts: string[] = [];
   for (const [k, v] of params) {
     if (v === undefined || v === null || v === "") continue;
-    parts.push(`${k}=${rawKeys.includes(k) ? v : encodeURIComponent(v)}`);
+    // alpn/mport 是逗号/冒号分隔的值，不能整段 encodeURIComponent（会把分隔符也编掉），
+    // 但也不能原样放行 —— 含 & 或 = 就能注入额外的 query 参数。只放行字符集。
+    const raw = rawKeys.includes(k) && /^[A-Za-z0-9.,:_-]+$/.test(v);
+    parts.push(`${k}=${raw ? v : encodeURIComponent(v)}`);
   }
   try {
     const url = new URL(uri);
@@ -187,7 +209,7 @@ export function genLinks(
   const links: string[] = [];
 
   for (const a of addrs) {
-    const hostPort = `${a.server}:${a.server_port}`;
+    const hostPort = hostPortOf(s(a.server), a.server_port);
     switch (type) {
       case "vless": {
         const uuid = path(userConfig, "vless", "uuid");
@@ -206,7 +228,7 @@ export function genLinks(
           if (flow) params.push(["flow", flow]);
         }
         links.push(
-          withParams(`vless://${uuid}@${hostPort}`, params, a.remark, ["alpn"]),
+          withParams(`vless://${userinfo(uuid)}@${hostPort}`, params, a.remark, ["alpn"]),
         );
         break;
       }
@@ -248,7 +270,7 @@ export function genLinks(
         if (a.tls && bool(a.tls.enabled))
           params.push(...tlsParams(a.tls, "allowInsecure"));
         links.push(
-          withParams(`trojan://${password}@${hostPort}`, params, a.remark, [
+          withParams(`trojan://${userinfo(password)}@${hostPort}`, params, a.remark, [
             "alpn",
           ]),
         );
@@ -280,7 +302,7 @@ export function genLinks(
         const mp = mport(inbound);
         if (mp) params.push(["mport", mp]);
         links.push(
-          withParams(`hysteria2://${password}@${hostPort}`, params, a.remark, [
+          withParams(`hysteria2://${userinfo(password)}@${hostPort}`, params, a.remark, [
             "alpn",
             "mport",
           ]),
@@ -296,7 +318,7 @@ export function genLinks(
           params.push(["congestion_control", s(inbound.congestion_control)]);
         links.push(
           withParams(
-            `tuic://${uuid}:${password}@${hostPort}`,
+            `tuic://${userinfo(uuid, password)}@${hostPort}`,
             params,
             a.remark,
             ["alpn"],
@@ -309,7 +331,7 @@ export function genLinks(
         const params: Array<[string, string]> = [];
         if (a.tls) params.push(...tlsParams(a.tls, "insecure"));
         links.push(
-          withParams(`anytls://${password}@${hostPort}`, params, a.remark, [
+          withParams(`anytls://${userinfo(password)}@${hostPort}`, params, a.remark, [
             "alpn",
           ]),
         );
@@ -319,7 +341,7 @@ export function genLinks(
         const u = path(userConfig, "socks", "username");
         const p = path(userConfig, "socks", "password");
         const frag = a.remark ? `#${encodeURIComponent(a.remark)}` : "";
-        links.push(`socks5://${u}:${p}@${hostPort}${frag}`);
+        links.push(`socks5://${userinfo(u, p)}@${hostPort}${frag}`);
         break;
       }
       case "http": {
@@ -327,7 +349,7 @@ export function genLinks(
         const p = path(userConfig, "http", "password");
         const scheme = a.tls ? "https" : "http";
         const frag = a.remark ? `#${encodeURIComponent(a.remark)}` : "";
-        links.push(`${scheme}://${u}:${p}@${hostPort}${frag}`);
+        links.push(`${scheme}://${userinfo(u, p)}@${hostPort}${frag}`);
         break;
       }
       case "mixed": {
@@ -338,7 +360,7 @@ export function genLinks(
           path(userConfig, "socks", "password") ||
           path(userConfig, "http", "password");
         const frag = a.remark ? `#${encodeURIComponent(a.remark)}` : "";
-        links.push(`socks5://${u}:${p}@${hostPort}${frag}`);
+        links.push(`socks5://${userinfo(u, p)}@${hostPort}${frag}`);
         links.push(
           `${a.tls ? "https" : "http"}://${u}:${p}@${hostPort}${frag}`,
         );

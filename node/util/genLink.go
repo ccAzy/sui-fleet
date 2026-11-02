@@ -4,7 +4,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/alireza0/s-ui/database/model"
@@ -139,7 +141,7 @@ func prepareTls(t *model.Tls) map[string]interface{} {
 func socksLink(userConfig map[string]interface{}, addrs []map[string]interface{}) []string {
 	var links []string
 	for _, addr := range addrs {
-		links = append(links, fmt.Sprintf("socks5://%s:%s@%s:%d", userConfig["username"], userConfig["password"], addr["server"].(string), uint(addr["server_port"].(float64))))
+		links = append(links, fmt.Sprintf("socks5://%s@%s", userinfo(fmt.Sprint(userConfig["username"]), fmt.Sprint(userConfig["password"])), hostPort(addr["server"].(string), addr["server_port"].(float64))))
 	}
 	return links
 }
@@ -151,7 +153,7 @@ func httpLink(userConfig map[string]interface{}, addrs []map[string]interface{})
 		if addr["tls"] != nil {
 			protocol = "https"
 		}
-		links = append(links, fmt.Sprintf("%s://%s:%s@%s:%d", protocol, userConfig["username"], userConfig["password"], addr["server"].(string), uint(addr["server_port"].(float64))))
+		links = append(links, fmt.Sprintf("%s://%s@%s", protocol, userinfo(fmt.Sprint(userConfig["username"]), fmt.Sprint(userConfig["password"])), hostPort(addr["server"].(string), addr["server_port"].(float64))))
 	}
 	return links
 }
@@ -176,7 +178,7 @@ func shadowsocksLink(
 	var links []string
 	for _, addr := range addrs {
 		port, _ := addr["server_port"].(float64)
-		links = append(links, fmt.Sprintf("%s@%s:%.0f#%s", uriBase, addr["server"].(string), port, addr["remark"].(string)))
+		links = append(links, fmt.Sprintf("%s@%s#%s", uriBase, hostPort(addr["server"].(string), port), url.PathEscape(fmt.Sprint(addr["remark"]))))
 	}
 	return links
 }
@@ -266,7 +268,7 @@ func hysteriaLink(
 		}
 
 		port, _ := addr["server_port"].(float64)
-		uri := fmt.Sprintf("%s%s:%.0f", baseUri, addr["server"].(string), port)
+		uri := baseUri + hostPort(addr["server"].(string), port)
 		links = append(links, addParams(uri, params, addr["remark"].(string)))
 	}
 
@@ -279,7 +281,7 @@ func hysteria2Link(
 	addrs []map[string]interface{}) []string {
 
 	password, _ := userConfig["password"].(string)
-	baseUri := fmt.Sprintf("%s%s@", "hysteria2://", password)
+	baseUri := "hysteria2://" + userinfo(password, "") + "@"
 	var links []string
 
 	for _, addr := range addrs {
@@ -319,7 +321,7 @@ func hysteria2Link(
 		}
 
 		port, _ := addr["server_port"].(float64)
-		uri := fmt.Sprintf("%s%s:%.0f", baseUri, addr["server"].(string), port)
+		uri := baseUri + hostPort(addr["server"].(string), port)
 		links = append(links, addParams(uri, params, addr["remark"].(string)))
 	}
 
@@ -331,7 +333,7 @@ func anytlsLink(
 	addrs []map[string]interface{}) []string {
 
 	password, _ := userConfig["password"].(string)
-	baseUri := fmt.Sprintf("%s%s@", "anytls://", password)
+	baseUri := "anytls://" + userinfo(password, "") + "@"
 	var links []string
 
 	for _, addr := range addrs {
@@ -341,7 +343,7 @@ func anytlsLink(
 		}
 
 		port, _ := addr["server_port"].(float64)
-		uri := fmt.Sprintf("%s%s:%.0f", baseUri, addr["server"].(string), port)
+		uri := baseUri + hostPort(addr["server"].(string), port)
 		links = append(links, addParams(uri, params, addr["remark"].(string)))
 	}
 
@@ -355,7 +357,7 @@ func tuicLink(
 
 	password, _ := userConfig["password"].(string)
 	uuid, _ := userConfig["uuid"].(string)
-	baseUri := fmt.Sprintf("%s%s:%s@", "tuic://", uuid, password)
+	baseUri := "tuic://" + userinfo(uuid, password) + "@"
 	var links []string
 
 	for _, addr := range addrs {
@@ -368,7 +370,7 @@ func tuicLink(
 		}
 
 		port, _ := addr["server_port"].(float64)
-		uri := fmt.Sprintf("%s%s:%.0f", baseUri, addr["server"].(string), port)
+		uri := baseUri + hostPort(addr["server"].(string), port)
 		links = append(links, addParams(uri, params, addr["remark"].(string)))
 	}
 
@@ -394,7 +396,7 @@ func vlessLink(
 			}
 		}
 		port, _ := addr["server_port"].(float64)
-		uri := fmt.Sprintf("vless://%s@%s:%.0f", uuid, addr["server"].(string), port)
+		uri := fmt.Sprintf("vless://%s@%s", userinfo(uuid, ""), hostPort(addr["server"].(string), port))
 		uri = addParams(uri, params, addr["remark"].(string))
 		links = append(links, uri)
 	}
@@ -417,7 +419,7 @@ func trojanLink(
 			getTlsParams(&params, tls, "allowInsecure")
 		}
 		port, _ := addr["server_port"].(float64)
-		uri := fmt.Sprintf("trojan://%s@%s:%.0f", password, addr["server"].(string), port)
+		uri := fmt.Sprintf("trojan://%s@%s", userinfo(password, ""), hostPort(addr["server"].(string), port))
 		uri = addParams(uri, params, addr["remark"].(string))
 		links = append(links, uri)
 	}
@@ -518,8 +520,31 @@ func toBase64(d []byte) string {
 	return base64.StdEncoding.EncodeToString(d)
 }
 
+// hostPort 拼 host:port，IPv6 自动加方括号。
+func hostPort(h string, port float64) string {
+	return net.JoinHostPort(h, strconv.FormatFloat(port, 'f', 0, 64))
+}
+
+// userinfo 返回 URL 里的 userinfo 段（不含 @），用户名/密码按 RFC 3986 编码。
+// 手写 "%s:%s@" 的问题是：密码里只要有 @ : / # ? %，链接就会被截断或换主机。
+func userinfo(user, pass string) string {
+	if pass == "" {
+		return url.User(user).String()
+	}
+	return url.UserPassword(user, pass).String()
+}
+
 func addParams(uri string, params []LinkParam, remark string) string {
-	URL, _ := url.Parse(uri)
+	URL, err := url.Parse(uri)
+	if err != nil || URL == nil {
+		// 解析失败时不能继续解引用：原来这里 `URL, _ :=` 忽略了 err，
+		// 一个含非法转义（如密码里的 %zz）的 uri 会让整条链接生成 panic。
+		// 退化处理：拼上转义后的 fragment，至少不崩。
+		if remark == "" {
+			return uri
+		}
+		return uri + "#" + url.PathEscape(remark)
+	}
 	var q []string
 	for _, p := range params {
 		switch p.Key {

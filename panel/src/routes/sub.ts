@@ -182,9 +182,64 @@ function collectLinks(cl: Record<string, unknown>): string[] {
   return out;
 }
 
+
+// 订阅端点的内存限速。
+//
+// 订阅 URL 里就是凭据：没有限速时，/sub/all 的 agg_key 和 /sub/:node 的
+// 客户端令牌都能被高速枚举（Go 侧的订阅服务早就有限速了，面板侧一直没有，
+// 安全属性不对称）。这里用进程内固定窗口，够挡住在线爆破。
+//
+// 为什么不写库：D1 免费档每天 10 万写入是全库共享的，一次枚举就能把额度烧光
+// （那才是真正的自伤）。进程内计数在 Workers 上是 per-isolate，弱一些，
+// 但自托管（我们自己的部署）就是单进程，效果正确。
+const SUB_RATE_LIMIT = 60; // 每 IP 每分钟
+const SUB_RATE_WINDOW_MS = 60_000;
+const subHits = new Map<string, { n: number; reset: number }>();
+
+function subClientKey(c: any): string {
+  const cf = c.req.header("CF-Connecting-IP");
+  if (cf) return cf;
+  // Caddy/反代会补 XFF；取第一跳作为客户端地址
+  const xff = c.req.header("X-Forwarded-For");
+  if (xff) return String(xff).split(",")[0].trim();
+  return "unknown";
+}
+
+function subRateLimited(c: any): boolean {
+  const key = subClientKey(c);
+  const nowMs = Date.now();
+  const cur = subHits.get(key);
+  if (!cur || nowMs > cur.reset) {
+    // 顺带清理，避免 Map 无界增长（每次最多清 256 条过期项）
+    if (subHits.size > 4096) {
+      let n = 0;
+      for (const [k, v] of subHits) {
+        if (nowMs > v.reset) {
+          subHits.delete(k);
+          if (++n >= 256) break;
+        }
+      }
+    }
+    subHits.set(key, { n: 1, reset: nowMs + SUB_RATE_WINDOW_MS });
+    return false;
+  }
+  cur.n += 1;
+  return cur.n > SUB_RATE_LIMIT;
+}
+
+async function rateLimitResponse(c: any): Promise<Response | null> {
+  if (!subRateLimited(c)) return null;
+  return new Response("Too Many Requests", {
+    status: 429,
+    headers: { "Retry-After": "60", "Cache-Control": "no-store" },
+  });
+}
+
 export function registerSub(app: Hono<{ Bindings: Env }>) {
   // ---- 聚合订阅（必须注册在 /sub/:nodeId 之前，否则会被当成 nodeId="all"） ----
   app.get("/sub/all", async (c) => {
+    const limited = await rateLimitResponse(c);
+    if (limited) return limited;
     const { key, clientFilter, subType } = parseSubQuery({
       k: c.req.query("k"),
       client: c.req.query("client"),
@@ -267,6 +322,8 @@ export function registerSub(app: Hono<{ Bindings: Env }>) {
 
   // ---- 单节点订阅（原有行为，保持不变） ----
   app.get("/sub/:nodeId", async (c) => {
+    const limited = await rateLimitResponse(c);
+    if (limited) return limited;
     const node = await getNode(c.env.DB, c.req.param("nodeId"));
     if (!node || !node.enabled) return c.text("not found", 404);
     if (!node.sub_key) return c.text("forbidden", 403);

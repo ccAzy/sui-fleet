@@ -66,13 +66,23 @@ func (s *SubHandler) subs(c *gin.Context) {
 		c.String(400, "Bad Request")
 		return
 	}
+	// 面板侧约定用 `type=`（singbox/json/clash），Go 侧历史上只认 `format=`。
+	// 前端是同一份产物，所以两个参数都要认，否则单机模式的二维码是坏的。
 	format, isFormat := c.GetQuery("format")
+	if !isFormat {
+		if t := c.Query("type"); t != "" {
+			format, isFormat = t, true
+		}
+	}
 	if isFormat {
 		switch format {
 		case "json":
 			result, headers, err = s.JsonService.GetJson(subId, format)
 		case "clash":
 			result, headers, err = s.ClashService.GetClash(subId)
+		case "singbox", "sing-box":
+			// 面板把 sing-box 配置叫 type=singbox；Go 侧只有 json 一种实现
+			result, headers, err = s.JsonService.GetJson(subId, "json")
 		default:
 			c.Header("Cache-Control", "no-store")
 			c.String(400, "Bad Request")
