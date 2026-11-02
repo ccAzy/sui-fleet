@@ -359,14 +359,25 @@ export async function saveObject(
         // 每个客户端一条自己的订阅令牌：链接 `?t=<sub_token>` 只能导出这一个客户端。
         // 原来是 `?k=<节点级 sub_key>&client=名字`，名字只是过滤参数 —— 去掉它就拿到
         // 同节点全部租户的 UUID/密码（审计 run-1 实测：1 条变 2 条）。凭据必须自带作用域。
-        const payload =
-          kind === "clients"
-            ? {
-                ...item,
-                id,
-                sub_token: String((item as any).sub_token ?? "") || randHex(16),
-              }
-            : { ...item, id };
+        // 令牌缺失时的语义要和 Go 侧一致：**保留旧值**，不是重新生成。
+        // 否则任何"部分字段更新"的调用（脚本、第三方集成、裁剪过的表单）
+        // 都会静默轮换令牌，把用户已经发出去的订阅链接打废。
+        let subToken = String((item as any).sub_token ?? "");
+        if (kind === "clients" && !subToken) {
+          const prev = await first<{ data: string }>(
+            db,
+            "SELECT data FROM objects WHERE node_id = ? AND kind = 'clients' AND obj_id = ?",
+            nodeId,
+            id,
+          );
+          try {
+            subToken = String(JSON.parse(prev?.data ?? "{}").sub_token ?? "");
+          } catch {
+            subToken = "";
+          }
+        }
+        if (kind === "clients" && !subToken) subToken = randHex(16);
+        const payload = kind === "clients" ? { ...item, id, sub_token: subToken } : { ...item, id };
         stmts.push(
           db
             .prepare(

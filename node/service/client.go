@@ -83,7 +83,11 @@ func (s *ClientService) Save(tx *gorm.DB, act string, data json.RawMessage, host
 			}
 		}
 		if client.SubToken == "" {
-			client.SubToken = database.RandomSubToken()
+			tok, err := database.RandomSubToken()
+			if err != nil {
+				return nil, err
+			}
+			client.SubToken = tok
 		}
 		err = tx.Save(&client).Error
 		if err != nil {
@@ -116,7 +120,11 @@ func (s *ClientService) Save(tx *gorm.DB, act string, data json.RawMessage, host
 				}
 			}
 			if c.SubToken == "" {
-				c.SubToken = database.RandomSubToken()
+				tok, err := database.RandomSubToken()
+				if err != nil {
+					return nil, err
+				}
+				c.SubToken = tok
 			}
 		}
 		err = tx.Save(clients).Error
@@ -157,7 +165,11 @@ func (s *ClientService) Save(tx *gorm.DB, act string, data json.RawMessage, host
 				}
 			}
 			if c.SubToken == "" {
-				c.SubToken = database.RandomSubToken()
+				tok, err := database.RandomSubToken()
+				if err != nil {
+					return nil, err
+				}
+				c.SubToken = tok
 			}
 		}
 		err = tx.Save(clients).Error

@@ -198,7 +198,7 @@ const SUB_RATE_WINDOW_MS = 60_000;
 const SUB_RATE_MAX_KEYS = 65_536;
 const subHits = new Map<string, { n: number; reset: number }>();
 
-function subClientKey(c: any): string {
+export function subClientKey(c: any): string {
   // 用 http.ts 的 clientIp()：它要求 cf-ray 与 CF-Connecting-IP 同时存在，
   // 自托管（没配 TRUST_PROXY）时一律返回 "direct"。原来无条件信 CF 头，
   // 攻击者每个请求换一个值就能永不触发限速 —— 等于没限。
@@ -210,7 +210,7 @@ function subClientKey(c: any): string {
  * IPv6 归到 /64：换地址零成本，不聚合的话一个 /64 就能绕过限速。
  * 这不是精确的 /64 计算，但对我们只需要"同一个前缀落进同一个桶"够用。
  */
-function maskIp(ip: string): string {
+export function maskIp(ip: string): string {
   if (!ip.includes(":")) return ip;
   const parts = ip.split("::");
   const head = (parts[0] || "").split(":").filter(Boolean).slice(0, 4);
@@ -218,7 +218,7 @@ function maskIp(ip: string): string {
   return `${head.join(":")}::/64`;
 }
 
-function subRateLimited(c: any): boolean {
+export function subRateLimited(c: any): boolean {
   const key = subClientKey(c);
   const nowMs = Date.now();
   const cur = subHits.get(key);

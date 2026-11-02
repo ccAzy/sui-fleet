@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 	"path"
 	"strings"
@@ -14,6 +13,7 @@ import (
 	"github.com/alireza0/s-ui/config"
 	"github.com/alireza0/s-ui/database/model"
 	slogger "github.com/alireza0/s-ui/logger"
+	"github.com/alireza0/s-ui/util/common"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -134,13 +134,18 @@ func InitDB(dbPath string) error {
 }
 
 // RandomSubToken 生成 32 位小写 hex 的订阅令牌（与面板侧 randHex(16) 对齐）。
-func RandomSubToken() string {
+//
+// 随机源不可用时**返回错误**，绝不退化成时间戳：
+// 订阅令牌就是凭据，可预测的令牌等于没有令牌（原来那条退化路径熵约 60 bit
+// 且与时间强相关，还会在极端短时间戳下切片越界）。
+func RandomSubToken() (string, error) {
 	b := make([]byte, 16)
-	if _, err := rand.Read(b); err != nil {
-		// 极端情况下退化到时间戳，仍然是不可猜的（只是熵低一些）
-		return hex.EncodeToString([]byte(fmt.Sprintf("%d", time.Now().UnixNano())))[:32]
+	for i := 0; i < 3; i++ {
+		if _, err := rand.Read(b); err == nil {
+			return hex.EncodeToString(b), nil
+		}
 	}
-	return hex.EncodeToString(b)
+	return "", common.NewError("无法生成订阅令牌：系统随机源不可用")
 }
 
 // backfillClientSubTokens 幂等地给缺令牌的客户端补令牌。
@@ -153,8 +158,12 @@ func backfillClientSubTokens() error {
 		return err
 	}
 	for _, id := range ids {
+		tok, err := RandomSubToken()
+		if err != nil {
+			return err
+		}
 		if err := conn.Model(&model.Client{}).Where("id = ?", id).
-			Update("sub_token", RandomSubToken()).Error; err != nil {
+			Update("sub_token", tok).Error; err != nil {
 			return err
 		}
 	}

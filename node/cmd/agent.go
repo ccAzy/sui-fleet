@@ -40,6 +40,7 @@ import (
 // ---------------------------------------------------------------------------
 
 const agentRevKey = "agent_revision"
+
 // 配置内容指纹：只比 revision 会漏掉「内容变了但版本号撞车」的情况（恢复备份、
 // 待机机 promote、手工改库）。两者都比，才能真正判断「节点跑的就是面板里的」。
 const agentHashKey = "agent_config_hash"
@@ -60,8 +61,8 @@ type agentPullResp struct {
 	Clients   []json.RawMessage         `json:"clients"`
 	// 面板算好的"客户端配置指纹"。带 up/down/totalUp/totalDown/sub_token
 	// 的原始 clients 每轮都在变，直接哈希会导致每次下发都重启内核。
-	ClientsSig string                    `json:"clients_sig"`
-	Commands  []agentCommand            `json:"commands"`
+	ClientsSig string         `json:"clients_sig"`
+	Commands   []agentCommand `json:"commands"`
 }
 
 type agentCommand struct {
@@ -335,7 +336,25 @@ func (a *agent) apply(pr *agentPullResp) error {
 		return err
 	}
 
+	// 先记住本地令牌：面板下发的 client 若缺 sub_token（老数据/旧版面板/导入），
+	// 全量 DELETE+INSERT 会把本机令牌清空，之后也不会自动回填（回填只在 InitDB 跑）。
+	oldTokens := map[uint]string{}
+	if pr.Clients != nil {
+		var rows []model.Client
+		if err := tx.Select("id", "sub_token").Find(&rows).Error; err == nil {
+			for _, r := range rows {
+				oldTokens[r.Id] = r.SubToken
+			}
+		}
+	}
+
 	for _, table := range []string{"inbounds", "outbounds", "endpoints", "services", "tls", "clients"} {
+		// clients 只有在面板确实下发了这个字段才清：pr.Clients 为 nil 表示
+		// "这一版 payload 不带客户端"（老面板/裁剪过的响应），清空会连带删掉
+		// 所有本地客户端与令牌。空数组（[]）反序列化后非 nil，仍按"清空"处理。
+		if table == "clients" && pr.Clients == nil {
+			continue
+		}
 		if err := tx.Exec("DELETE FROM " + table).Error; err != nil {
 			return fail(err)
 		}
@@ -390,6 +409,9 @@ func (a *agent) apply(pr *agentPullResp) error {
 		var m model.Client
 		if err := json.Unmarshal(raw, &m); err != nil {
 			return fail(fmt.Errorf("client: %w", err))
+		}
+		if m.SubToken == "" {
+			m.SubToken = oldTokens[m.Id]
 		}
 		if err := tx.Create(&m).Error; err != nil {
 			return fail(fmt.Errorf("client create: %w", err))

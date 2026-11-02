@@ -6,13 +6,16 @@ import {
   json,
   okMsg,
   randHex,
+  readBody,
   reissueSession,
   resolveNode,
 } from "../http";
 import {
   bumpSessionEpoch,
+  first,
   getNode,
   listNodes,
+  logChange,
   now,
   run,
   type Env,
@@ -483,6 +486,54 @@ export function registerApiWrite(app: Hono<{ Bindings: Env }>) {
       `curl -fsSL ${base}/install.sh -o /tmp/sui.sh && ` +
       `sudo bash /tmp/sui.sh --token ${token}`;
     return json(c, { id, token, install_cmd: installCmd });
+  });
+
+  // 轮换单个客户端的订阅令牌。
+  //
+  // 之前令牌泄露只能删客户端或直接改库。令牌不属于内核配置
+  // （configFingerprintView 排除了 sub_token），所以这里只改库、不 bump revision、
+  // 不重启内核；客户端下次拉到新对象时自然更新。
+  app.post("/api/clients/rotate-sub-token", async (c) => {
+    const body = await readBody(c).catch(() => ({}) as Record<string, unknown>);
+    const node = await resolveNode(c.env.DB, c.req.header("X-Remote-Server"));
+    if (!node) return json(c, null, new Error("no node selected"));
+    const id = String((body as Record<string, unknown>).id ?? "").trim();
+    if (!id) return json(c, null, new Error("缺少客户端 id"));
+
+    const row = await first<{ data: string }>(
+      c.env.DB,
+      "SELECT data FROM objects WHERE node_id = ? AND kind = 'clients' AND obj_id = ?",
+      node.id,
+      id,
+    );
+    if (!row) return json(c, null, new Error("客户端不存在"));
+
+    let obj: Record<string, unknown>;
+    try {
+      obj = JSON.parse(row.data) as Record<string, unknown>;
+    } catch {
+      return json(c, null, new Error("客户端数据损坏，无法轮换"));
+    }
+    const token = randHex(16);
+    obj.sub_token = token;
+    await run(
+      c.env.DB,
+      "UPDATE objects SET data = ?, updated_at = ? WHERE node_id = ? AND kind = 'clients' AND obj_id = ?",
+      JSON.stringify(obj, null, 2),
+      now(),
+      node.id,
+      id,
+    );
+    logChange(
+      c.env.DB,
+      node.id,
+      actorOf(c),
+      "clients",
+      "rotate-sub-token",
+      JSON.stringify({ id, name: obj.name ?? "" }),
+    );
+    // 旧链接立即失效：只回新令牌，旧值不留痕
+    return json(c, { id, sub_token: token });
   });
 
   app.post("/api/nodes/:id/delete", async (c) => {
