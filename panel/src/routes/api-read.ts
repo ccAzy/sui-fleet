@@ -386,7 +386,8 @@ export function registerApiRead(app: Hono<{ Bindings: Env }>) {
         (kind ? " AND kind = ?" : "") +
         " ORDER BY id DESC LIMIT ?",
       ...[
-        scopeAll ? 0 : node!.id,
+        // scopeAll 时不需要节点；否则上面的守卫已经保证 node 存在
+        scopeAll ? 0 : (node ? node.id : ""),
         since,
         ...(actor ? [actor] : []),
         ...(kind ? [kind] : []),
@@ -456,7 +457,10 @@ export function registerApiRead(app: Hono<{ Bindings: Env }>) {
   app.get("/api/usage-summary", async (c) => {
     const node = await resolveNode(c.env.DB, c.req.header("X-Remote-Server"));
     if (!node) return json(c, { days: [], top: [], watch: [] });
-    const days = Math.min(Math.max(parseInt(c.req.query("days") ?? "7", 10) || 7, 1), 30);
+    const days = Math.min(
+      Math.max(parseInt(c.req.query("days") ?? "7", 10) || 7, 1),
+      30,
+    );
     const since = now() - days * 86400;
 
     const dailyRows = await all<{ d: string; up: number; down: number }>(
@@ -490,7 +494,8 @@ export function registerApiRead(app: Hono<{ Bindings: Env }>) {
           enabled: c2.enable !== false,
           used,
           volume,
-          pct: volume > 0 ? Math.min(100, Math.round((used / volume) * 100)) : 0,
+          pct:
+            volume > 0 ? Math.min(100, Math.round((used / volume) * 100)) : 0,
           expiry,
           daysLeft: expiry > 0 ? Math.ceil((expiry - nowTs) / 86400) : 0,
         };
