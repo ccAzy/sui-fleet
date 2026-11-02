@@ -149,12 +149,18 @@ async function loginRateLimited(
     return json(c, null, rateLimited());
   // 全局上限：不看 IP。客户端地址来自请求头，自托管时可能被伪造；
   // 只用「按 IP 计数」的话，攻击者每次换一个头就能绕开。
+  //
+  // 阈值必须足够高：这个闸门是**不看来源**的，攻击者只要持续打错密码就能把
+  // 管理员一起挡在门外（30/5min 时几分钟就能达成，等于一条免费的拒服攻击）。
+  // 200/5min 仍然能挡住"换头扫密码"的量级（正常运维不会 5 分钟错 200 次），
+  // 但不容易被单独一个人打满。
+  const GLOBAL_FAIL_LIMIT = 200;
   const globalRecent = await first<{ c: number }>(
     c.env.DB,
     "SELECT COUNT(*) as c FROM login_attempts WHERE ts > ? AND ok = 0",
     now() - 300,
   );
-  if ((globalRecent?.c ?? 0) >= 30)
+  if ((globalRecent?.c ?? 0) >= GLOBAL_FAIL_LIMIT)
     return json(c, null, rateLimited());
   return null;
 }
