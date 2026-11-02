@@ -2,6 +2,7 @@ package model
 
 import (
 	"encoding/json"
+	"fmt"
 )
 
 type Endpoint struct {
@@ -26,7 +27,14 @@ func (o *Endpoint) UnmarshalJSON(data []byte) error {
 	delete(raw, "id")
 	o.Type, _ = raw["type"].(string)
 	delete(raw, "type")
-	o.Tag = raw["tag"].(string)
+	// 不能用硬断言：面板下发的对象缺 tag（或 tag 不是字符串）时，
+	// 这里会 panic；而 UnmarshalJSON 是在 agent 主循环里调的，没有 recover，
+	// 结果就是 systemd 每 5 秒重启一次、无限崩溃循环。返回错误让上层跳过这条即可。
+	tag, ok := raw["tag"].(string)
+	if !ok || tag == "" {
+		return fmt.Errorf("缺 tag 或 tag 不是字符串")
+	}
+	o.Tag = tag
 	delete(raw, "tag")
 	o.Ext, _ = json.MarshalIndent(raw["ext"], "", "  ")
 	delete(raw, "ext")

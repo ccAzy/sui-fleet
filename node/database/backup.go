@@ -78,7 +78,19 @@ func GetDb(exclude string) ([]byte, error) {
 	if err := db.Model(&model.Setting{}).Scan(&settings).Error; err != nil {
 		return nil, err
 	} else if len(settings) > 0 {
-		if err := backupDb.Save(settings).Error; err != nil {
+		// 不要把 settings.secret 放进备份：它是会话 cookie 的签名密钥
+		// （web.go 里 cookie.NewStore(secret)），gorilla securecookie 只有 hash key、
+		// 不加密，所以拿到它就能离线伪造任意用户名的会话 —— 而且改密/轮换 API token
+		// 都止不住（secret 不变）。备份可以给运维、可以被 APIv2 token 拉走，
+		// 它不是"实例密钥"该出现的地方。
+		kept := make([]model.Setting, 0, len(settings))
+		for _, st := range settings {
+			if st.Key == "secret" {
+				continue
+			}
+			kept = append(kept, st)
+		}
+		if err := backupDb.Save(kept).Error; err != nil {
 			return nil, err
 		}
 	}

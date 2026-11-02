@@ -136,11 +136,27 @@ func (s *ConfigService) IsCoreRunning() bool {
 }
 
 func (s *ConfigService) RestartCore() error {
+	// 先验证再停。原实现是"停 → 渲染 → 起"，新配置一旦不合法，
+	// 旧内核已经没了、新的起不来 —— 一条坏配置就让整节点断流，
+	// 而 agent 下一轮还是同一份坏数据，于是反复"停-起不来"。
+	if err := s.validateCoreConfig(); err != nil {
+		logger.Error("refuse to restart with invalid config:", err.Error())
+		return err
+	}
 	err := s.StopCore()
 	if err != nil {
 		return err
 	}
 	return s.StartCore()
+}
+
+// validateCoreConfig 渲染当前配置并让内核解析一遍，不改变运行状态。
+func (s *ConfigService) validateCoreConfig() error {
+	raw, err := s.GetConfig("")
+	if err != nil {
+		return err
+	}
+	return core.ValidateConfig(*raw)
 }
 
 func (s *ConfigService) restartCoreWithConfig(config json.RawMessage) error {

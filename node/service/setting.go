@@ -42,7 +42,9 @@ var defaultConfig = `{
 }`
 
 var defaultValueMap = map[string]string{
-	"webListen":     "",
+	// 默认只监听回环：以前是空字符串 = 0.0.0.0:2095，配合首次启动的 admin/admin，
+	// 等于"装好即被接管"。要对外开放必须显式配置（并自己做 TLS/反代）。
+	"webListen":     "127.0.0.1",
 	"webDomain":     "",
 	"webPort":       "2095",
 	"secret":        common.Random(32),
@@ -225,6 +227,17 @@ func (s *SettingService) SetWebPath(webPath string) error {
 
 func (s *SettingService) GetSecret() ([]byte, error) {
 	secret, err := s.getString("secret")
+	if err != nil || secret == "" {
+		// 自愈：备份/导出不再携带 secret（见 database/backup.go），导入后这里
+		// 必须能重新生成一把并落库。否则 cookie store 会拿到空 key，
+		// 表现为"导入备份后登录不上"或 securecookie 直接报错。
+		secret = common.Random(32)
+		if e := s.saveSetting("secret", secret); e != nil {
+			logger.Warning("save regenerated secret failed:", e)
+			return nil, e
+		}
+		return []byte(secret), nil
+	}
 	if secret == defaultValueMap["secret"] {
 		err := s.saveSetting("secret", secret)
 		if err != nil {
