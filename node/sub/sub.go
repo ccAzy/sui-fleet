@@ -3,6 +3,7 @@ package sub
 import (
 	"context"
 	"crypto/tls"
+	"github.com/alireza0/s-ui/util/common"
 	"io"
 	"net"
 	"net/http"
@@ -45,6 +46,8 @@ func (s *Server) initRouter() (*gin.Engine, error) {
 	}
 
 	engine := gin.Default()
+	// 订阅路由统一限速（凭据就在 URL 里，必须防枚举/爆破）
+	engine.Use(subRateLimit())
 
 	subPath, err := s.SettingService.GetSubPath()
 	if err != nil {
@@ -117,15 +120,28 @@ func (s *Server) Start() (err error) {
 		listener = tls.NewListener(listener, c)
 	}
 
-	if certFile != "" || keyFile != "" {
-		logger.Info("Sub server run https on", listener.Addr())
+	plaintext := certFile == "" && keyFile == ""
+	if plaintext {
+		// 明文 + 非回环 = 订阅凭据在公网上裸奔（token 就在 URL 里）。
+		// 默认拒绝启动，要求显式开 subAllowInsecure 或配好证书。
+		if !isLoopbackListen(listen) && !s.SettingService.GetSubAllowInsecure() {
+			listener.Close()
+			return common.NewError("订阅服务拒绝了不安全的配置：监听 " + listenAddr +
+				" 且未配置 TLS 证书。请配 subCertFile/subKeyFile，或监听 127.0.0.1 交给反代，" +
+				"或显式设置 subAllowInsecure=true（不建议）")
+		}
+		logger.Warning("Sub server run http (plaintext) on", listener.Addr())
 	} else {
-		logger.Info("Sub server run http on", listener.Addr())
+		logger.Info("Sub server run https on", listener.Addr())
 	}
 	s.listener = listener
 
 	s.httpServer = &http.Server{
-		Handler: engine,
+		Handler:           engine,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 
 	go func() {
@@ -161,4 +177,13 @@ func (s *Server) Stop() error {
 
 func (s *Server) GetCtx() context.Context {
 	return s.ctx
+}
+
+// isLoopbackListen 判断监听地址是否只在本机。
+func isLoopbackListen(host string) bool {
+	if host == "" || host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }

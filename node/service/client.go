@@ -39,7 +39,7 @@ func (s *ClientService) GetAll() (*[]model.Client, error) {
 	db := database.GetDB()
 	var clients []model.Client
 	err := db.Model(model.Client{}).
-		Select("`id`, `enable`, `name`, `desc`, `group`, `inbounds`, `up`, `down`, `volume`, `expiry`").
+		Select("`id`, `enable`, `name`, `desc`, `group`, `inbounds`, `up`, `down`, `volume`, `expiry`, `sub_token`").
 		Scan(&clients).Error
 	if err != nil {
 		return nil, err
@@ -73,6 +73,17 @@ func (s *ClientService) Save(tx *gorm.DB, act string, data json.RawMessage, host
 			if err != nil {
 				return nil, err
 			}
+		}
+		// 订阅令牌：新建时必须生成；编辑时如果前端没带（老版本前端 / 精简表单），
+		// 保留库里的旧值 —— 否则一次编辑就会把用户已发出去的订阅链接打废。
+		if act == "edit" && client.SubToken == "" && client.Id != 0 {
+			var old model.Client
+			if e := tx.Model(&model.Client{}).Select("sub_token").Where("id = ?", client.Id).First(&old).Error; e == nil {
+				client.SubToken = old.SubToken
+			}
+		}
+		if client.SubToken == "" {
+			client.SubToken = database.RandomSubToken()
 		}
 		err = tx.Save(&client).Error
 		if err != nil {

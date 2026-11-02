@@ -35,6 +35,11 @@ type Client struct {
 	Up       int64           `json:"up" form:"up"`
 	Desc     string          `json:"desc" form:"desc"`
 	Group    string          `json:"group" form:"group"`
+	// SubToken 是订阅令牌。以前 /sub/<客户端名> 直接拿名字当凭据 ——
+	// 名字往往就是用户名/邮箱，可猜、会出现在备份与 /api/clients 里，
+	// 等于把"订阅"退化成了"知道用户名就能下载全部凭据"。
+	// 不用 uniqueIndex：AutoMigrate 时现存行全是空串，会撞唯一约束。
+	SubToken string `json:"sub_token" form:"sub_token" gorm:"index"`
 
 	// Delay start and periodic reset
 	DelayStart bool  `json:"delayStart" form:"delayStart" gorm:"default:false;not null"`

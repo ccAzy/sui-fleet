@@ -1,7 +1,10 @@
 package database
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path"
 	"strings"
@@ -9,6 +12,7 @@ import (
 
 	"github.com/alireza0/s-ui/config"
 	"github.com/alireza0/s-ui/database/model"
+	slogger "github.com/alireza0/s-ui/logger"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -119,7 +123,43 @@ func InitDB(dbPath string) error {
 	if err != nil {
 		return err
 	}
+	// 给还没有订阅令牌的客户端补一个（老库升级、以及导入旧备份之后）。
+	// 失败不阻断启动：没有令牌时旧的"按名字订阅"仍然可用。
+	if err := backfillClientSubTokens(); err != nil {
+		slogger.Warning("backfill client sub_token failed:", err)
+	}
 
+	return nil
+}
+
+// RandomSubToken 生成 32 位小写 hex 的订阅令牌（与面板侧 randHex(16) 对齐）。
+func RandomSubToken() string {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		// 极端情况下退化到时间戳，仍然是不可猜的（只是熵低一些）
+		return hex.EncodeToString([]byte(fmt.Sprintf("%d", time.Now().UnixNano())))[:32]
+	}
+	return hex.EncodeToString(b)
+}
+
+// backfillClientSubTokens 幂等地给缺令牌的客户端补令牌。
+func backfillClientSubTokens() error {
+	conn := GetDB()
+	var ids []uint
+	if err := conn.Model(&model.Client{}).
+		Where("sub_token = '' OR sub_token IS NULL").
+		Pluck("id", &ids).Error; err != nil {
+		return err
+	}
+	for _, id := range ids {
+		if err := conn.Model(&model.Client{}).Where("id = ?", id).
+			Update("sub_token", RandomSubToken()).Error; err != nil {
+			return err
+		}
+	}
+	if len(ids) > 0 {
+		slogger.Info("backfilled sub_token for ", len(ids), " client(s)")
+	}
 	return nil
 }
 

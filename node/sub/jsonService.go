@@ -96,9 +96,7 @@ func (j *JsonService) GetJson(subId string, format string) (*string, []string, e
 }
 
 func (j *JsonService) getData(subId string) (*model.Client, []*model.Inbound, error) {
-	db := database.GetDB()
-	client := &model.Client{}
-	err := db.Model(model.Client{}).Where("enable = true and name = ?", subId).First(client).Error
+	client, err := FindClientBySubID(subId, j.SettingService.GetSubLegacyNameAccess())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -108,7 +106,7 @@ func (j *JsonService) getData(subId string) (*model.Client, []*model.Inbound, er
 		return nil, nil, err
 	}
 	var inbounds []*model.Inbound
-	err = db.Model(model.Inbound{}).Preload("Tls").Where("id in ?", clientInbounds).Find(&inbounds).Error
+	err = database.GetDB().Model(model.Inbound{}).Preload("Tls").Where("id in ?", clientInbounds).Find(&inbounds).Error
 	if err != nil {
 		return nil, nil, err
 	}

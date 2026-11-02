@@ -55,20 +55,21 @@ var defaultValueMap = map[string]string{
 	"sessionMaxAge": "0",
 	"trafficAge":    "30",
 	"timeLocation":  "Asia/Tehran",
-	"subListen":     "",
-	"subPort":       "2096",
-	"subPath":       "/sub/",
-	"subDomain":     "",
-	"subCertFile":   "",
-	"subKeyFile":    "",
-	"subUpdates":    "12",
-	"subEncode":     "true",
-	"subShowInfo":   "false",
-	"subURI":        "",
-	"subJsonExt":    "",
-	"subClashExt":   "",
-	"config":        defaultConfig,
-	"version":       config.GetVersion(),
+	// 订阅服务以前默认空串 = 0.0.0.0:2096，配合"客户端名即凭据"就是公网裸奔。
+	"subListen":   "127.0.0.1",
+	"subPort":     "2096",
+	"subPath":     "/sub/",
+	"subDomain":   "",
+	"subCertFile": "",
+	"subKeyFile":  "",
+	"subUpdates":  "12",
+	"subEncode":   "true",
+	"subShowInfo": "false",
+	"subURI":      "",
+	"subJsonExt":  "",
+	"subClashExt": "",
+	"config":      defaultConfig,
+	"version":     config.GetVersion(),
 }
 
 type SettingService struct {
@@ -273,7 +274,26 @@ func (s *SettingService) GetTimeLocation() (*time.Location, error) {
 }
 
 func (s *SettingService) GetSubListen() (string, error) {
-	return s.getString("subListen")
+	v, err := s.getString("subListen")
+	// 老库里存的是空串（旧默认值），只改 defaultValueMap 对已有实例无效 ——
+	// 空串一律按回环处理，避免"升级后仍然对公网监听"。
+	if err != nil || v == "" {
+		return "127.0.0.1", err
+	}
+	return v, nil
+}
+
+// GetSubLegacyNameAccess 控制是否还接受 /sub/<客户端名> 这种旧地址。
+// 默认 true：升级不能立刻踢掉客户端里已保存的旧订阅 URL。
+func (s *SettingService) GetSubLegacyNameAccess() bool {
+	v, err := s.getString("subLegacyNameAccess")
+	return err != nil || v != "false"
+}
+
+// GetSubAllowInsecure 是否允许"非回环监听 + 无 TLS"。默认 false。
+func (s *SettingService) GetSubAllowInsecure() bool {
+	v, err := s.getString("subAllowInsecure")
+	return err == nil && v == "true"
 }
 
 func (s *SettingService) GetSubPort() (int, error) {
