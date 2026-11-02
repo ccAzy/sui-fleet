@@ -131,6 +131,12 @@ log(`  dist=${distDir}`);
 // 能拿到 200，等于给了一条不走 TLS 的登录入口。面板只该被本机 Caddy 反代。
 // 需要局域网访问，显式设 SUI_PANEL_HOST（例如 192.168.8.103）。
 const hostname = process.env.SUI_PANEL_HOST ?? "127.0.0.1";
+// 反代部署时如果没设 TRUST_PROXY，clientIp() 会落到 "direct" 单一桶：
+// 订阅限速变成全站 60 次/分钟，登录失败计数也不再按 IP 分桶。
+if (!process.env.TRUST_PROXY && hostname !== "127.0.0.1" && hostname !== "::1") {
+  log("警告：监听在非回环地址但未设置 TRUST_PROXY —— 所有客户端会落进同一个限速桶。");
+  log("     若前面有 Caddy/Nginx，请设 TRUST_PROXY=1 并让反代覆盖 X-Forwarded-For。");
+}
 
 serve(
   {

@@ -55,7 +55,12 @@ cat >/etc/caddy/Caddyfile <<CADDY
 }
 $ADDRS {
   tls $TLS_DIR/fullchain.pem $TLS_DIR/privkey.pem
-  reverse_proxy 127.0.0.1:$PORT
+  reverse_proxy 127.0.0.1:$PORT {
+    # 显式**覆盖** XFF：面板默认只信 CF 头（cf-ray + CF-Connecting-IP），
+    # 自建 Caddy 场景下没有这两个头，所有请求会落进同一个 "direct" 桶 ——
+    # 订阅限速退化成"全站 60 次/分钟"，客户端一多就集体 429。
+    header_up X-Forwarded-For {remote_host}
+  }
 }
 CADDY
 
@@ -102,3 +107,10 @@ fi
 echo
 echo "这台已能对外提供 HTTPS（监听 $LISTEN_PORT）。"
 echo "若 $LISTEN_PORT 不是 443，需要在 Cloudflare 上给这些域名加一条 Origin Rule：源站端口 → $LISTEN_PORT。"
+
+# 反代已就位：让面板采信 X-Forwarded-For 的首跳（Caddy 上面已改成覆盖写入）。
+# 安全的**前提**是反代覆盖 XFF，否则客户端可以自己伪造，把失败计数摊薄。
+if [ -f /etc/sui-panel.env ] && ! grep -q '^TRUST_PROXY=' /etc/sui-panel.env; then
+  echo 'TRUST_PROXY=1' >> /etc/sui-panel.env
+  echo "  已写入 TRUST_PROXY=1 到 /etc/sui-panel.env（改完记得 systemctl restart sui-panel）"
+fi

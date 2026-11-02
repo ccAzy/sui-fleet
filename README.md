@@ -291,3 +291,21 @@ GPL-3.0，见 [LICENSE](./LICENSE)。
 派生自 [alireza0/s-ui](https://github.com/alireza0/s-ui) 与 [Teminuosi/s-ui](https://github.com/Teminuosi/s-ui)，
 前端派生自 [Teminuosi/s-ui-frontend](https://github.com/Teminuosi/s-ui-frontend)。
 内核为 [SagerNet/sing-box](https://github.com/SagerNet/sing-box)。
+
+## 自托管：反代与限速分桶（`TRUST_PROXY`）
+
+面板的 `clientIp()` 默认只信 Cloudflare 的 `CF-Connecting-IP` + `cf-ray` 组合
+（直连时这两个头可伪造，默认采信 `X-Forwarded-For` 等于不限速）。
+
+**自建反代部署必须显式设置：**
+
+```bash
+# /etc/sui-panel.env
+TRUST_PROXY=1
+```
+
+并且反代要**覆盖**而不是追加 XFF（`apps/selfhost/scripts/enable-tls.sh` 生成的
+Caddyfile 已带 `header_up X-Forwarded-For {remote_host}`）。
+
+不设的后果：所有请求落进同一个桶 —— 订阅限速退化成全站 60 次/分钟，
+登录失败计数也不再按 IP 分桶。
