@@ -48,6 +48,8 @@ const SECRET_KEYS = new Set([
   "security_token",
   "secret_key",
   "session_token",
+  // Cloudflare DNS-01 的 zone token（Acme.vue 的 params 里有它）
+  "zone_token",
 ]);
 
 /**

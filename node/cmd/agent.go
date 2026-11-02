@@ -58,6 +58,9 @@ type agentPullResp struct {
 	Services  []json.RawMessage         `json:"services"`
 	TLS       []json.RawMessage         `json:"tls"`
 	Clients   []json.RawMessage         `json:"clients"`
+	// 面板算好的"客户端配置指纹"。带 up/down/totalUp/totalDown/sub_token
+	// 的原始 clients 每轮都在变，直接哈希会导致每次下发都重启内核。
+	ClientsSig string                    `json:"clients_sig"`
 	Commands  []agentCommand            `json:"commands"`
 }
 
@@ -870,14 +873,22 @@ func coreConfigSig(pr *agentPullResp) string {
 			h.Write([]byte{0})
 		}
 	}
-	clients := make([]string, 0, len(pr.Clients))
-	for _, b := range pr.Clients {
-		clients = append(clients, string(b))
-	}
-	sort.Strings(clients)
-	for _, c := range clients {
-		h.Write([]byte(c))
+	if pr.ClientsSig != "" {
+		// 面板已经按"配置字段"算好了指纹（剔除 up/down/totalUp/totalDown/sub_token）。
+		// 用它，不要用 clients 原文——原文里的流量计数每轮都变。
+		h.Write([]byte(pr.ClientsSig))
 		h.Write([]byte{0})
+	} else {
+		// 老面板没这个字段时的退路：仍然按内容哈希（会比新版更容易误重启，但不漏改）。
+		clients := make([]string, 0, len(pr.Clients))
+		for _, b := range pr.Clients {
+			clients = append(clients, string(b))
+		}
+		sort.Strings(clients)
+		for _, c := range clients {
+			h.Write([]byte(c))
+			h.Write([]byte{0})
+		}
 	}
 	return hex.EncodeToString(h.Sum(nil))
 }

@@ -120,6 +120,8 @@ export function configFingerprintView(
   });
 }
 
+const sha256Str = async (s: string): Promise<string> => await sha256(s);
+
 export async function pullPayload(
   db: D1Database,
   node: NodeRow,
@@ -253,6 +255,15 @@ export async function pullPayload(
     services,
     tls,
     clients,
+    // clients 的"配置指纹"，由面板用和自指纹相同的那一层过滤算出来。
+    //
+    // 为什么不能直接让节点对 clients 原文做哈希：原文里有 up/down/totalUp/
+    // totalDown/sub_token，这些字段每轮上报/回填都会变。节点一哈希就会判定
+    // "配置变了"→ 重启内核。表现出来就是「改一个和内核无关的设置，所有节点
+    // 断一次线」。而节点又不能自己剔除这些字段——它的 client.Up/TotalUp 要留
+    // 着自己算流量和配额（node/service/client.go:493-495）。
+    // 所以：面板算好配置指纹下发，节点只比这个值。
+    clients_sig: await sha256Str(canonical(configClients)),
     commands: cmds.map((c) => ({
       id: c.id,
       kind: c.kind,
@@ -276,6 +287,8 @@ function safeParse(s: string): CmdPayload {
 
 export type ReportBody = {
   revision_applied?: number;
+  /** 老 agent 只发这个字段（兼容），schema 两个都收 */
+  revision?: number;
   agent_version?: string;
   kernel_version?: string;
   core_state?: string;
@@ -326,7 +339,12 @@ export async function handleReport(
           ...status,
           uptime: body.uptime ?? status.uptime ?? 0,
         }),
-        body.revision_applied ?? node.applied_rev,
+        // 老 agent 只发 revision；两个都没有就保持原值。
+        // 再 clamp 到 node.revision：节点不可能"应用"一个面板还没下发的版本。
+        Math.min(
+          body.revision_applied ?? body.revision ?? node.applied_rev,
+          node.revision,
+        ),
         node.id,
       ),
   ];

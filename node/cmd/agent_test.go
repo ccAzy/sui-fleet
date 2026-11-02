@@ -143,3 +143,30 @@ func TestCoreConfigSigIgnoresClientOrder(t *testing.T) {
 		t.Fatal("client 顺序变化不该触发内核重启")
 	}
 }
+
+// 关键回归：clients 原文里的 up/down/totalUp/totalDown 每轮上报都在变，
+// 它们绝不能影响内核是否重启。面板用 clients_sig 下发"配置指纹"，
+// 节点只比这个值。
+func TestCoreConfigSigIgnoresTrafficCounters(t *testing.T) {
+	a := &agentPullResp{
+		Config:     json.RawMessage(`{}`),
+		Clients:    []json.RawMessage{json.RawMessage(`{"id":1,"up":10,"totalDown":99}`)},
+		ClientsSig: "sig-A",
+	}
+	b := &agentPullResp{
+		Config:     json.RawMessage(`{}`),
+		Clients:    []json.RawMessage{json.RawMessage(`{"id":1,"up":777,"totalDown":8888}`)},
+		ClientsSig: "sig-A",
+	}
+	if coreConfigSig(a) != coreConfigSig(b) {
+		t.Fatal("只改流量计数就换签名 → 每次下发都会重启内核")
+	}
+}
+
+func TestCoreConfigSigChangesWhenClientsSigChanges(t *testing.T) {
+	a := &agentPullResp{Config: json.RawMessage(`{}`), ClientsSig: "sig-A"}
+	b := &agentPullResp{Config: json.RawMessage(`{}`), ClientsSig: "sig-B"}
+	if coreConfigSig(a) == coreConfigSig(b) {
+		t.Fatal("clients_sig 变了必须换签名（删/停用/改密客户端）")
+	}
+}
