@@ -115,8 +115,17 @@ func prepareTls(t *model.Tls) map[string]interface{} {
 		case "enabled", "server_name", "alpn":
 			oTls[k] = v
 		case "reality":
-			reality := v.(map[string]interface{})
-			clientReality := oTls["reality"].(map[string]interface{})
+			// 不能硬断言：TLS JSON 里的 reality 是 null/字符串/缺字段时（旧数据、
+			// 手工改库、导入备份）这里会 panic —— gin 的 Recovery 会变成 500，
+			// 保存/生成链接直接失败。取值失败就跳过这一项。
+			reality, ok := v.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			clientReality, ok := oTls["reality"].(map[string]interface{})
+			if !ok {
+				clientReality = map[string]interface{}{}
+			}
 			clientReality["enabled"] = reality["enabled"]
 			if shortIDs, hasSIds := reality["short_id"].([]interface{}); hasSIds && len(shortIDs) > 0 {
 				clientReality["short_id"] = shortIDs[common.RandomInt(len(shortIDs))]

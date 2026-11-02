@@ -134,7 +134,25 @@ function prefixRemark(uri: string, nodeName: string): string {
       remark = uri.slice(hash + 1);
     }
   }
-  return `${base}#${encodeURIComponent(`${nodeName} · ${remark || "node"}`)}`;
+  // encodeURIComponent 遇到"孤立代理项"（半个 UTF-16 代理对）会抛 URIError，
+  // 而备注来自客户端 links 的原始 JSON —— 一条坏备注就能让整份聚合订阅 500。
+  // 不用 toWellFormed() 是因为 tsconfig 的 lib 目标里还没有它（ES2024）。
+  const label = `${nodeName} · ${remark || "node"}`;
+  let frag: string;
+  try {
+    frag = encodeURIComponent(label);
+  } catch {
+    // 逐字符编码，坏的那个换成 U+FFFD（%EF%BF%BD）
+    frag = "";
+    for (const ch of label) {
+      try {
+        frag += encodeURIComponent(ch);
+      } catch {
+        frag += "%EF%BF%BD";
+      }
+    }
+  }
+  return `${base}#${frag}`;
 }
 
 function clientHeaders(

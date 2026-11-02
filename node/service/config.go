@@ -15,8 +15,11 @@ import (
 
 var (
 	// 最近一次成功启动的配置：Start 失败时用它回滚，避免"坏配置一存就整节点断流"。
-	lastGoodConfig      []byte
-	lastGoodConfigMu    sync.Mutex
+	lastGoodConfig   []byte
+	lastGoodConfigMu sync.Mutex
+	// 所有「停 + 起」必须串行：RestartCore 与 restartCoreWithConfig 并发时，
+	// 后者刚起的内核会被前者 Stop 掉，两边都报成功、实际停着。
+	applyMu             sync.Mutex
 	LastUpdate          int64
 	corePtr             *core.Core
 	startCoreMu         sync.Mutex
@@ -119,7 +122,9 @@ func (s *ConfigService) StartCore() error {
 	if err != nil {
 		return err
 	}
+	applyMu.Lock()
 	err = corePtr.Start(*rawConfig)
+	applyMu.Unlock()
 	if err != nil {
 		startCoreMu.Lock()
 		lastStartFailTime = time.Now()
@@ -128,9 +133,7 @@ func (s *ConfigService) StartCore() error {
 		return err
 	}
 	logger.Info("sing-box started")
-	lastGoodConfigMu.Lock()
-	lastGoodConfig = append([]byte(nil), (*rawConfig)...)
-	lastGoodConfigMu.Unlock()
+	rememberGoodConfig(*rawConfig)
 	return nil
 }
 
@@ -142,18 +145,59 @@ func (s *ConfigService) IsCoreRunning() bool {
 }
 
 func (s *ConfigService) RestartCore() error {
-	// 先验证再停。原实现是"停 → 渲染 → 起"，新配置一旦不合法，
-	// 旧内核已经没了、新的起不来 —— 一条坏配置就让整节点断流，
-	// 而 agent 下一轮还是同一份坏数据，于是反复"停-起不来"。
-	if err := s.validateCoreConfig(); err != nil {
-		logger.Error("refuse to restart with invalid config:", err.Error())
-		return err
-	}
-	err := s.StopCore()
+	raw, err := s.GetConfig("")
 	if err != nil {
 		return err
 	}
-	return s.StartCore()
+	// 先验证再停：新配置一旦不合法，旧内核不该被干掉。
+	if err := core.ValidateConfig(*raw); err != nil {
+		logger.Error("refuse to restart with invalid config:", err.Error())
+		return err
+	}
+	return s.applyRawConfig(*raw)
+}
+
+// applyRawConfig 是唯一的「停 → 起 → 失败回滚」路径。
+// RestartCore 和 restartCoreWithConfig 都走它，避免两条路各自演化出不同语义。
+func (s *ConfigService) applyRawConfig(raw []byte) error {
+	applyMu.Lock()
+	defer applyMu.Unlock()
+
+	if corePtr.IsRunning() {
+		if err := corePtr.Stop(); err != nil {
+			logger.Error("restart sing-box err (stop):", err.Error())
+			return err
+		}
+	}
+	if err := corePtr.Start(raw); err != nil {
+		logger.Error("restart sing-box err (start):", err.Error())
+		if good := lastGoodConfigCopy(); len(good) > 0 {
+			if e := corePtr.Start(good); e != nil {
+				logger.Error("rollback to last good config failed:", e.Error())
+			} else {
+				logger.Warning("已回滚到最近一次成功启动的配置（新配置在库里，修正后重新保存即可）")
+			}
+		} else {
+			logger.Warning("没有可回滚的历史配置（本次是首次启动）")
+		}
+		return err
+	}
+	// 成功后必须刷新回滚目标：否则下一次失败会回滚到更早的配置，
+	// 把中间成功的那些改动无声丢掉。
+	rememberGoodConfig(raw)
+	return nil
+}
+
+func rememberGoodConfig(raw []byte) {
+	lastGoodConfigMu.Lock()
+	lastGoodConfig = append([]byte(nil), raw...)
+	lastGoodConfigMu.Unlock()
+}
+
+func lastGoodConfigCopy() []byte {
+	lastGoodConfigMu.Lock()
+	defer lastGoodConfigMu.Unlock()
+	return lastGoodConfig
 }
 
 // validateCoreConfig 渲染当前配置并让内核解析一遍，不改变运行状态。
@@ -169,7 +213,9 @@ func (s *ConfigService) restartCoreWithConfig(config json.RawMessage) error {
 	startCoreMu.Lock()
 	if startCoreInProgress {
 		startCoreMu.Unlock()
-		return nil
+		// 不能返回 nil：调用方（Save 的 goroutine）会把 nil 当"已应用"，
+		// 于是配置落库了但内核没换，面板还显示成功。
+		return common.NewError("restart skipped: another start is in progress, config saved but not applied")
 	}
 	startCoreInProgress = true
 	startCoreMu.Unlock()
@@ -179,10 +225,6 @@ func (s *ConfigService) restartCoreWithConfig(config json.RawMessage) error {
 		startCoreMu.Unlock()
 	}()
 
-	// 先渲染 + 验证，再停旧内核。
-	// 原实现是"停 → 渲染 → 起"：新配置一旦不合法（JSON 结构对但语义错、端口占用、
-	// 证书读不到），旧内核已经没了、新的起不来，而这个坏配置已经落库，
-	// cron 每 5 秒重试同一次失败 —— 节点持续断流直到人工改回。
 	rawConfig, err := s.GetConfig(string(config))
 	if err != nil {
 		logger.Error("restart sing-box err (get config):", err.Error())
@@ -192,25 +234,7 @@ func (s *ConfigService) restartCoreWithConfig(config json.RawMessage) error {
 		logger.Error("restart sing-box err (invalid config, 旧内核继续运行):", err.Error())
 		return err
 	}
-	if corePtr.IsRunning() {
-		if err := corePtr.Stop(); err != nil {
-			logger.Error("restart sing-box err (stop):", err.Error())
-			return err
-		}
-	}
-	if err := corePtr.Start(*rawConfig); err != nil {
-		logger.Error("restart sing-box err (start):", err.Error())
-		// 用最近一次成功的配置把内核拉回来：坏配置已经入库，不回滚就是一直断流。
-		lastGoodConfigMu.Lock()
-		good := lastGoodConfig
-		lastGoodConfigMu.Unlock()
-		if len(good) > 0 {
-			if e := corePtr.Start(good); e != nil {
-				logger.Error("rollback to last good config failed:", e.Error())
-			} else {
-				logger.Warning("已回滚到最近一次成功启动的配置（新配置保留在库里，修正后重新保存即可）")
-			}
-		}
+	if err := s.applyRawConfig(*rawConfig); err != nil {
 		return err
 	}
 	logger.Info("sing-box restarted with new config")
