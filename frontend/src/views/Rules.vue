@@ -233,8 +233,8 @@ const inboundTags = computed((): string[] => [
   ...Data().endpoints?.filter((e:any) => e.listen_port > 0).map((e:any) => e.tag)
 ])
 
-let delRuleOverlay = ref(new Array<boolean>)
-let delRulesetOverlay = ref(new Array<boolean>)
+let delRuleOverlay = ref([] as boolean[])
+let delRulesetOverlay = ref([] as boolean[])
 
 const ruleModal = ref({ visible: false, index: -1, data: "" })
 const showRuleModal = (index: number) => {

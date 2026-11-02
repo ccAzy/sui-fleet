@@ -1,146 +1,512 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
-<head>
-<meta charset="utf-8">
-<title>sui-cf 全面检查 · 2026-11-02</title>
-<style>
-  :root{
-    --paper:#faf8f3; --ink:#1d1c1a; --ink-2:#4a4844; --ink-3:#8a867e;
-    --rule:#d9d4c8; --accent:#8a6d3b; --ok:#3f6b4a; --warn:#8a5a2b; --bad:#8c3a35;
-  }
-  *{box-sizing:border-box}
-  body{
-    margin:0; padding:56px 24px 96px; background:var(--paper); color:var(--ink);
-    font-family:"Noto Serif SC","Songti SC",Georgia,serif; font-size:15px; line-height:1.85;
-    -webkit-font-smoothing:antialiased;
-  }
-  .sheet{max-width:860px;margin:0 auto}
-  header{border-bottom:2px solid var(--ink);padding-bottom:18px;margin-bottom:34px}
-  h1{font-size:27px;margin:0 0 8px;letter-spacing:.02em;font-weight:600}
-  .meta{color:var(--ink-3);font-size:13px;letter-spacing:.03em}
-  h2{font-size:18px;margin:44px 0 14px;padding-bottom:7px;border-bottom:1px solid var(--rule);font-weight:600}
-  h3{font-size:15px;margin:24px 0 8px;font-weight:600;color:var(--ink-2)}
-  p{margin:10px 0}
-  table{width:100%;border-collapse:collapse;margin:14px 0 6px;font-size:13.5px}
-  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--rule);vertical-align:top}
-  th{font-weight:600;color:var(--ink-2);border-bottom:1.5px solid var(--rule)}
-  code{font-family:"JetBrains Mono",Consolas,monospace;font-size:12.5px;background:#f1ede3;padding:1px 5px;border-radius:2px}
-  .score{font-variant-numeric:tabular-nums;font-weight:600}
-  .s7{color:var(--ok)} .s6{color:var(--warn)} .s8{color:var(--ok)}
-  ul{margin:8px 0 8px 0;padding-left:22px}
-  li{margin:5px 0}
-  .tag{display:inline-block;font-size:11.5px;letter-spacing:.06em;padding:1px 7px;border:1px solid var(--rule);color:var(--ink-3);border-radius:2px;margin-right:6px}
-  .p0{border-color:var(--bad);color:var(--bad)} .p1{border-color:var(--warn);color:var(--warn)} .p2{border-color:var(--ink-3)}
-  blockquote{margin:16px 0;padding:10px 16px;border-left:2px solid var(--accent);color:var(--ink-2);background:#f5f2ea}
-  footer{margin-top:56px;padding-top:16px;border-top:1px solid var(--rule);color:var(--ink-3);font-size:12.5px}
-</style>
-</head>
-<body>
-<div class="sheet">
+  <head>
+    <meta charset="utf-8" />
+    <title>sui-cf 全面检查 · 2026-11-02</title>
+    <style>
+      :root {
+        --paper: #faf8f3;
+        --ink: #1d1c1a;
+        --ink-2: #4a4844;
+        --ink-3: #8a867e;
+        --rule: #d9d4c8;
+        --accent: #8a6d3b;
+        --ok: #3f6b4a;
+        --warn: #8a5a2b;
+        --bad: #8c3a35;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 56px 24px 96px;
+        background: var(--paper);
+        color: var(--ink);
+        font-family: "Noto Serif SC", "Songti SC", Georgia, serif;
+        font-size: 15px;
+        line-height: 1.85;
+        -webkit-font-smoothing: antialiased;
+      }
+      .sheet {
+        max-width: 860px;
+        margin: 0 auto;
+      }
+      header {
+        border-bottom: 2px solid var(--ink);
+        padding-bottom: 18px;
+        margin-bottom: 34px;
+      }
+      h1 {
+        font-size: 27px;
+        margin: 0 0 8px;
+        letter-spacing: 0.02em;
+        font-weight: 600;
+      }
+      .meta {
+        color: var(--ink-3);
+        font-size: 13px;
+        letter-spacing: 0.03em;
+      }
+      h2 {
+        font-size: 18px;
+        margin: 44px 0 14px;
+        padding-bottom: 7px;
+        border-bottom: 1px solid var(--rule);
+        font-weight: 600;
+      }
+      h3 {
+        font-size: 15px;
+        margin: 24px 0 8px;
+        font-weight: 600;
+        color: var(--ink-2);
+      }
+      p {
+        margin: 10px 0;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 14px 0 6px;
+        font-size: 13.5px;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--rule);
+        vertical-align: top;
+      }
+      th {
+        font-weight: 600;
+        color: var(--ink-2);
+        border-bottom: 1.5px solid var(--rule);
+      }
+      code {
+        font-family: "JetBrains Mono", Consolas, monospace;
+        font-size: 12.5px;
+        background: #f1ede3;
+        padding: 1px 5px;
+        border-radius: 2px;
+      }
+      .score {
+        font-variant-numeric: tabular-nums;
+        font-weight: 600;
+      }
+      .s7 {
+        color: var(--ok);
+      }
+      .s6 {
+        color: var(--warn);
+      }
+      .s8 {
+        color: var(--ok);
+      }
+      ul {
+        margin: 8px 0 8px 0;
+        padding-left: 22px;
+      }
+      li {
+        margin: 5px 0;
+      }
+      .tag {
+        display: inline-block;
+        font-size: 11.5px;
+        letter-spacing: 0.06em;
+        padding: 1px 7px;
+        border: 1px solid var(--rule);
+        color: var(--ink-3);
+        border-radius: 2px;
+        margin-right: 6px;
+      }
+      .p0 {
+        border-color: var(--bad);
+        color: var(--bad);
+      }
+      .p1 {
+        border-color: var(--warn);
+        color: var(--warn);
+      }
+      .p2 {
+        border-color: var(--ink-3);
+      }
+      blockquote {
+        margin: 16px 0;
+        padding: 10px 16px;
+        border-left: 2px solid var(--accent);
+        color: var(--ink-2);
+        background: #f5f2ea;
+      }
+      footer {
+        margin-top: 56px;
+        padding-top: 16px;
+        border-top: 1px solid var(--rule);
+        color: var(--ink-3);
+        font-size: 12.5px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="sheet">
+      <header>
+        <h1>sui-cf 全面检查</h1>
+        <div class="meta">
+          2026-11-02 · 架构 / 设计 / 代码质量 / 测试 / 工程化 · 提交
+          <code>0af708e</code>
+        </div>
+      </header>
 
-<header>
-  <h1>sui-cf 全面检查</h1>
-  <div class="meta">2026-11-02 · 架构 / 设计 / 代码质量 / 测试 / 工程化 · 提交 <code>0af708e</code></div>
-</header>
+      <blockquote>
+        一句话结论：<strong>骨架是好的，堆放是乱的</strong>。控制面/数据面分离、pull
+        模型、双运行时可移植这些架构决策都站得住；
+        真正拖后腿的是三件事——没有运行时校验层、没有静态检查配置、两个上帝文件。这三样都不是"重写"能解决的，是日常纪律。
+      </blockquote>
 
-<blockquote>
-一句话结论：<strong>骨架是好的，堆放是乱的</strong>。控制面/数据面分离、pull 模型、双运行时可移植这些架构决策都站得住；
-真正拖后腿的是三件事——没有运行时校验层、没有静态检查配置、两个上帝文件。这三样都不是"重写"能解决的，是日常纪律。
-</blockquote>
+      <h2>评分</h2>
+      <table>
+        <tr>
+          <th>维度</th>
+          <th>分</th>
+          <th>依据</th>
+        </tr>
+        <tr>
+          <td>架构</td>
+          <td class="score s7">7</td>
+          <td>
+            控制面/数据面干净分离；节点只 pull、面板不回调；同一份业务代码跑在
+            Worker 与 Node 两个运行时上（靠
+            <code>d1.ts</code> 垫片）。扣分在模块粒度：<code>objects.ts</code>
+            一个文件同时管 CRUD、链接重算、种子数据、级联删除、指纹。
+          </td>
+        </tr>
+        <tr>
+          <td>设计 / UI</td>
+          <td class="score s8">8</td>
+          <td>
+            纸账本语言贯穿（细线、无卡片、账目抬头），壁纸对比度有门禁，六语种
+            100%，首页新增按天趋势。扣分在 <code>Settings.vue</code> 1037
+            行、Cloud 模式下仍有无效字段。
+          </td>
+        </tr>
+        <tr>
+          <td>代码质量</td>
+          <td class="score s6">6</td>
+          <td>
+            本轮修掉 2 处（登录限流重复、非空断言）。存量：<code>unknown</code>
+            112 处、<code>any</code> 13 处、6 组重复块、仓库内无 eslint/biome
+            配置。
+          </td>
+        </tr>
+        <tr>
+          <td>测试</td>
+          <td class="score s6">6</td>
+          <td>
+            单元 59、e2e 76
+            断言，覆盖登录/2FA/订阅/导入/告警关键路径。缺口：前端零测试、Go
+            agent 零测试、无覆盖率统计。
+          </td>
+        </tr>
+        <tr>
+          <td>安全</td>
+          <td class="score s8">8</td>
+          <td>
+            本轮清完 30+ 项（脱敏、会话吊销、导入校验、恒定时间比较、非 root
+            运行、Cloudflare 退出）。剩余是纵深项，不是漏洞。
+          </td>
+        </tr>
+        <tr>
+          <td>运维</td>
+          <td class="score s7">7</td>
+          <td>
+            告警+心跳（双机视角）、本地仲裁者、日志轮转、10
+            节点滚动验证流程。扣分：单点 hk、备份恢复从未演练。
+          </td>
+        </tr>
+        <tr>
+          <td>文档</td>
+          <td class="score s7">7</td>
+          <td>
+            README / SECURITY / CONTRIBUTING / 事故记录 / i18n
+            缺口表齐全。扣分：<code>apps/arbiter/README.md</code> 仍在讲已停用的
+            Worker 部署。
+          </td>
+        </tr>
+        <tr>
+          <td>可维护性</td>
+          <td class="score s6">6</td>
+          <td>
+            61 个端点分布在 6
+            个路由文件里还算清楚，但一旦接手就要面对上表的上帝模块与缺失的校验层。
+          </td>
+        </tr>
+      </table>
 
-<h2>评分</h2>
-<table>
-  <tr><th>维度</th><th>分</th><th>依据</th></tr>
-  <tr><td>架构</td><td class="score s7">7</td><td>控制面/数据面干净分离；节点只 pull、面板不回调；同一份业务代码跑在 Worker 与 Node 两个运行时上（靠 <code>d1.ts</code> 垫片）。扣分在模块粒度：<code>objects.ts</code> 一个文件同时管 CRUD、链接重算、种子数据、级联删除、指纹。</td></tr>
-  <tr><td>设计 / UI</td><td class="score s8">8</td><td>纸账本语言贯穿（细线、无卡片、账目抬头），壁纸对比度有门禁，六语种 100%，首页新增按天趋势。扣分在 <code>Settings.vue</code> 1037 行、Cloud 模式下仍有无效字段。</td></tr>
-  <tr><td>代码质量</td><td class="score s6">6</td><td>本轮修掉 2 处（登录限流重复、非空断言）。存量：<code>unknown</code> 112 处、<code>any</code> 13 处、6 组重复块、仓库内无 eslint/biome 配置。</td></tr>
-  <tr><td>测试</td><td class="score s6">6</td><td>单元 59、e2e 76 断言，覆盖登录/2FA/订阅/导入/告警关键路径。缺口：前端零测试、Go agent 零测试、无覆盖率统计。</td></tr>
-  <tr><td>安全</td><td class="score s8">8</td><td>本轮清完 30+ 项（脱敏、会话吊销、导入校验、恒定时间比较、非 root 运行、Cloudflare 退出）。剩余是纵深项，不是漏洞。</td></tr>
-  <tr><td>运维</td><td class="score s7">7</td><td>告警+心跳（双机视角）、本地仲裁者、日志轮转、10 节点滚动验证流程。扣分：单点 hk、备份恢复从未演练。</td></tr>
-  <tr><td>文档</td><td class="score s7">7</td><td>README / SECURITY / CONTRIBUTING / 事故记录 / i18n 缺口表齐全。扣分：<code>apps/arbiter/README.md</code> 仍在讲已停用的 Worker 部署。</td></tr>
-  <tr><td>可维护性</td><td class="score s6">6</td><td>61 个端点分布在 6 个路由文件里还算清楚，但一旦接手就要面对上表的上帝模块与缺失的校验层。</td></tr>
-</table>
+      <h2>架构</h2>
+      <h3>站得住的三件事</h3>
+      <ul>
+        <li>
+          <strong>控制面与数据面分离，节点只 pull</strong
+          >：面板永远不主动连节点，节点挂了自己重试，面板换机只需改地址。这个决定让"面板在
+          Cloudflare / 面板在 VPS / 面板换机器"三次迁移都没动过节点侧逻辑。
+        </li>
+        <li>
+          <strong>双运行时共享业务代码</strong>：<code
+            >apps/selfhost/src/d1.ts</code
+          >
+          用 <code>node:sqlite</code> 实现 D1 的子集，同一份
+          <code>panel/src</code> 在 Worker 和 Node
+          上跑。代价是垫片必须保持"语义等价"，一旦 D1 加了特性就要同步。
+        </li>
+        <li>
+          <strong>变更靠 revision + 内容指纹双保险</strong>：revision
+          说"变过几次"，指纹说"现在是什么"。只有后者能发现"恢复备份 / 手改库 /
+          待机 promote"造成的漂移。
+        </li>
+      </ul>
 
-<h2>架构</h2>
-<h3>站得住的三件事</h3>
-<ul>
-  <li><strong>控制面与数据面分离，节点只 pull</strong>：面板永远不主动连节点，节点挂了自己重试，面板换机只需改地址。这个决定让"面板在 Cloudflare / 面板在 VPS / 面板换机器"三次迁移都没动过节点侧逻辑。</li>
-  <li><strong>双运行时共享业务代码</strong>：<code>apps/selfhost/src/d1.ts</code> 用 <code>node:sqlite</code> 实现 D1 的子集，同一份 <code>panel/src</code> 在 Worker 和 Node 上跑。代价是垫片必须保持"语义等价"，一旦 D1 加了特性就要同步。</li>
-  <li><strong>变更靠 revision + 内容指纹双保险</strong>：revision 说"变过几次"，指纹说"现在是什么"。只有后者能发现"恢复备份 / 手改库 / 待机 promote"造成的漂移。</li>
-</ul>
+      <h3>该拆的地方</h3>
+      <ul>
+        <li>
+          <code>panel/src/objects.ts</code>（672 行）同时负责：对象
+          CRUD、客户端链接重算、默认配置种子、级联删除+审计、配置指纹投影。<span
+            class="tag p1"
+            >P1</span
+          >建议按职责拆成
+          <code>objects/crud.ts</code
+          >、<code>objects/links.ts</code>、<code>objects/lifecycle.ts</code>。
+        </li>
+        <li>
+          路由层直接写 SQL（<code>api-read.ts</code> 里 20+ 条内联查询）。<span
+            class="tag p2"
+            >P2</span
+          >不是错，但让"同一个查询在两处略有不同"这类 bug
+          无法避免（本轮就修过一次类似的）。
+        </li>
+        <li>
+          没有领域错误类型。<span class="tag p1">P1</span>所有失败都是
+          <code>json(c, null, new Error("中文句子"))</code
+          >，前端只能靠文案分支，无法做"未登录 vs 权限不足 vs
+          业务拒绝"的差异化处理。
+        </li>
+      </ul>
 
-<h3>该拆的地方</h3>
-<ul>
-  <li><code>panel/src/objects.ts</code>（672 行）同时负责：对象 CRUD、客户端链接重算、默认配置种子、级联删除+审计、配置指纹投影。<span class="tag p1">P1</span>建议按职责拆成 <code>objects/crud.ts</code>、<code>objects/links.ts</code>、<code>objects/lifecycle.ts</code>。</li>
-  <li>路由层直接写 SQL（<code>api-read.ts</code> 里 20+ 条内联查询）。<span class="tag p2">P2</span>不是错，但让"同一个查询在两处略有不同"这类 bug 无法避免（本轮就修过一次类似的）。</li>
-  <li>没有领域错误类型。<span class="tag p1">P1</span>所有失败都是 <code>json(c, null, new Error("中文句子"))</code>，前端只能靠文案分支，无法做"未登录 vs 权限不足 vs 业务拒绝"的差异化处理。</li>
-</ul>
+      <h2>代码质量</h2>
+      <h3>重复代码（jscpd 实测）</h3>
+      <table>
+        <tr>
+          <th>位置</th>
+          <th>重复</th>
+          <th>说明</th>
+        </tr>
+        <tr>
+          <td><code>api-read.ts:142</code> ↔ <code>api-write.ts:136</code></td>
+          <td>16 行</td>
+          <td>对象列表/保存的公共外壳</td>
+        </tr>
+        <tr>
+          <td><code>api-read.ts:143</code> ↔ <code>api-write.ts:114</code></td>
+          <td>14 行</td>
+          <td>同上</td>
+        </tr>
+        <tr>
+          <td><code>index.ts:131</code> ↔ <code>:201</code></td>
+          <td>20 行</td>
+          <td>
+            <strong>已修</strong>：登录限流前置抽成
+            <code>loginRateLimited()</code>
+          </td>
+        </tr>
+        <tr>
+          <td><code>otp.ts:133</code> ↔ <code>:179</code></td>
+          <td>13 行</td>
+          <td>启用/关闭 2FA 的 bump+重签块，可再抽一层</td>
+        </tr>
+        <tr>
+          <td><code>clash.ts</code> ×4</td>
+          <td>各 8 行</td>
+          <td>四种协议的 transport 拼装，可表驱动</td>
+        </tr>
+        <tr>
+          <td><code>sub.ts:152</code> ↔ <code>:242</code></td>
+          <td>8 行</td>
+          <td>订阅头的公共部分</td>
+        </tr>
+      </table>
 
-<h2>代码质量</h2>
-<h3>重复代码（jscpd 实测）</h3>
-<table>
-  <tr><th>位置</th><th>重复</th><th>说明</th></tr>
-  <tr><td><code>api-read.ts:142</code> ↔ <code>api-write.ts:136</code></td><td>16 行</td><td>对象列表/保存的公共外壳</td></tr>
-  <tr><td><code>api-read.ts:143</code> ↔ <code>api-write.ts:114</code></td><td>14 行</td><td>同上</td></tr>
-  <tr><td><code>index.ts:131</code> ↔ <code>:201</code></td><td>20 行</td><td><strong>已修</strong>：登录限流前置抽成 <code>loginRateLimited()</code></td></tr>
-  <tr><td><code>otp.ts:133</code> ↔ <code>:179</code></td><td>13 行</td><td>启用/关闭 2FA 的 bump+重签块，可再抽一层</td></tr>
-  <tr><td><code>clash.ts</code> ×4</td><td>各 8 行</td><td>四种协议的 transport 拼装，可表驱动</td></tr>
-  <tr><td><code>sub.ts:152</code> ↔ <code>:242</code></td><td>8 行</td><td>订阅头的公共部分</td></tr>
-</table>
+      <h3>类型边界</h3>
+      <ul>
+        <li>
+          <code>unknown</code> 出现 <strong>112</strong> 次、<code>any</code>
+          <strong>13</strong> 次，集中在
+          <code>objects.ts</code
+          >／<code>api-read.ts</code>／<code>clash.ts</code>。根因不是懒，是<strong>没有运行时校验层</strong>：请求体、备份文件、节点上报都是"先当
+          unknown 收下，再到处 <code>typeof</code>"。<span class="tag p1"
+            >P1</span
+          >引入 zod/valibot 在边界一次性 decode，能让这 112
+          处里的大半消失，同时把"脏输入"挡在业务层之外。
+        </li>
+        <li>
+          13 处 <code>any</code> 里最该改的是 <code>http.ts</code> 的
+          <code>c: any</code>（Hono Context 没写泛型），它让每个 handler
+          都失去类型保护。
+        </li>
+      </ul>
 
-<h3>类型边界</h3>
-<ul>
-  <li><code>unknown</code> 出现 <strong>112</strong> 次、<code>any</code> <strong>13</strong> 次，集中在 <code>objects.ts</code>／<code>api-read.ts</code>／<code>clash.ts</code>。根因不是懒，是<strong>没有运行时校验层</strong>：请求体、备份文件、节点上报都是"先当 unknown 收下，再到处 <code>typeof</code>"。<span class="tag p1">P1</span>引入 zod/valibot 在边界一次性 decode，能让这 112 处里的大半消失，同时把"脏输入"挡在业务层之外。</li>
-  <li>13 处 <code>any</code> 里最该改的是 <code>http.ts</code> 的 <code>c: any</code>（Hono Context 没写泛型），它让每个 handler 都失去类型保护。</li>
-</ul>
+      <h3>工程化缺口</h3>
+      <ul>
+        <li>
+          <strong>仓库内没有 eslint / biome 配置</strong>。现在所有 lint
+          都来自我这边的 pi-lens，别人 clone 下来是零检查。<span class="tag p0"
+            >P0</span
+          >加一份 biome.json（快、零配置冲突）比 eslint 更符合这个仓库的现状。
+        </li>
+        <li>
+          <strong
+            ><code>apps/selfhost</code> 的 devDependencies 本地未安装</strong
+          >，导致类型检查报 56 个"假错误"（<code>process</code>
+          未定义之类）。已在本轮 <code>npm install</code> 后归零，但应在 README
+          写明"三个包各自要 npm i"。
+        </li>
+        <li>
+          CI 有 typecheck +
+          unit，但没有覆盖率门槛，也没有"产物大小"这类回归门禁（agent
+          二进制曾因此翻车）。
+        </li>
+      </ul>
 
-<h3>工程化缺口</h3>
-<ul>
-  <li><strong>仓库内没有 eslint / biome 配置</strong>。现在所有 lint 都来自我这边的 pi-lens，别人 clone 下来是零检查。<span class="tag p0">P0</span>加一份 biome.json（快、零配置冲突）比 eslint 更符合这个仓库的现状。</li>
-  <li><strong><code>apps/selfhost</code> 的 devDependencies 本地未安装</strong>，导致类型检查报 56 个"假错误"（<code>process</code> 未定义之类）。已在本轮 <code>npm install</code> 后归零，但应在 README 写明"三个包各自要 npm i"。</li>
-  <li>CI 有 typecheck + unit，但没有覆盖率门槛，也没有"产物大小"这类回归门禁（agent 二进制曾因此翻车）。</li>
-</ul>
+      <h2>设计</h2>
+      <ul>
+        <li>
+          <strong>做得好</strong>：仪表 → 曲线 → 明细 →
+          趋势，信息密度递增；壁纸只铺底色、纸面保持不透明；对比度门禁取最亮格计算。这些是"看得见的设计"，不是样式堆砌。
+        </li>
+        <li>
+          <code>Settings.vue</code> 1037 行、20+ 个字段平铺在一页。<span
+            class="tag p2"
+            >P2</span
+          >按"面板自身 / 节点 / 订阅 / 安全"分组折叠，比加 tab 更省点击。
+        </li>
+        <li>
+          Cloud 模式下有 17 个字段是无效的（web
+          端口、证书路径等），保存仍会触发一次下发。<span class="tag p1"
+            >P1</span
+          >用运行时能力探测决定显隐，而不是靠文档说明。
+        </li>
+        <li>
+          新增的趋势块用的是同一套纸账本语言（细线、无卡片、无图例框），和首页其它部分一致——这是有意的，新功能不该长成另一个产品。
+        </li>
+      </ul>
 
-<h2>设计</h2>
-<ul>
-  <li><strong>做得好</strong>：仪表 → 曲线 → 明细 → 趋势，信息密度递增；壁纸只铺底色、纸面保持不透明；对比度门禁取最亮格计算。这些是"看得见的设计"，不是样式堆砌。</li>
-  <li><code>Settings.vue</code> 1037 行、20+ 个字段平铺在一页。<span class="tag p2">P2</span>按"面板自身 / 节点 / 订阅 / 安全"分组折叠，比加 tab 更省点击。</li>
-  <li>Cloud 模式下有 17 个字段是无效的（web 端口、证书路径等），保存仍会触发一次下发。<span class="tag p1">P1</span>用运行时能力探测决定显隐，而不是靠文档说明。</li>
-  <li>新增的趋势块用的是同一套纸账本语言（细线、无卡片、无图例框），和首页其它部分一致——这是有意的，新功能不该长成另一个产品。</li>
-</ul>
+      <h2>测试</h2>
+      <table>
+        <tr>
+          <th>层</th>
+          <th>现状</th>
+          <th>缺口</th>
+        </tr>
+        <tr>
+          <td>单元（vitest）</td>
+          <td>59 条：鉴权、会话、IP、脱敏、指纹、链接转换</td>
+          <td>纯函数覆盖不错；<code>objects.ts</code> 的业务分支几乎没测</td>
+        </tr>
+        <tr>
+          <td>端到端（python）</td>
+          <td>76 条断言：登录→2FA→建节点→订阅→导入→告警</td>
+          <td>导入/恢复只有"拒绝重复键"一条正例；备份-恢复从未跑通全流程</td>
+        </tr>
+        <tr>
+          <td>前端</td>
+          <td>无</td>
+          <td>至少该给"设置页不白屏"这类回归加一条</td>
+        </tr>
+        <tr>
+          <td>Go agent</td>
+          <td>无</td>
+          <td>流量聚合、配置签名、上报重试都是纯逻辑，适合单元测试</td>
+        </tr>
+      </table>
 
-<h2>测试</h2>
-<table>
-  <tr><th>层</th><th>现状</th><th>缺口</th></tr>
-  <tr><td>单元（vitest）</td><td>59 条：鉴权、会话、IP、脱敏、指纹、链接转换</td><td>纯函数覆盖不错；<code>objects.ts</code> 的业务分支几乎没测</td></tr>
-  <tr><td>端到端（python）</td><td>76 条断言：登录→2FA→建节点→订阅→导入→告警</td><td>导入/恢复只有"拒绝重复键"一条正例；备份-恢复从未跑通全流程</td></tr>
-  <tr><td>前端</td><td>无</td><td>至少该给"设置页不白屏"这类回归加一条</td></tr>
-  <tr><td>Go agent</td><td>无</td><td>流量聚合、配置签名、上报重试都是纯逻辑，适合单元测试</td></tr>
-</table>
+      <h2>安全与运维（现状）</h2>
+      <ul>
+        <li>
+          已完成：只读令牌字段级脱敏、订阅按客户端发令牌、会话可吊销、导入通道与在线接口同等校验、恒定时间比较、非
+          root 运行、Cloudflare 只剩 DNS。
+        </li>
+        <li>
+          告警：<code>alertd</code> 双机视角（hk 看节点明细，jp
+          看公网可达性），Telegram 已接通，每日 09:00 心跳。
+        </li>
+        <li>
+          未做：备份恢复演练（<code>restore.sh</code>
+          存在但没在真实数据上跑过）、单点 hk、Komari 2FA 无恢复码。
+        </li>
+      </ul>
 
-<h2>安全与运维（现状）</h2>
-<ul>
-  <li>已完成：只读令牌字段级脱敏、订阅按客户端发令牌、会话可吊销、导入通道与在线接口同等校验、恒定时间比较、非 root 运行、Cloudflare 只剩 DNS。</li>
-  <li>告警：<code>alertd</code> 双机视角（hk 看节点明细，jp 看公网可达性），Telegram 已接通，每日 09:00 心跳。</li>
-  <li>未做：备份恢复演练（<code>restore.sh</code> 存在但没在真实数据上跑过）、单点 hk、Komari 2FA 无恢复码。</li>
-</ul>
+      <h2>优先清单</h2>
+      <table>
+        <tr>
+          <th></th>
+          <th>事项</th>
+          <th>为什么现在做</th>
+        </tr>
+        <tr>
+          <td><span class="tag p0">P0</span></td>
+          <td>
+            加 <code>biome.json</code> 并把 <code>npm run lint</code> 接进 CI
+          </td>
+          <td>现在只有我这边会报警；别人 clone 后代码质量全靠自觉</td>
+        </tr>
+        <tr>
+          <td><span class="tag p1">P1</span></td>
+          <td>
+            边界引入
+            zod（<code>/api/save</code>、<code>/api/importdb</code>、<code
+              >/agent/report</code
+            >
+            三个入口）
+          </td>
+          <td>
+            能消掉大部分
+            <code>unknown</code>/<code>typeof</code>，并且把脏输入挡在业务层外
+          </td>
+        </tr>
+        <tr>
+          <td><span class="tag p1">P1</span></td>
+          <td>拆 <code>objects.ts</code>（CRUD / 链接 / 生命周期三块）</td>
+          <td>它是唯一一个"改一处要读全文件"的地方</td>
+        </tr>
+        <tr>
+          <td><span class="tag p1">P1</span></td>
+          <td>领域错误类型替代裸 <code>Error(中文)</code></td>
+          <td>前端现在只能靠文案分支判断失败类型</td>
+        </tr>
+        <tr>
+          <td><span class="tag p1">P1</span></td>
+          <td>备份 → 恢复到临时库的一次真实演练</td>
+          <td>"能恢复"目前是推断，不是事实</td>
+        </tr>
+        <tr>
+          <td><span class="tag p2">P2</span></td>
+          <td>
+            拆 <code>Settings.vue</code>、clash 的 transport 表驱动、otp 的 bump
+            块抽函数
+          </td>
+          <td>纯收益，无风险，可随手做</td>
+        </tr>
+        <tr>
+          <td><span class="tag p2">P2</span></td>
+          <td>前端与 Go agent 各加几条测试</td>
+          <td>补齐"三层里有两层裸奔"的现状</td>
+        </tr>
+      </table>
 
-<h2>优先清单</h2>
-<table>
-  <tr><th></th><th>事项</th><th>为什么现在做</th></tr>
-  <tr><td><span class="tag p0">P0</span></td><td>加 <code>biome.json</code> 并把 <code>npm run lint</code> 接进 CI</td><td>现在只有我这边会报警；别人 clone 后代码质量全靠自觉</td></tr>
-  <tr><td><span class="tag p1">P1</span></td><td>边界引入 zod（<code>/api/save</code>、<code>/api/importdb</code>、<code>/agent/report</code> 三个入口）</td><td>能消掉大部分 <code>unknown</code>/<code>typeof</code>，并且把脏输入挡在业务层外</td></tr>
-  <tr><td><span class="tag p1">P1</span></td><td>拆 <code>objects.ts</code>（CRUD / 链接 / 生命周期三块）</td><td>它是唯一一个"改一处要读全文件"的地方</td></tr>
-  <tr><td><span class="tag p1">P1</span></td><td>领域错误类型替代裸 <code>Error(中文)</code></td><td>前端现在只能靠文案分支判断失败类型</td></tr>
-  <tr><td><span class="tag p1">P1</span></td><td>备份 → 恢复到临时库的一次真实演练</td><td>"能恢复"目前是推断，不是事实</td></tr>
-  <tr><td><span class="tag p2">P2</span></td><td>拆 <code>Settings.vue</code>、clash 的 transport 表驱动、otp 的 bump 块抽函数</td><td>纯收益，无风险，可随手做</td></tr>
-  <tr><td><span class="tag p2">P2</span></td><td>前端与 Go agent 各加几条测试</td><td>补齐"三层里有两层裸奔"的现状</td></tr>
-</table>
-
-<footer>
-方法：pi-lens 全量诊断（ast-grep / jscpd / knip / madge + LSP）、tsc/vue-tsc、pygount 规模统计、单元与 e2e 实跑，配合 clean-architecture / clean-code / software-design-philosophy / web-interface-guidelines 的判据逐条对照。本轮已修 3 项（登录限流重复、非空断言、selfhost 依赖缺失），其余按上表排序。
-</footer>
-
-</div>
-</body>
+      <footer>
+        方法：pi-lens 全量诊断（ast-grep / jscpd / knip / madge +
+        LSP）、tsc/vue-tsc、pygount 规模统计、单元与 e2e 实跑，配合
+        clean-architecture / clean-code / software-design-philosophy /
+        web-interface-guidelines 的判据逐条对照。本轮已修 3
+        项（登录限流重复、非空断言、selfhost 依赖缺失），其余按上表排序。
+      </footer>
+    </div>
+  </body>
 </html>

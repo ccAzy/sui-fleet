@@ -276,7 +276,7 @@ function brightestCell(ctx: CanvasRenderingContext2D, w: number, h: number): num
 function srgbLum(r: number, g: number, b: number): number {
   const f = (v: number) => {
     const s = v / 255
-    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4)
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
   }
   return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b)
 }

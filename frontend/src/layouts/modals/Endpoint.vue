@@ -99,7 +99,7 @@ export default {
       // Use previous data
       let prevConfig = {}
       switch (this.endpoint.type) {
-        case EpTypes.Wireguard:
+        case EpTypes.Wireguard: {
           const wgKeys = (await this.genWgKey())
           const randomIPoctet = RandomUtil.randomIntRange(1, 255)
           prevConfig = {
@@ -114,6 +114,7 @@ export default {
             }
           }
           break
+        }
         case EpTypes.Warp:
           prevConfig = {
             tag: tag,
@@ -193,7 +194,7 @@ export default {
       this.loading = false
     },
     findFreeIP(): string{
-      const peerAllowedIPs = this.endpoint.peers.map((peer: any) => peer.allowed_ips).flat()
+      const peerAllowedIPs = this.endpoint.peers.flatMap((peer: any) => peer.allowed_ips)
       for (let i = 2; i < 255; i++) {
         const newIP = '10.0.1.'+ i.toString() +'/32'
         if (!peerAllowedIPs.includes(newIP)) return newIP

@@ -169,7 +169,7 @@ const submitOtp = async () => {
 
 const finish = (obj: any) => {
   // 首次用默认密码登录：直接带去改密页，避免面板长期用 admin/admin 裸奔
-  router.push(Boolean(obj?.must_change) ? '/admins' : '/')
+  router.push(obj?.must_change ? '/admins' : '/')
 }
 
 const changeLocale = (l: string) => {

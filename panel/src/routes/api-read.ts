@@ -387,7 +387,7 @@ export function registerApiRead(app: Hono<{ Bindings: Env }>) {
         " ORDER BY id DESC LIMIT ?",
       ...[
         // scopeAll 时不需要节点；否则上面的守卫已经保证 node 存在
-        scopeAll ? 0 : (node ? node.id : ""),
+        scopeAll ? 0 : node ? node.id : "",
         since,
         ...(actor ? [actor] : []),
         ...(kind ? [kind] : []),

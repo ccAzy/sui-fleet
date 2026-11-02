@@ -117,9 +117,7 @@ export default {
             },
             beginAtZero: true,
             ticks: {
-              callback: function(label:any, index: number) {
-                return label == 0 ? 0 : HumanReadable.sizeFormat(label,0)
-              },
+              callback: (label:any, index: number) => label == 0 ? 0 : HumanReadable.sizeFormat(label,0),
               count: 10
             }
           }

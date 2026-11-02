@@ -35,9 +35,9 @@ describe("clash 转换", () => {
   it("vless+reality 保留端口、SNI 与公钥", () => {
     const p = linkToProxy(VLESS);
     expect(p).not.toBeNull();
-    expect(p!.type).toBe("vless");
-    expect(p!.port).toBe(443);
-    expect(p!.server).toBe("1.2.3.4");
+    expect(p?.type).toBe("vless");
+    expect(p?.port).toBe(443);
+    expect(p?.server).toBe("1.2.3.4");
     expect((p as any)["servername"] ?? (p as any).sni).toBe("www.apple.com");
     const pbk = (p as any)["reality-opts"]?.["public-key"];
     expect(pbk).toBe("TrsKws6hJseeVGwMIqUtY9z_uZLwUpmBC_nX9DgRrBc");
@@ -194,34 +194,34 @@ describe("socks / http 链接的解析对称性", () => {
   it("socks5 → clash", () => {
     const p = linkToProxy(SOCKS);
     expect(p).not.toBeNull();
-    expect(p!.type).toBe("socks5");
-    expect(p!.server).toBe("1.2.3.4");
-    expect(p!.port).toBe(1080);
-    expect(p!.username).toBe("alice");
-    expect(p!.password).toBe("s3cret");
+    expect(p?.type).toBe("socks5");
+    expect(p?.server).toBe("1.2.3.4");
+    expect(p?.port).toBe(1080);
+    expect(p?.username).toBe("alice");
+    expect(p?.password).toBe("s3cret");
   });
 
   it("socks5 → sing-box", () => {
     const o = linkToOutbound(SOCKS);
     expect(o).not.toBeNull();
-    expect(o!.type).toBe("socks");
-    expect(o!.username).toBe("alice");
+    expect(o?.type).toBe("socks");
+    expect(o?.username).toBe("alice");
   });
 
   it("https → clash（带 tls 与 sni）", () => {
     const p = linkToProxy(HTTP);
     expect(p).not.toBeNull();
-    expect(p!.type).toBe("http");
-    expect(p!.tls).toBe(true);
-    expect(p!.servername).toBe("cdn.example.com");
-    expect(p!.username).toBe("bob");
+    expect(p?.type).toBe("http");
+    expect(p?.tls).toBe(true);
+    expect(p?.servername).toBe("cdn.example.com");
+    expect(p?.username).toBe("bob");
   });
 
   it("https → sing-box", () => {
     const o = linkToOutbound(HTTP);
     expect(o).not.toBeNull();
-    expect(o!.type).toBe("http");
-    expect((o!.tls as Record<string, unknown>)?.enabled).toBe(true);
+    expect(o?.type).toBe("http");
+    expect((o?.tls as Record<string, unknown>)?.enabled).toBe(true);
   });
 
   it("clash 配置里两个节点都出现（不再静默丢弃）", () => {

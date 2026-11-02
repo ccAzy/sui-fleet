@@ -173,7 +173,7 @@ export function registerSub(app: Hono<{ Bindings: Env }>) {
     const links: string[] = [];
     let up = 0;
     let down = 0;
-    let matchedClients = 0;
+    let _matchedClients = 0;
 
     // 一次取回所有启用节点的客户端，而不是每个节点查一遍。
     // 原来是 N+1：10 台节点 = 1 次查 meta + 1 次查 nodes + 10 次查 clients，
@@ -199,7 +199,7 @@ export function registerSub(app: Hono<{ Bindings: Env }>) {
       }
       if (cl.enable === false) continue;
       if (clientFilter && String(cl.name ?? "") !== clientFilter) continue;
-      matchedClients++;
+      _matchedClients++;
       up += Number(cl.up ?? 0) || 0;
       down += Number(cl.down ?? 0) || 0;
       for (const uri of collectLinks(cl))

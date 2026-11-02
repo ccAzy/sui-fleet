@@ -49,3 +49,15 @@ CI 会校验产物与源码一致，不一致直接红。这条不是形式主�
 改动 `panel/src/links.ts` / `clash.ts` / `singbox.ts` 时，
 注意 `node/util/genLink.go` 里还有一份平行实现——两边不一致会导致
 「面板订阅有、节点自带订阅没有」的静默分叉。
+
+## 提交前必做
+
+```bash
+npm ci              # 仓库根：安装 biome
+npm run lint        # 静态检查（只卡 error，warning 是存量）
+npm run typecheck   # panel / frontend / selfhost 三个包各自 tsc
+npm test            # panel 单元测试
+```
+
+三个子包（`panel`、`frontend`、`apps/selfhost`、`apps/arbiter`）**各自**需要 `npm ci`，
+否则类型检查会报 `process 未定义` 这类假错误（它们的 devDependencies 不共享）。
