@@ -104,7 +104,16 @@ function renderSubscription(
     );
   }
   const text = links.join(String.fromCharCode(10));
-  const payload = btoa(String.fromCharCode(...new TextEncoder().encode(text)));
+  // 不能写 btoa(String.fromCharCode(...bytes))：展开运算符把每个字节当一个实参，
+  // 聚合订阅（所有节点所有客户端）很容易超过调用栈上限 —— 实测 13 万字节就抛
+  // RangeError，整个 /sub/all 直接 500。分块转字符串再拼。
+  const bytes = new TextEncoder().encode(text);
+  let bin = "";
+  const CHUNK = 8192;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  const payload = btoa(bin);
   return new Response(payload, {
     status: 200,
     headers: { ...headers, "Content-Type": "text/plain; charset=utf-8" },
@@ -115,7 +124,16 @@ function renderSubscription(
 function prefixRemark(uri: string, nodeName: string): string {
   const hash = uri.indexOf("#");
   const base = hash >= 0 ? uri.slice(0, hash) : uri;
-  const remark = hash >= 0 ? decodeURIComponent(uri.slice(hash + 1)) : "";
+  // 外部链接里的坏 %（例如 `%E0%A4`）会让 decodeURIComponent 抛 URIError，
+  // 一个租户的坏链接就把整份聚合订阅打成 500。解不开就当没有备注。
+  let remark = "";
+  if (hash >= 0) {
+    try {
+      remark = decodeURIComponent(uri.slice(hash + 1));
+    } catch {
+      remark = uri.slice(hash + 1);
+    }
+  }
   return `${base}#${encodeURIComponent(`${nodeName} · ${remark || "node"}`)}`;
 }
 

@@ -26,6 +26,6 @@ func (h *Inbound) UpdateUsers(users []option.TUICUser) error {
 		userPasswordList = append(userPasswordList, user.Password)
 	}
 	h.server.UpdateUsers(userList, userUUIDList, userPasswordList)
-	h.userNameList = userNameList
+	h.userNameList.Store(&userNameList)
 	return nil
 }

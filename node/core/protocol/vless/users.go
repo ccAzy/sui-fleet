@@ -13,6 +13,6 @@ func (h *Inbound) UpdateUsers(users []option.VLESSUser) error {
 	}), common.Map(users, func(it option.VLESSUser) string {
 		return it.Flow
 	}))
-	h.users = users
+	h.users.Store(&users)
 	return nil
 }

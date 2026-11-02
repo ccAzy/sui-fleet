@@ -14,6 +14,6 @@ func (h *Inbound) UpdateUsers(users []option.TrojanUser) error {
 	if err != nil {
 		return err
 	}
-	h.users = users
+	h.users.Store(&users)
 	return nil
 }

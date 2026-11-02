@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"os"
+	"sync/atomic"
 
 	"github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing-box/adapter/inbound"
@@ -35,7 +36,7 @@ type Inbound struct {
 	logger                   log.ContextLogger
 	listener                 *listener.Listener
 	service                  *trojan.Service[int]
-	users                    []option.TrojanUser
+	users                    atomic.Pointer[[]option.TrojanUser]
 	tlsConfig                tls.ServerConfig
 	fallbackAddr             M.Socksaddr
 	fallbackAddrTLSNextProto map[string]M.Socksaddr
@@ -47,7 +48,6 @@ func NewInbound(ctx context.Context, router adapter.Router, logger log.ContextLo
 		Adapter: inbound.NewAdapter(C.TypeTrojan, tag),
 		router:  router,
 		logger:  logger,
-		users:   options.Users,
 	}
 	if options.TLS != nil {
 		tlsConfig, err := tls.NewServerWithOptions(tls.ServerOptions{
@@ -62,6 +62,7 @@ func NewInbound(ctx context.Context, router adapter.Router, logger log.ContextLo
 		}
 		inbound.tlsConfig = tlsConfig
 	}
+	inbound.users.Store(&options.Users)
 	var fallbackHandler N.TCPConnectionHandlerEx
 	if options.Fallback != nil && options.Fallback.Server != "" || len(options.FallbackForALPN) > 0 {
 		if options.Fallback != nil && options.Fallback.Server != "" {
@@ -189,7 +190,7 @@ func (h *Inbound) newConnection(ctx context.Context, conn net.Conn, metadata ada
 		N.CloseOnHandshakeFailure(conn, onClose, os.ErrInvalid)
 		return
 	}
-	user := h.users[userIndex].Name
+	user := h.userName(userIndex)
 	if user == "" {
 		user = F.ToString(userIndex)
 	} else {
@@ -207,7 +208,7 @@ func (h *Inbound) newPacketConnection(ctx context.Context, conn N.PacketConn, me
 		N.CloseOnHandshakeFailure(conn, onClose, os.ErrInvalid)
 		return
 	}
-	user := h.users[userIndex].Name
+	user := h.userName(userIndex)
 	if user == "" {
 		user = F.ToString(userIndex)
 	} else {
@@ -259,4 +260,18 @@ func (h *inboundTransportHandler) NewConnectionEx(ctx context.Context, conn net.
 	//nolint:staticcheck
 	h.logger.InfoContext(ctx, "inbound connection from ", metadata.Source)
 	(*Inbound)(h).NewConnectionEx(ctx, conn, metadata, onClose)
+}
+
+// userName 取用户显示名，越界返回空串（调用方会用索引字符串兜底）。
+//
+// users 会在 UpdateUsers 里被整体替换，而一条在旧列表下认证通过的连接可能
+// 拿着旧的 userIndex 才走到这里。直接索引会 index out of range，panic 会带走
+// 整个进程（sing-box 跑在进程内，连接路径没有 recover，只有 Close 里有）。
+// 用 atomic.Pointer 存列表，读的时候 Load 一次拿到一致的快照。
+func (h *Inbound) userName(i int) string {
+	users := h.users.Load()
+	if users == nil || i < 0 || i >= len(*users) {
+		return ""
+	}
+	return (*users)[i].Name
 }

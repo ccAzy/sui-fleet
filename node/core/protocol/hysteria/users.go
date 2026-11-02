@@ -20,6 +20,6 @@ func (h *Inbound) UpdateUsers(users []option.HysteriaUser) error {
 		userPasswordList = append(userPasswordList, password)
 	}
 	h.service.UpdateUsers(userList, userPasswordList)
-	h.userNameList = userNameList
+	h.userNameList.Store(&userNameList)
 	return nil
 }

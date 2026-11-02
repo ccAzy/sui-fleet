@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"os"
+	"sync/atomic"
 
 	"github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing-box/adapter/inbound"
@@ -41,7 +42,7 @@ type Inbound struct {
 	logger    logger.ContextLogger
 	listener  *listener.Listener
 	service   *vmess.Service[int]
-	users     []option.VMessUser
+	users     atomic.Pointer[[]option.VMessUser]
 	tlsConfig tls.ServerConfig
 	transport adapter.V2RayServerTransport
 }
@@ -52,13 +53,13 @@ func NewInbound(ctx context.Context, router adapter.Router, logger log.ContextLo
 		ctx:     ctx,
 		router:  uot.NewRouter(router, logger),
 		logger:  logger,
-		users:   options.Users,
 	}
 	var err error
 	inbound.router, err = mux.NewRouterWithOptions(inbound.router, logger, common.PtrValueOrDefault(options.Multiplex))
 	if err != nil {
 		return nil, err
 	}
+	inbound.users.Store(&options.Users)
 	var serviceOptions []vmess.ServiceOption
 	if timeFunc := ntp.TimeFuncFromContext(ctx); timeFunc != nil {
 		serviceOptions = append(serviceOptions, vmess.ServiceWithTimeFunc(timeFunc))
@@ -178,7 +179,7 @@ func (h *Inbound) newConnectionEx(ctx context.Context, conn net.Conn, metadata a
 		N.CloseOnHandshakeFailure(conn, onClose, os.ErrInvalid)
 		return
 	}
-	user := h.users[userIndex].Name
+	user := h.userName(userIndex)
 	if user == "" {
 		user = F.ToString(userIndex)
 	} else {
@@ -196,7 +197,7 @@ func (h *Inbound) newPacketConnectionEx(ctx context.Context, conn N.PacketConn, 
 		N.CloseOnHandshakeFailure(conn, onClose, os.ErrInvalid)
 		return
 	}
-	user := h.users[userIndex].Name
+	user := h.userName(userIndex)
 	if user == "" {
 		user = F.ToString(userIndex)
 	} else {
@@ -225,4 +226,18 @@ func (h *inboundTransportHandler) NewConnectionEx(ctx context.Context, conn net.
 	//nolint:staticcheck
 	h.logger.InfoContext(ctx, "inbound connection from ", metadata.Source)
 	(*Inbound)(h).NewConnectionEx(ctx, conn, metadata, onClose)
+}
+
+// userName 取用户显示名，越界返回空串（调用方会用索引字符串兜底）。
+//
+// users 会在 UpdateUsers 里被整体替换，而一条在旧列表下认证通过的连接可能
+// 拿着旧的 userIndex 才走到这里。直接索引会 index out of range，panic 会带走
+// 整个进程（sing-box 跑在进程内，连接路径没有 recover，只有 Close 里有）。
+// 用 atomic.Pointer 存列表，读的时候 Load 一次拿到一致的快照。
+func (h *Inbound) userName(i int) string {
+	users := h.users.Load()
+	if users == nil || i < 0 || i >= len(*users) {
+		return ""
+	}
+	return (*users)[i].Name
 }

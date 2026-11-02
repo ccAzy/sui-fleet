@@ -14,6 +14,9 @@ import (
 )
 
 var (
+	// 最近一次成功启动的配置：Start 失败时用它回滚，避免"坏配置一存就整节点断流"。
+	lastGoodConfig      []byte
+	lastGoodConfigMu    sync.Mutex
 	LastUpdate          int64
 	corePtr             *core.Core
 	startCoreMu         sync.Mutex
@@ -125,6 +128,9 @@ func (s *ConfigService) StartCore() error {
 		return err
 	}
 	logger.Info("sing-box started")
+	lastGoodConfigMu.Lock()
+	lastGoodConfig = append([]byte(nil), (*rawConfig)...)
+	lastGoodConfigMu.Unlock()
 	return nil
 }
 
@@ -173,19 +179,38 @@ func (s *ConfigService) restartCoreWithConfig(config json.RawMessage) error {
 		startCoreMu.Unlock()
 	}()
 
+	// 先渲染 + 验证，再停旧内核。
+	// 原实现是"停 → 渲染 → 起"：新配置一旦不合法（JSON 结构对但语义错、端口占用、
+	// 证书读不到），旧内核已经没了、新的起不来，而这个坏配置已经落库，
+	// cron 每 5 秒重试同一次失败 —— 节点持续断流直到人工改回。
+	rawConfig, err := s.GetConfig(string(config))
+	if err != nil {
+		logger.Error("restart sing-box err (get config):", err.Error())
+		return err
+	}
+	if err := core.ValidateConfig(*rawConfig); err != nil {
+		logger.Error("restart sing-box err (invalid config, 旧内核继续运行):", err.Error())
+		return err
+	}
 	if corePtr.IsRunning() {
 		if err := corePtr.Stop(); err != nil {
 			logger.Error("restart sing-box err (stop):", err.Error())
 			return err
 		}
 	}
-	rawConfig, err := s.GetConfig(string(config))
-	if err != nil {
-		logger.Error("restart sing-box err (get config):", err.Error())
-		return err
-	}
 	if err := corePtr.Start(*rawConfig); err != nil {
 		logger.Error("restart sing-box err (start):", err.Error())
+		// 用最近一次成功的配置把内核拉回来：坏配置已经入库，不回滚就是一直断流。
+		lastGoodConfigMu.Lock()
+		good := lastGoodConfig
+		lastGoodConfigMu.Unlock()
+		if len(good) > 0 {
+			if e := corePtr.Start(good); e != nil {
+				logger.Error("rollback to last good config failed:", e.Error())
+			} else {
+				logger.Warning("已回滚到最近一次成功启动的配置（新配置保留在库里，修正后重新保存即可）")
+			}
+		}
 		return err
 	}
 	logger.Info("sing-box restarted with new config")

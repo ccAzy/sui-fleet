@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"sync/atomic"
 	"time"
 
 	"github.com/sagernet/sing-box/adapter"
@@ -35,7 +36,7 @@ type Inbound struct {
 	listener     *listener.Listener
 	tlsConfig    tls.ServerConfig
 	service      *hysteria2.Service[int]
-	userNameList []string
+	userNameList atomic.Pointer[[]string]
 }
 
 func NewInbound(ctx context.Context, router adapter.Router, logger log.ContextLogger, tag string, options option.Hysteria2InboundOptions) (adapter.Inbound, error) {
@@ -139,7 +140,7 @@ func NewInbound(ctx context.Context, router adapter.Router, logger log.ContextLo
 	}
 	service.UpdateUsers(userList, userPasswordList)
 	inbound.service = service
-	inbound.userNameList = userNameList
+	inbound.userNameList.Store(&userNameList)
 	return inbound, nil
 }
 
@@ -156,7 +157,7 @@ func (h *Inbound) NewConnectionEx(ctx context.Context, conn net.Conn, source M.S
 	metadata.Destination = destination
 	h.logger.InfoContext(ctx, "inbound connection from ", metadata.Source)
 	userID, _ := auth.UserFromContext[int](ctx)
-	if userName := nameAt(h.userNameList, userID); userName != "" {
+	if userName := h.userName(userID); userName != "" {
 		metadata.User = userName
 		h.logger.InfoContext(ctx, "[", userName, "] inbound connection to ", metadata.Destination)
 	} else {
@@ -178,7 +179,7 @@ func (h *Inbound) NewPacketConnectionEx(ctx context.Context, conn N.PacketConn, 
 	metadata.Destination = destination
 	h.logger.InfoContext(ctx, "inbound packet connection from ", metadata.Source)
 	userID, _ := auth.UserFromContext[int](ctx)
-	if userName := nameAt(h.userNameList, userID); userName != "" {
+	if userName := h.userName(userID); userName != "" {
 		metadata.User = userName
 		h.logger.InfoContext(ctx, "[", userName, "] inbound packet connection to ", metadata.Destination)
 	} else {
@@ -212,15 +213,16 @@ func (h *Inbound) Close() error {
 	)
 }
 
-// nameAt 做越界保护。
+// userName 安全取用户名：atomic 快照 + 越界保护。
 //
 // userNameList 会在运行时被 UpdateUsers 整体替换（无锁）。一条在旧列表下认证
 // 通过的连接，可能在替换之后才走到这里，手里还是旧的 userID —— 直接索引会
 // index out of range，而 sing-box 跑在进程内、panic 会带走整个 agent 和内核
 // （所有用户瞬间断开，直到 systemd 重启）。
-func nameAt(list []string, i int) string {
-	if i < 0 || i >= len(list) {
+func (h *Inbound) userName(i int) string {
+	list := h.userNameList.Load()
+	if list == nil || i < 0 || i >= len(*list) {
 		return ""
 	}
-	return list[i]
+	return (*list)[i]
 }
