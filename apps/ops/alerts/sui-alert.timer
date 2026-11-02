@@ -1,0 +1,10 @@
+[Unit]
+Description=sui 告警定时器（每 2 分钟）
+
+[Timer]
+OnBootSec=90s
+OnUnitActiveSec=2min
+Unit=sui-alert.service
+
+[Install]
+WantedBy=timers.target

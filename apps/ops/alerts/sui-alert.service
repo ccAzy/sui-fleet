@@ -1,0 +1,7 @@
+[Unit]
+Description=sui 面板与节点告警守护
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/sui-alert/alertd.sh
