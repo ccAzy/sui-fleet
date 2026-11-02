@@ -47,7 +47,7 @@ func (s *Server) initRouter() (*gin.Engine, error) {
 
 	engine := gin.Default()
 	// 订阅路由统一限速（凭据就在 URL 里，必须防枚举/爆破）
-	engine.Use(subRateLimit())
+	engine.Use(subRateLimit(s.SettingService))
 
 	subPath, err := s.SettingService.GetSubPath()
 	if err != nil {
@@ -100,6 +100,13 @@ func (s *Server) Start() (err error) {
 	}
 
 	listenAddr := net.JoinHostPort(listen, strconv.Itoa(port))
+	// 安全检查必须在 Listen 之前：先占端口再拒绝，既会留下 TIME_WAIT，
+	// 报错信息还可能被 "address already in use" 盖住，看不出真正原因。
+	if certFile == "" && keyFile == "" && !isLoopbackListen(listen) && !s.SettingService.GetSubAllowInsecure() {
+		return common.NewError("订阅服务拒绝了不安全的配置：监听 " + listenAddr +
+			" 且未配置 TLS 证书。请配 subCertFile/subKeyFile，或监听 127.0.0.1 交给反代，" +
+			"或显式设置 subAllowInsecure=true（不建议）")
+	}
 	listener, err := net.Listen("tcp", listenAddr)
 	if err != nil {
 		return err
@@ -120,16 +127,14 @@ func (s *Server) Start() (err error) {
 		listener = tls.NewListener(listener, c)
 	}
 
+	if s.SettingService.GetSubLegacyNameAccess() {
+		// 这条必须显眼：legacy = 知道客户端名就能拿到该客户端全部凭据。
+		// 客户端名通常就是用户名/邮箱，等于把订阅退回了"可枚举"。
+		logger.Warning("订阅服务的 legacy 名字访问是开启的（/sub/<客户端名> 仍可用）；" +
+			"确认所有客户端都已换用 /sub/<sub_token> 后，把设置项 subLegacyNameAccess 置为 false")
+	}
 	plaintext := certFile == "" && keyFile == ""
 	if plaintext {
-		// 明文 + 非回环 = 订阅凭据在公网上裸奔（token 就在 URL 里）。
-		// 默认拒绝启动，要求显式开 subAllowInsecure 或配好证书。
-		if !isLoopbackListen(listen) && !s.SettingService.GetSubAllowInsecure() {
-			listener.Close()
-			return common.NewError("订阅服务拒绝了不安全的配置：监听 " + listenAddr +
-				" 且未配置 TLS 证书。请配 subCertFile/subKeyFile，或监听 127.0.0.1 交给反代，" +
-				"或显式设置 subAllowInsecure=true（不建议）")
-		}
 		logger.Warning("Sub server run http (plaintext) on", listener.Addr())
 	} else {
 		logger.Info("Sub server run https on", listener.Addr())

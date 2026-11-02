@@ -98,6 +98,7 @@ func (s *SubHandler) subs(c *gin.Context) {
 }
 
 func (s *SubHandler) subHeaders(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
 	subId := subIDFrom(c)
 	if subId == "" {
 		c.String(400, "Bad Request")

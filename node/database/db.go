@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -168,5 +169,7 @@ func GetDB() *gorm.DB {
 }
 
 func IsNotFound(err error) bool {
-	return err == gorm.ErrRecordNotFound
+	// errors.Is 而不是 ==：一旦上层开始 wrap（fmt.Errorf("%w")），
+	// 裸等值比较会把"查不到"误判成 500，或把 500 误判成 404。
+	return errors.Is(err, gorm.ErrRecordNotFound)
 }

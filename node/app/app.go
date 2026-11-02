@@ -76,7 +76,10 @@ func (a *APP) Start() error {
 
 	err = a.subServer.Start()
 	if err != nil {
-		return err
+		// 订阅面起不来（例如配了 0.0.0.0 监听又没有证书）不应该让整个面板退出：
+		// 以前这里 return err → main.go 的 log.Fatal → 进程退出，
+		// 管理员连设置页都进不去，也就改不回配置。降级成"面板可用、订阅面关闭"。
+		logger.Error("sub server not started:", err)
 	}
 
 	err = a.configService.StartCore()

@@ -56,20 +56,25 @@ var defaultValueMap = map[string]string{
 	"trafficAge":    "30",
 	"timeLocation":  "Asia/Tehran",
 	// 订阅服务以前默认空串 = 0.0.0.0:2096，配合"客户端名即凭据"就是公网裸奔。
-	"subListen":   "127.0.0.1",
-	"subPort":     "2096",
-	"subPath":     "/sub/",
-	"subDomain":   "",
-	"subCertFile": "",
-	"subKeyFile":  "",
-	"subUpdates":  "12",
-	"subEncode":   "true",
-	"subShowInfo": "false",
-	"subURI":      "",
-	"subJsonExt":  "",
-	"subClashExt": "",
-	"config":      defaultConfig,
-	"version":     config.GetVersion(),
+	"subListen": "127.0.0.1",
+	// 下面三个开关必须进这张表：SettingService.Save 只做 Where(key=?) 的 UPDATE，
+	// 键不存在时影响 0 行且返回 nil —— 不进表的开关在应用内永远打不开。
+	"subLegacyNameAccess": "true",
+	"subAllowInsecure":    "false",
+	"subTrustedProxies":   "127.0.0.1,::1",
+	"subPort":             "2096",
+	"subPath":             "/sub/",
+	"subDomain":           "",
+	"subCertFile":         "",
+	"subKeyFile":          "",
+	"subUpdates":          "12",
+	"subEncode":           "true",
+	"subShowInfo":         "false",
+	"subURI":              "",
+	"subJsonExt":          "",
+	"subClashExt":         "",
+	"config":              defaultConfig,
+	"version":             config.GetVersion(),
 }
 
 type SettingService struct {
@@ -288,6 +293,12 @@ func (s *SettingService) GetSubListen() (string, error) {
 func (s *SettingService) GetSubLegacyNameAccess() bool {
 	v, err := s.getString("subLegacyNameAccess")
 	return err != nil || v != "false"
+}
+
+// GetSubTrustedProxies 返回可信代理地址列表（逗号分隔）。
+// 只有来自这些地址的请求才会看 X-Forwarded-For 判定客户端 IP。
+func (s *SettingService) GetSubTrustedProxies() (string, error) {
+	return s.getString("subTrustedProxies")
 }
 
 // GetSubAllowInsecure 是否允许"非回环监听 + 无 TLS"。默认 false。
