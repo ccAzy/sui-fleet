@@ -1,0 +1,10 @@
+[Unit]
+Description=sui 本地仲裁者定时器（每 2 分钟）
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=2min
+Unit=sui-arbiter.service
+
+[Install]
+WantedBy=timers.target

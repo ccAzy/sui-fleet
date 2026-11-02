@@ -1,0 +1,7 @@
+[Unit]
+Description=sui 本地仲裁者（探活 + 顺位切换）
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/sui-arbiter/arbiter.sh
