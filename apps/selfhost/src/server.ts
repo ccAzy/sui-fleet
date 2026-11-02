@@ -126,12 +126,19 @@ log(`s-ui selfhost 启动：port=${port} db=${dbPath}`);
 log(`  panel_base=${panelBase}`);
 log(`  dist=${distDir}`);
 
+// 监听地址很关键：@hono/node-server 不传 hostname 就是 0.0.0.0:8788。
+// 那是明文 HTTP，绕过 Caddy/Cloudflare 直接对外——实测 hk/jp 的 8788 从公网
+// 能拿到 200，等于给了一条不走 TLS 的登录入口。面板只该被本机 Caddy 反代。
+// 需要局域网访问，显式设 SUI_PANEL_HOST（例如 192.168.8.103）。
+const hostname = process.env.SUI_PANEL_HOST ?? "127.0.0.1";
+
 serve(
   {
     port,
+    hostname,
     fetch: (req: Request) => panel.fetch(req, env as never, {} as never),
   },
-  () => log(`  监听 http://127.0.0.1:${port}`),
+  () => log(`  监听 http://${hostname}:${port}`),
 );
 
 // 与 wrangler.toml 的 crons 保持一致（*/10）；cronTick 内部还有 6 小时清理节流

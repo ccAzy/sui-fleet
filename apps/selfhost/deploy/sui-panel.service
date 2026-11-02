@@ -11,12 +11,18 @@ Wants=network-online.target
 
 [Service]
 Type=simple
+# 生产用 sui 用户跑（/opt/sui-panel/data 属主 sui，目录 0750、库 0600）
+User=sui
+Group=sui
 WorkingDirectory=/opt/sui-panel/apps/selfhost
 EnvironmentFile=/etc/sui-panel.env
 Environment=SUI_DB=/opt/sui-panel/data/sui.db
 Environment=SUI_DIST=/opt/sui-panel/frontend-dist
 Environment=PORT=8788
-Environment=PANEL_BASE=https://panel.example.com
+# 注意不要在这里写死 PANEL_BASE：单元里的 Environment= 会覆盖 EnvironmentFile，
+# 于是改 /etc/sui-panel.env 变得无效（生产上真踩过：写死成已下线的域名，
+# 防脑裂 epoch 闸门一直在问一个不存在的地址）。
+# 同理 SUI_PANEL_HOST 默认 127.0.0.1（只给本机 Caddy 反代），需要局域网访问才设。
 ExecStart=/usr/bin/npm start
 Restart=always
 RestartSec=5

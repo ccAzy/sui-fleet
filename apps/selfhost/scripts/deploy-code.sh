@@ -68,7 +68,10 @@ fi
 # 两个包都要装：apps/selfhost 是运行入口，panel 是被它 import 的业务代码。
 for pkg in panel apps/selfhost; do
   if ! ( cd "/opt/sui-panel/$pkg" && npm install --no-audit --no-fund --prefer-offline >/dev/null 2>&1 ); then
-    echo "  警告：$pkg 依赖安装失败，稍后启动可能报 MODULE_NOT_FOUND" >&2
+    # 不能只告警继续：依赖没装完就重启，服务起不来，而旧进程已经被 systemctl 停掉，
+    # 结果是一次“自己把自己弄故障”的部署。这里直接退出，旧进程不动。
+    echo "  错误：$pkg 依赖安装失败，中止部署（未重启，旧版本继续运行）" >&2
+    exit 1
   fi
 done
 
@@ -82,9 +85,11 @@ for i in $(seq 1 15); do
 done
 
 echo "  health 失败 → 回滚"
-cp -a "$BK/panel-src" /opt/sui-panel/panel/src
-cp -a "$BK/frontend-dist" /opt/sui-panel/panel/frontend-dist
-cp -a "$BK/apps-src" /opt/sui-panel/apps/selfhost/src
+# 注意末尾的 /. ：`cp -a 源目录 目标目录` 在目标已存在时会把源目录塞进去，
+# 变成 target/panel-src，回滚实际什么都没换回来（已复现）。
+cp -a "$BK/panel-src/." /opt/sui-panel/panel/src/
+cp -a "$BK/frontend-dist/." /opt/sui-panel/panel/frontend-dist/
+cp -a "$BK/apps-src/." /opt/sui-panel/apps/selfhost/src/
 systemctl restart sui-panel
 exit 1
 REMOTE_SH
