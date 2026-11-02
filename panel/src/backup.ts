@@ -33,6 +33,9 @@ const META_CARRY = [
   "agent_release_version",
   "cleanup_at",
   "schema_ver",
+  // 订阅令牌回填的一次性迁移标记：不带的话，恢复后 cron 会以为没跑过而重跑一遍
+  //（本身幂等、无副作用，但状态不一致会让人以为迁移出了问题）。
+  "sub_tokens_backfilled",
 ];
 type Table = (typeof TABLES)[number] | "meta";
 

@@ -10,7 +10,8 @@
     "db:init": "wrangler d1 execute DB --local --file=./schema.sql --config wrangler.local.toml",
     "db:init:remote": "wrangler d1 execute DB --remote --file=./schema.sql --config wrangler.local.toml",
     "build:web": "bash ./build-frontend.sh",
-    "test:unit": "vitest run"
+    "test:unit": "vitest run",
+    "drill:backup": "tsx scripts/backup-drill.mts"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261023.1",
