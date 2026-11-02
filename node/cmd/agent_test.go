@@ -107,3 +107,39 @@ func TestCoreConfigSigDetectsOrder(t *testing.T) {
 		t.Fatal("入站顺序变了就是配置变了，签名必须不同")
 	}
 }
+
+// clients 会渲染进 sing-box 配置（inbounds 的用户列表），所以它变了必须重启内核。
+// 这条是回归防线：曾有版本把 clients 漏在签名之外，导致「删客户端/停用/改密」只改
+// 本地 SQLite 而不重启，被撤销的用户照样能代理。
+func TestCoreConfigSigChangesWithClients(t *testing.T) {
+	a := &agentPullResp{
+		Config:  json.RawMessage(`{}`),
+		Clients: []json.RawMessage{json.RawMessage(`{"id":1,"name":"alice"}`)},
+	}
+	b := &agentPullResp{
+		Config:  json.RawMessage(`{}`),
+		Clients: []json.RawMessage{json.RawMessage(`{"id":1,"name":"alice","enable":false}`)},
+	}
+	if coreConfigSig(a) == coreConfigSig(b) {
+		t.Fatal("client 内容不同（停用），签名必须不同，否则撤销的用户不会被踢下线")
+	}
+}
+
+// 但 clients 的顺序不代表配置差异：不排序就会因为列表顺序抖动反复重启。
+func TestCoreConfigSigIgnoresClientOrder(t *testing.T) {
+	a := &agentPullResp{
+		Config: json.RawMessage(`{}`),
+		Clients: []json.RawMessage{
+			json.RawMessage(`{"id":1}`), json.RawMessage(`{"id":2}`),
+		},
+	}
+	b := &agentPullResp{
+		Config: json.RawMessage(`{}`),
+		Clients: []json.RawMessage{
+			json.RawMessage(`{"id":2}`), json.RawMessage(`{"id":1}`),
+		},
+	}
+	if coreConfigSig(a) != coreConfigSig(b) {
+		t.Fatal("client 顺序变化不该触发内核重启")
+	}
+}

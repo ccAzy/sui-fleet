@@ -14,6 +14,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime/debug"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -850,6 +851,13 @@ func (a *agent) clearTraffic() {
 }
 
 // coreConfigSig 只覆盖「内核配置」：settings 变化不需要重启 sing-box。
+//
+// clients 必须算进来：inbounds 的用户列表是从 clients 表渲染进 sing-box 配置的
+// （service/inbounds.go 的 enabledClientNames / ClientIds），删客户端、停用、改密、
+// 配额超限自动停用，最终都体现为「配置文件变了」。少了这一项，这些操作只改本地
+// SQLite 不重启内核 —— 被撤销的用户照样能代理。
+//
+// clients 的顺序不影响语义，所以排序后再入哈希，避免列表顺序抖动导致无谓重启。
 func coreConfigSig(pr *agentPullResp) string {
 	h := sha256.New()
 	h.Write(pr.Config)
@@ -859,6 +867,15 @@ func coreConfigSig(pr *agentPullResp) string {
 			h.Write(b)
 			h.Write([]byte{0})
 		}
+	}
+	clients := make([]string, 0, len(pr.Clients))
+	for _, b := range pr.Clients {
+		clients = append(clients, string(b))
+	}
+	sort.Strings(clients)
+	for _, c := range clients {
+		h.Write([]byte(c))
+		h.Write([]byte{0})
 	}
 	return hex.EncodeToString(h.Sum(nil))
 }

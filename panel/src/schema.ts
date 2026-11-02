@@ -71,7 +71,12 @@ const CommandResult = z.object({
 
 /** /agent/report 的请求体。字段都可选：老版本 agent 不会带新字段。 */
 export const AgentReportBody = z.object({
+  // 节点上报的字段名是 revision_applied（见 node/cmd/agent.go 的 reportBody）。
+  // 这里曾经只写 revision，zod 默认 strip 未知键 → 上报里的 revision_applied 被丢掉，
+  // nodes.applied_rev 永远停在旧值，「已下发 == 已应用」的验收因此失效。
+  // 两个名字都收：老 agent 若只发 revision 也不会被拒。
   revision: z.number().int().nonnegative().optional(),
+  revision_applied: z.number().int().nonnegative().optional(),
   agent_version: z.string().max(64).optional(),
   kernel_version: z.string().max(64).optional(),
   core_state: z.enum(["running", "stopped", "error"]).optional(),

@@ -91,3 +91,17 @@ describe("decode / tryDecode", () => {
     if (!r.ok) expect(r.issues.length).toBeGreaterThan(0);
   });
 });
+
+// 回归防线：agent 上报的字段名是 revision_applied，而 schema 曾经只写 revision，
+// zod 默认 strip 未知键 → applied_rev 永远停在旧值。这条测试就是在拦这个。
+describe("AgentReportBody 的 revision 兼容", () => {
+  it("revision_applied 不能被 strip 掉", () => {
+    const r = decode(AgentReportBody, { revision_applied: 42 });
+    expect(r.revision_applied).toBe(42);
+  });
+
+  it("老 agent 只发 revision 也收", () => {
+    const r = decode(AgentReportBody, { revision: 7 });
+    expect(r.revision).toBe(7);
+  });
+});
