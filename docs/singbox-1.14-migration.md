@@ -60,3 +60,35 @@ core/protocol/hysteria2/inbound.go:144  wrong type for method Start
 ```bash
 curl -s https://raw.githubusercontent.com/alireza0/s-ui/main/node/go.mod | grep sing-box
 ```text
+
+## 迁移进展（第二轮，实测）
+
+协议接口层已全部改完（可复用）：
+- `NewUpstreamContextHandlerEx` → `NewUpstreamContextHandler`（4 处）
+- adapter 的 `ConnectionHandler`：vless/vmess/trojan/anytls 加 `NewConnection`（委托 `NewConnectionEx`）；
+  hysteria/hysteria2/tuic 保留 `NewConnectionEx`（sing-quic 的 `ServerHandler` 仍要此名）
+- `Start(stage)` → `Start(stage, *adapter.Scope)`（7 处）
+- hysteria：删除 v0.9.7 已移除的 `ConnReceiveWindow` / `StreamReceiveWindow` / `MaxIncomingStreams`
+
+### 真正的深水区在 core/box.go（v1.14 重构了内核装配）
+
+```text
+core/log.go:86   *defaultFactory does not implement log.Factory (missing AttachPlatformWriter)
+core/box.go:174  too many arguments in call to endpoint.NewManager
+core/box.go:175  too many arguments in call to inbound.NewManager
+core/box.go:176  too many arguments in call to outbound.NewManager
+core/box.go:177  too many arguments in call to dns.NewTransportManager
+core/box.go:178  too many arguments in call to boxService.NewManager
+core/box.go:186  assignment mismatch: 1 variable but dns.NewRouter returns 2 values
+core/box.go:194  not enough arguments in call to route.NewConnectionManager
+core/box.go:515  adapter.Lifecycle has no Close
+core/box.go:536  adapter.LifecycleService has no Close
+```
+
+这不是改签名，是**重写内核装配顺序**：五个 Manager 构造器、dns.Router、ConnectionManager、
+Lifecycle 的关闭语义全变了。上游 s-ui 有完整适配（`core/box.go` + `core/log.go` + 自建的
+`core/quicgrace/`），可行路径是整套搬过来再把我们的补丁（clients_sig、nameAt 越界保护、
+sendbox 自定义）重贴回去。
+
+结论：**这不是 1–2 小时的活**，是半天级、且改的是代理的内核启动链路。
+在当前 v1.13.18 无故障、1.14 无我们必需功能的前提下，投产比不成立。
