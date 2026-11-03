@@ -460,6 +460,8 @@ export default {
     "port": "Порт",
     "ssMethod": "Метод",
     "ssManageable": "Управляемый",
+    "portHop": "Скачок портов",
+    "portHopHint": "Диапазон UDP-портов для скачка",
     "sSide": "Сторона сервера",
     "cSide": "Сторона клиента",
     "multiDomain": "Мультидомен",

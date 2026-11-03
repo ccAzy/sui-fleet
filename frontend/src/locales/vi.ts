@@ -459,6 +459,8 @@ export default {
     "port": "Cổng",
     "ssMethod": "Phương thức",
     "ssManageable": "Quản lý được",
+    "portHop": "Nhảy cổng",
+    "portHopHint": "Dải cổng UDP để nhảy",
     "sSide": "Phía Máy chủ",
     "cSide": "Phía Khách hàng",
     "multiDomain": "Nhiều Tên miền",

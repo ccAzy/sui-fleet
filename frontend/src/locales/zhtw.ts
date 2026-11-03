@@ -459,6 +459,8 @@ export default {
     "port": "端口",
     "ssMethod": "方法",
     "ssManageable": "可管理的",
+    "portHop": "連接埠跳躍",
+    "portHopHint": "客戶端在此 UDP 連接埠範圍內跳躍",
     "sSide": "服務器端",
     "cSide": "客戶端",
     "multiDomain": "多域名",

@@ -459,6 +459,8 @@ export default {
     "port": "پورت",
     "ssMethod": "روش",
     "ssManageable": "قابل مدیریت",
+    "portHop": "پرش پورت",
+    "portHopHint": "محدوده پورت UDP برای جابه‌جایی",
     "sSide": "سمت سرور",
     "cSide": "سمت کاربر",
     "multiDomain": "دامنه چندگانه",

@@ -35,6 +35,17 @@
       </v-col>
     </v-row>
     <template v-if="direction == 'in'">
+      <v-row>
+        <v-col cols="12" sm="6" md="4">
+          <v-text-field
+            :label="$t('in.portHop')"
+            :hint="$t('in.portHopHint')"
+            placeholder="40000:42000"
+            persistent-hint
+            v-model="hopPorts">
+          </v-text-field>
+        </v-col>
+      </v-row>
       <v-card subtitle="Hysteria2 Masquerade" v-if="data.masquerade != undefined">
         <v-row>
           <v-col cols="12" sm="6" md="4">
@@ -208,6 +219,22 @@ export default {
     optionMasq: {
       get(): boolean { return this.$props.data.masquerade != undefined },
       set(v:boolean) { this.$props.data.masquerade = v ? "" : undefined }
+    },
+    hopPorts: {
+      // 服务端端口跳跃：只写 out_json.server_ports（不进内核配置），
+      // 由 node/core/port_hop.go 转成 iptables SUI_HOP 的 dnat；
+      // links.ts 也读这个字段生成订阅里的 mport 参数。
+      get(): string {
+        const sp = this.$props.data.out_json?.server_ports
+        return Array.isArray(sp) ? sp.join(',') : (typeof sp === 'string' ? sp : '')
+      },
+      set(v: string) {
+        const d = this.$props.data
+        if (!d.out_json) d.out_json = {}
+        const t = (v ?? '').trim()
+        if (t) d.out_json.server_ports = [t]
+        else delete d.out_json.server_ports
+      }
     },
     optionMPort: {
       get(): boolean { return this.$props.data.server_ports != undefined },

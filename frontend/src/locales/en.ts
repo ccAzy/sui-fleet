@@ -618,6 +618,8 @@ export default {
     "port": "Port",
     "ssMethod": "Method",
     "ssManageable": "Manageable",
+    "portHop": "Port hopping",
+    "portHopHint": "UDP port range the client hops within",
     "sSide": "Server Side",
     "cSide": "Client Side",
     "multiDomain": "Multi Domain",

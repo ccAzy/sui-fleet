@@ -618,6 +618,8 @@ export default {
     "port": "端口",
     "ssMethod": "方法",
     "ssManageable": "可管理的",
+    "portHop": "端口跳跃",
+    "portHopHint": "客户端在此 UDP 端口段内跳端口",
     "sSide": "服务器端",
     "cSide": "客户端",
     "multiDomain": "多域名",
