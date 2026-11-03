@@ -472,6 +472,11 @@ body .v-overlay__content.v-tooltip {
   font-size: var(--fs-base);
   font-weight: 600;
   color: var(--ink);
+  /* 客户端名/入站 tag 是用户随便起的：200 个字符、长英文、emoji 都会撑破
+     grid 轨道（.ledger-meta 早就有 ellipsis，名字这一列漏了）。 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
