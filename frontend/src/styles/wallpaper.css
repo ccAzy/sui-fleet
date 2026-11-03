@@ -1,33 +1,41 @@
 /**
  * styles/wallpaper.css
  *
- * 壁纸 = 那张照片就是桌面本身，纸浮在上面。
+ * 壁纸模式 = 照片是**桌面**，账簿是摊在桌面上的一张纸。
  *
- * 口径修正（2026-11，阿柴：之前那种「只在四周露一条」只能叫背景）：
- * 只把图片铺在底层、纸面 94% 不透明，等于花 90% 的屏幕去挡那张图。
- * 现在两种强度都由 CSS 变量控制，图片要真的能透过纸看出来：
- *   data-wallpaper="on"    纸 70%（磨砂纸，能看见照片的明暗与色块）
- *   data-wallpaper="glass" 纸 56%（薄玻璃，照片轮廓清楚）
- * 对比度靠 blur + 遮罩保底，不靠把纸做成实心。
+ * 口径（2026-11 第三版，经 DSH 设计评审收敛）。前两版的错误写在下面，别再走回去：
+ *
+ *   第一版：照片铺底 + 纸 94% 不透明 + 纸几乎顶满视口
+ *           → 照片只剩四周一条边，被用户判为「背景」。
+ *   第二版：把纸调透（70%→60%）+ backdrop-filter 模糊
+ *           → 犯了三件事：①照片要穿过 blur→veil→backdrop-filter 三层才到眼睛，
+ *             信息量被自己的"材质"吃掉；②纸透了以后 11px 说明文字在亮部只有
+ *             2.43:1（实测），而纸不透又看不出照片 —— 60~84% 之间没有解；
+ *             ③半透明纸在账簿世界里不是纸，是亚克力。
+ *
+ * 第三版的原则：**不降质照片，只分配照片。**
+ *   - 照片：原片、cover、不模糊、不缩放、不加遮罩。
+ *   - 纸：不透明、直角、无阴影，左边/上边/下边三条出血到视口边缘，
+ *         只有右侧一条缝，缝上一根 1px 线 + 纸侧 2px 压暗（切口吃不到光）。
+ *   - 于是照片拿到一整块满高竖窗（1254 宽屏约 40% 视口，桌面越宽越多），
+ *     纸拿到满高 + 750~900 宽 —— 两边各拿自己最缺的那一维。
+ *   - 顶栏/侧栏不再压在照片上：它们退进纸里（书眉与栏列）。
+ *
+ * 为什么不做半透明、不做模糊、不做暗角：见 docs/wallpaper-review.md 的 W1–W7 验收标准。
  */
 
-#wp-layer,
-#wp-veil {
+#wp-layer {
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 0;
-}
-
-#wp-layer {
   background-color: var(--paper);
   background-image: var(--wp-image, none);
   background-size: var(--wp-size, cover);
   background-position: center;
   background-repeat: no-repeat;
-  filter: blur(var(--wp-blur, 0px)) saturate(var(--wp-saturate, 100%)) contrast(var(--wp-contrast, 100%));
-  /* blur 会在四边漏出透明缝，稍微放大盖住 */
-  transform: scale(1.06);
+  /* 只保留用户主动调的色彩项；不模糊、不缩放（scale 会吃掉边缘像素） */
+  filter: saturate(var(--wp-saturate, 100%)) contrast(var(--wp-contrast, 100%));
   opacity: 0;
   transition: opacity 200ms cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -37,11 +45,10 @@ html[data-wallpaper='glass'] #wp-layer {
   opacity: 1;
 }
 
-/* 遮罩：一层纸色，按比例压在图上。它不是装饰，是对比度工具 */
+/* 遮罩层停用：它的作用是把照片压成灰色好让字看得清，等于降低照片信息量。
+   新方案靠几何让位，不靠把照片压灰。元素保留（老配置里还有这个节点），但不显形。 */
 #wp-veil {
-  background: var(--paper);
-  opacity: var(--wp-veil, 0);
-  transition: opacity 160ms cubic-bezier(0.16, 1, 0.3, 1);
+  display: none !important;
 }
 
 /* 应用主体浮在壁纸之上 */
@@ -50,89 +57,121 @@ html[data-wallpaper='glass'] #wp-layer {
   z-index: 1;
 }
 
-/* 打开了壁纸：应用容器让位，露出下面的桌面 */
+/* 纸：左边一角，满高，右边界一条缝 */
 html[data-wallpaper='on'] .v-application,
-html[data-wallpaper='glass'] .v-application,
-html[data-wallpaper='on'] .v-application__wrap,
-html[data-wallpaper='glass'] .v-application__wrap {
+html[data-wallpaper='on'] .v-application__wrap {
   background: transparent !important;
 }
 
-/* 半透明面板：显式开启才生效，且把浮层的实心背景一起换掉 */
-html[data-wallpaper='glass'] .v-card:not(.v-overlay .v-card),
-html[data-wallpaper='glass'] .v-sheet:not(.v-overlay .v-sheet) {
-  background: color-mix(in srgb, var(--surface) 88%, transparent) !important;
-  backdrop-filter: blur(18px) saturate(1.1);
+html[data-wallpaper='on'] .v-application__wrap {
+  position: relative;
+  /* Vuetify 里 wrap 是 .v-application 的 flex 子项（flex: 1 1 auto），
+     光写 width 会被 flex 拉伸吃掉 → 必须同时把 flex 定死。 */
+  flex: 0 0 auto;
+  width: clamp(750px, 60vw, 900px);
+  max-width: none;
+  min-height: 100dvh;
+  background: var(--surface);
+  /* 缝上的那根线画在纸侧，不是照片侧；颜色是纸色阶差，不是黑线 */
+  border-right: 1px solid var(--rule-strong);
 }
 
-html[data-wallpaper='glass'] .v-data-table,
-html[data-wallpaper='glass'] .v-table {
-  background: transparent !important;
+/* 切口：缝内侧 2px 再压暗一点 —— 这是阴影的替代品。
+   纸压在桌面上，投影最多 1px 肉眼不可见；真正的线索是「切口吃不到光」。 */
+html[data-wallpaper='on'] .v-application__wrap::after {
+  content: '';
+  position: absolute;
+  /* 缝的内侧再压 1px「切口吃不到光」，比外面的线浅一档：
+     外线 = 纸色 −12 L*（border-right 那条），内档 = 纸色 −3 L*。
+     顺序必须是「线在最外，浅档在里面」，反过来就成了描边加粗。 */
+  inset: 0 0 0 auto;
+  width: 1px;
+  background: color-mix(in srgb, var(--surface) 96%, #000);
+  pointer-events: none;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  #wp-layer,
-  #wp-veil {
-    transition: none;
-  }
-}
-
-/* 开了壁纸，账簿就要真的「摊在桌上」：
-   内容区从页面底浮起来变成一张纸，壁纸只在纸的四周露出来。
-   不起这一步，Home 的读数会直接压在照片上——对比度守门员算得再准也没用，
-   因为那里的文字本来就没有自己的底面。 */
+/* 纸内部：内容铺满这张纸，不再是"居中的卡片" */
 html[data-wallpaper='on'] .page-shell,
 html[data-wallpaper='glass'] .page-shell {
-  /* 94% 而非 100%：留一点点"薄纸"的通透感，壁纸的明暗会渗进纸面，
-     但不影响正文对比度（这是与玻璃档 86% 之间的中间档）。 */
-  background: color-mix(in srgb, var(--surface) calc(var(--wp-paper, 84) * 1%), transparent);
-  backdrop-filter: blur(26px) saturate(1.18);
-  border: 1px solid var(--rule);
-  border-radius: 2px;
-  /* 桌面要留得出来，纸才像"摊在桌上"：
-     视口再宽也至少露出 60px 桌面，内容宽度收在 1080 —— 之前是 56px/1240，
-     纸几乎顶满视口，壁纸只剩顶上一条，看着像横幅而不是背景。 */
-  /* 960 而不是 1080：纸越窄，四周露出的桌面越多，才像「一张纸摊在桌面上」，
-     而不是「屏风挡住墙」。 */
-  width: min(960px, calc(100% - 180px));
-  margin: 26px auto 52px;
-  padding: 26px 30px 56px;
-  /* 壁纸模式下唯一允许的阴影：给纸一点离地高度，
-     否则它和背景之间是一条硬切边，观感像"屏风挡住墙"而不是"纸上写字"。
-     （DESIGN.md 里"页面元素不加阴影"的例外，只在开壁纸时生效。） */
-  box-shadow: 0 20px 44px -30px rgba(0, 0, 0, 0.28);
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 18px 22px 40px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
 }
 
-/* 玻璃模式：纸本身半透明，壁纸透进内容区（默认关闭，显式开启才生效）。
-   86% 而不是 78%：再透就和正文抢对比度了——实测 78% 时照片亮部会把
-   --ink-3 的说明文字压到 3:1 附近，正文 13px 看着发虚。 */
-html[data-wallpaper='glass'] .page-shell {
-  background: color-mix(in srgb, var(--surface) 56%, transparent);
-  backdrop-filter: blur(30px) saturate(1.2);
-}
-
-/* 顶栏与侧栏也要让壁纸透出来。
-   它们原来是不透明的 --paper / --surface-2，把窗口最上面 64px 全盖住了——
-   这正是"壁纸只在中间露一条横幅"的根因。 */
+/* 书眉与栏列：同一种材料，只在纸内，绝不压在照片上 */
 html[data-wallpaper='on'] .v-app-bar,
 html[data-wallpaper='glass'] .v-app-bar {
-  background: color-mix(in srgb, var(--paper) calc((var(--wp-paper, 84) - 32) * 1%), transparent) !important;
-  backdrop-filter: blur(22px) saturate(1.12);
+  background: var(--surface) !important;
+  backdrop-filter: none;
+  border-bottom: 1px solid var(--rule);
+  /* 书眉只在纸内。Vuetify 给 app-bar 写的是**内联**样式
+     `position:fixed; left:56px; width:calc(100% - 56px)`，普通声明赢不了，
+     必须 !important；left 保留给它（等于侧栏宽度），只把宽度掐到纸内。 */
+  right: auto !important;
+  width: calc(clamp(750px, 60vw, 900px) - var(--v-layout-left, 56px)) !important;
 }
 
 html[data-wallpaper='on'] .v-navigation-drawer,
 html[data-wallpaper='glass'] .v-navigation-drawer {
-  background: color-mix(in srgb, var(--surface-2) calc((var(--wp-paper, 84) - 26) * 1%), transparent) !important;
-  backdrop-filter: blur(22px) saturate(1.12);
+  background: var(--surface-2) !important;
+  backdrop-filter: none;
 }
 
-@media (max-width: 960px) {
-  html[data-wallpaper='on'] .page-shell,
-  html[data-wallpaper='glass'] .page-shell {
-    width: calc(100% - 24px);
-    margin: 12px auto 24px;
-    padding: 16px 16px 40px;
-    border-radius: 2px;
-    box-shadow: 0 12px 28px -22px rgba(0, 0, 0, 0.22);
+html[data-wallpaper='on'] .v-main,
+html[data-wallpaper='glass'] .v-main {
+  background: var(--surface);
+}
+
+/* 窄屏（≤1099）：竖窗放不下，改成"卷首图版"——照片在顶部出血一条，
+   纸在下面按文档流接住。这是同一个方案在窄屏的退化形态，不是另一套设计。 */
+@media (max-width: 1099px) {
+  html[data-wallpaper='on'] #wp-layer {
+    inset: 0 0 auto 0;
+    height: min(34vh, 56.25vw);
+  }
+
+  html[data-wallpaper='on'] .v-application__wrap {
+    width: 100%;
+    flex: 0 0 auto;
+    min-height: auto;
+    margin-top: min(34vh, 56.25vw);
+    border-right: 0;
+    /* 纸的上边与照片带交界：一条同规格的缝，方向转了 90° */
+    border-top: 1px solid var(--rule-strong);
+  }
+
+  html[data-wallpaper='on'] .v-application__wrap::after {
+    inset: 1px 0 auto auto;
+    width: 100%;
+    height: 1px;
+  }
+
+  html[data-wallpaper='on'] .v-app-bar,
+  html[data-wallpaper='on'] .v-navigation-drawer,
+  html[data-wallpaper='on'] .v-main {
+    background: var(--surface) !important;
+  }
+
+  html[data-wallpaper='on'] .v-app-bar {
+    right: 0 !important;
+    width: 100% !important;
+    /* 书眉跟着纸走：落在照片带的下沿，而不是压在照片上 */
+    top: min(34vh, 56.25vw) !important;
+  }
+
+  html[data-wallpaper='on'] .v-navigation-drawer {
+    background: var(--surface-2) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #wp-layer {
+    transition: none;
   }
 }

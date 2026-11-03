@@ -55,13 +55,13 @@ export const DEFAULT_WP: WpConfig = {
   lumLight: -1,
   lumDark: -1,
   builtin: 'none',
-  blur: 0,
+  blur: 0,        // 已停用（照片不再模糊），保留字段只为兼容老配置
   contrast: 100,
   saturate: 100,
-  veil: 30,
-  // 84 是「照片能当桌面、字还能读」的交点：再往下 ink-3 的说明文字在亮部会掉到
-  // 4.5:1 以下（实测 60% 时 2.43:1）。想更透自己在设置里往下拖，界面会实时报警。
-  paper: 84,
+  veil: 0,        // 已停用（遮罩层不再显形）
+  // 纸是不透明的：第三版方案靠几何让位（照片拿右侧满高竖窗），
+  // 不再靠纸面透明度换面积。这个字段保留只为兼容老配置。
+  paper: 100,
   fit: 'cover',
   glass: false,
 }

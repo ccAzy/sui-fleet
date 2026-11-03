@@ -1,157 +1,107 @@
 <template>
-        <div class="wp">
-          <div class="wp-line">
-            <div class="wp-key">
-              {{ $t('setting.wallpaper.enable') }}
-              <span class="wp-note">{{ $t('setting.wallpaper.hint') }}</span>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              class="wp-switch"
-              :aria-checked="wp.on"
-              :aria-label="$t('setting.wallpaper.enable')"
-              @click="wp.on = !wp.on"
-            ><span class="wp-switch-knob"></span></button>
-          </div>
+  <div class="wp">
+    <div class="wp-line">
+      <div class="wp-key">
+        {{ $t('setting.wallpaper.enable') }}
+        <span class="wp-note">{{ $t('setting.wallpaper.hint') }}</span>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        class="wp-switch"
+        :aria-checked="wp.on"
+        :aria-label="$t('setting.wallpaper.enable')"
+        @click="wp.on = !wp.on"
+      ><span class="wp-switch-knob"></span></button>
+    </div>
 
-          <div class="wp-line">
-            <div class="wp-key">{{ $t('setting.wallpaper.source') }}</div>
-            <div class="wp-ctrl">
-              <v-text-field
-                v-model="urlInput"
-                density="compact"
-                hide-details
-                single-line
-                class="wp-url"
-                :placeholder="$t('setting.wallpaper.urlPlaceholder')"
-                @keyup.enter="useUrl"
-              ></v-text-field>
-              <v-btn size="small" variant="outlined" :loading="wpBusy" @click="useUrl">{{ $t('setting.wallpaper.useUrl') }}</v-btn>
-              <v-btn size="small" variant="outlined" :loading="wpBusy" @click="fileInput?.click()">{{ $t('setting.wallpaper.upload') }}</v-btn>
-              <input ref="fileInput" type="file" accept="image/*" hidden @change="onFile" />
-            </div>
-          </div>
+    <div class="wp-line">
+      <div class="wp-key">{{ $t('setting.wallpaper.source') }}</div>
+      <div class="wp-ctrl">
+        <v-text-field
+          v-model="urlInput"
+          density="compact"
+          hide-details
+          single-line
+          class="wp-url"
+          :placeholder="$t('setting.wallpaper.urlPlaceholder')"
+          @keyup.enter="useUrl"
+        ></v-text-field>
+        <v-btn size="small" variant="outlined" :loading="wpBusy" @click="useUrl">{{ $t('setting.wallpaper.useUrl') }}</v-btn>
+        <v-btn size="small" variant="outlined" :loading="wpBusy" @click="fileInput?.click()">{{ $t('setting.wallpaper.upload') }}</v-btn>
+        <input ref="fileInput" type="file" accept="image/*" hidden @change="onFile" />
+      </div>
+    </div>
 
-          <div class="wp-line">
-            <div class="wp-key">
-              {{ $t('setting.wallpaper.builtin') }}
-              <span class="wp-note">{{ $t('setting.wallpaper.localOnly') }}</span>
-            </div>
-            <div class="wp-ctrl">
-              <v-btn-toggle v-model="wp.builtin" density="compact" mandatory variant="outlined" divided>
-                <v-btn value="none" size="small">{{ $t('setting.wallpaper.builtinNone') }}</v-btn>
-                <v-btn value="fiber" size="small">{{ $t('setting.wallpaper.builtinFiber') }}</v-btn>
-                <v-btn value="grid" size="small">{{ $t('setting.wallpaper.builtinGrid') }}</v-btn>
-                <v-btn value="dots" size="small">{{ $t('setting.wallpaper.builtinDots') }}</v-btn>
-              </v-btn-toggle>
-            </div>
-          </div>
+    <div class="wp-line">
+      <div class="wp-key">
+        {{ $t('setting.wallpaper.builtin') }}
+        <span class="wp-note">{{ $t('setting.wallpaper.localOnly') }}</span>
+      </div>
+      <div class="wp-ctrl">
+        <v-btn-toggle v-model="wp.builtin" density="compact" mandatory variant="outlined" divided>
+          <v-btn value="none" size="small">{{ $t('setting.wallpaper.builtinNone') }}</v-btn>
+          <v-btn value="fiber" size="small">{{ $t('setting.wallpaper.builtinFiber') }}</v-btn>
+          <v-btn value="grid" size="small">{{ $t('setting.wallpaper.builtinGrid') }}</v-btn>
+          <v-btn value="dots" size="small">{{ $t('setting.wallpaper.builtinDots') }}</v-btn>
+        </v-btn-toggle>
+      </div>
+    </div>
 
-          <div class="wp-line">
-            <div class="wp-key">{{ $t('setting.wallpaper.blur') }}</div>
-            <div class="wp-ctrl wp-ctrl--slider">
-              <v-slider v-model="wp.blur" :min="0" :max="40" :step="1" thumb-label hide-details density="compact" :aria-label="$t('setting.wallpaper.blur')"></v-slider>
-              <span class="wp-val mono">{{ wp.blur }}px</span>
-            </div>
-          </div>
+    <div class="wp-line">
+      <div class="wp-key">{{ $t('setting.wallpaper.contrast') }}</div>
+      <div class="wp-ctrl wp-ctrl--slider">
+        <v-slider v-model="wp.contrast" :min="80" :max="140" :step="1" thumb-label hide-details density="compact" :aria-label="$t('setting.wallpaper.contrast')"></v-slider>
+        <span class="wp-val mono">{{ wp.contrast }}%</span>
+      </div>
+    </div>
 
-          <div class="wp-line">
-            <div class="wp-key">{{ $t('setting.wallpaper.contrast') }}</div>
-            <div class="wp-ctrl wp-ctrl--slider">
-              <v-slider v-model="wp.contrast" :min="80" :max="140" :step="1" thumb-label hide-details density="compact" :aria-label="$t('setting.wallpaper.contrast')"></v-slider>
-              <span class="wp-val mono">{{ wp.contrast }}%</span>
-            </div>
-          </div>
+    <div class="wp-line">
+      <div class="wp-key">{{ $t('setting.wallpaper.saturate') }}</div>
+      <div class="wp-ctrl wp-ctrl--slider">
+        <v-slider v-model="wp.saturate" :min="0" :max="160" :step="1" thumb-label hide-details density="compact" :aria-label="$t('setting.wallpaper.saturate')"></v-slider>
+        <span class="wp-val mono">{{ wp.saturate }}%</span>
+      </div>
+    </div>
 
-          <div class="wp-line">
-            <div class="wp-key">{{ $t('setting.wallpaper.saturate') }}</div>
-            <div class="wp-ctrl wp-ctrl--slider">
-              <v-slider v-model="wp.saturate" :min="0" :max="160" :step="1" thumb-label hide-details density="compact" :aria-label="$t('setting.wallpaper.saturate')"></v-slider>
-              <span class="wp-val mono">{{ wp.saturate }}%</span>
-            </div>
-          </div>
+    <div class="wp-line">
+      <div class="wp-key">{{ $t('setting.wallpaper.fit') }}</div>
+      <div class="wp-ctrl">
+        <v-btn-toggle v-model="wp.fit" density="compact" mandatory variant="outlined" divided>
+          <v-btn value="cover" size="small">{{ $t('setting.wallpaper.fitCover') }}</v-btn>
+          <v-btn value="contain" size="small">{{ $t('setting.wallpaper.fitContain') }}</v-btn>
+        </v-btn-toggle>
+      </div>
+    </div>
 
-          <div class="wp-line">
-            <div class="wp-key">{{ $t('setting.wallpaper.veil') }}</div>
-            <div class="wp-ctrl wp-ctrl--slider">
-              <v-slider v-model="wp.veil" :min="0" :max="85" :step="1" thumb-label hide-details density="compact" :aria-label="$t('setting.wallpaper.veil')"></v-slider>
-              <span class="wp-val mono">{{ wp.veil }}%</span>
-            </div>
-          </div>
+    <!-- 模糊 / 遮罩浓度 / 纸张通透度 / 玻璃档 四个滑块已删除：
+         它们做的是同一件事——降低照片的信息量好让纸面赢。现在靠几何让位
+         （照片占右侧满高竖窗，纸在左边），不再靠把照片模糊/压灰。 -->
+    <div class="wp-line">
+      <div class="wp-key">{{ $t('setting.wallpaper.structure') }}</div>
+      <div class="wp-ctrl">
+        <span class="wp-note">{{ $t('setting.wallpaper.structureHint') }}</span>
+      </div>
+    </div>
 
-          <div class="wp-line">
-            <div class="wp-key">
-              {{ $t('setting.wallpaper.paper') }}
-              <span class="wp-note">{{ $t('setting.wallpaper.paperHint') }}</span>
-            </div>
-            <div class="wp-ctrl wp-ctrl--slider">
-              <v-slider v-model="wp.paper" :min="60" :max="100" :step="1" thumb-label hide-details density="compact" :aria-label="$t('setting.wallpaper.paper')"></v-slider>
-              <span class="wp-val mono">{{ wp.paper }}%</span>
-            </div>
-          </div>
-
-          <div class="wp-line">
-            <div class="wp-key">{{ $t('setting.wallpaper.fit') }}</div>
-            <div class="wp-ctrl">
-              <v-btn-toggle v-model="wp.fit" density="compact" mandatory variant="outlined" divided>
-                <v-btn value="cover" size="small">{{ $t('setting.wallpaper.fitCover') }}</v-btn>
-                <v-btn value="contain" size="small">{{ $t('setting.wallpaper.fitContain') }}</v-btn>
-              </v-btn-toggle>
-            </div>
-          </div>
-
-          <div class="wp-line">
-            <div class="wp-key">
-              {{ $t('setting.wallpaper.contrastCheck') }}
-              <span class="wp-note">{{ $t('setting.wallpaper.contrastHint') }}</span>
-            </div>
-            <div class="wp-ctrl">
-              <span class="wp-ratio mono" :data-ok="wpOk ? '1' : '0'">
-                {{ wpContrast < 0 ? '—' : wpContrast.toFixed(1) + ':1' }}
-              </span>
-              <span class="wp-flag" :data-ok="wpOk ? '1' : '0'">
-                {{ wpContrast < 0 ? $t('setting.wallpaper.noSample') : wpOk ? $t('setting.wallpaper.contrastOk') : $t('setting.wallpaper.contrastLow') }}
-              </span>
-              <v-btn v-if="wpContrast >= 0 && !wpOk" size="small" variant="outlined" @click="fixVeil">{{ $t('setting.wallpaper.fix') }}</v-btn>
-            </div>
-          </div>
-
-          <div class="wp-line">
-            <div class="wp-key">
-              {{ $t('setting.wallpaper.glass') }}
-              <span class="wp-note">{{ $t('setting.wallpaper.glassWarn') }}</span>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              class="wp-switch"
-              :aria-checked="wp.glass"
-              :aria-label="$t('setting.wallpaper.glass')"
-              @click="wp.glass = !wp.glass"
-            ><span class="wp-switch-knob"></span></button>
-          </div>
-
-          <div class="wp-foot">
-            <v-btn size="small" variant="text" class="toolbar-ghost" prepend-icon="mdi-restore" @click="clearWp">{{ $t('setting.wallpaper.clear') }}</v-btn>
-          </div>
-        </div>
+    <div class="wp-foot">
+      <v-btn size="small" variant="text" class="toolbar-ghost" prepend-icon="mdi-restore" @click="clearWp">{{ $t('setting.wallpaper.clear') }}</v-btn>
+    </div>
+  </div>
 </template>
 
 <script lang="ts" setup>
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { onUnmounted, ref, watch } from 'vue'
 import { push } from 'notivue'
 import { i18n } from '@/locales'
 import {
   DEFAULT_WP,
   applyWp,
-  estimateContrast,
   isDarkNow,
   prepareImage,
   readWp,
   saveParams,
   saveWp,
-  suggestVeil,
   type WpConfig,
 } from '@/plugins/wallpaper'
 
@@ -166,15 +116,9 @@ const commitWp = () => {
   applyWp(wp.value)
 }
 watch(wp, commitWp, { deep: true })
-// 明暗主题换了，读数也要跟着换（浅色图和深色图各一份）
+// 明暗主题换了，用哪张图也要跟着换（浅色图与深色图各一份）
 const themeTick = setInterval(() => { wpDark.value = isDarkNow() }, 1200)
 onUnmounted(() => clearInterval(themeTick))
-
-const wpContrast = computed(() => {
-  const lum = wpDark.value ? wp.value.lumDark : wp.value.lumLight
-  return estimateContrast(lum, wp.value.veil, wpDark.value, wp.value.paper)
-})
-const wpOk = computed(() => wpContrast.value < 0 || wpContrast.value >= 4.5)
 
 const setImage = async (input: File | string) => {
   wpBusy.value = true
@@ -193,8 +137,6 @@ const setImage = async (input: File | string) => {
     }
     wp.value.builtin = 'none'
     wp.value.on = true
-    // 装完先按最坏区域算一个能达标的遮罩，别让人自己摸
-    if (r.sampled) wp.value.veil = suggestVeil(r.lum, wpDark.value)
     saveWp(wp.value)
     applyWp(wp.value)
   } catch (e) {
@@ -217,11 +159,6 @@ const onFile = (e: Event) => {
   input.value = ''
 }
 
-const fixVeil = () => {
-  const lum = wpDark.value ? wp.value.lumDark : wp.value.lumLight
-  wp.value.veil = suggestVeil(lum, wpDark.value)
-}
-
 const clearWp = () => {
   wp.value = { ...DEFAULT_WP }
   saveWp(wp.value)
@@ -229,6 +166,7 @@ const clearWp = () => {
   urlInput.value = ''
 }
 </script>
+
 
 <style scoped>
 /* 外观面板：账簿行式排布（key 左、控件右、1px 细线），不是卡片堆 */

@@ -426,6 +426,8 @@ export default {
       "fix": "一键修正",
       "glass": "半透明面板",
       "glassWarn": "玻璃效果与账簿风格冲突，默认关闭",
+      "structure": "结构",
+      "structureHint": "照片占右侧一整块满高竖窗，账簿是左边一张纸；窄屏改成顶部一条图版",
       "clear": "清除壁纸",
       "loadFailed": "这张图读不出来，换一张或改用链接"
     },

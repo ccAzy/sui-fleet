@@ -296,6 +296,8 @@ export default {
       "fix": "Sửa ngay",
       "glass": "Bảng bán trong suốt",
       "glassWarn": "Hiệu ứng kính xung đột với phong cách “sổ giấy”; mặc định tắt",
+      "structure": "Bố cục",
+      "structureHint": "Ảnh chiếm một cửa sổ cao hết bên phải; sổ nằm trên tờ giấy bên trái",
       "clear": "Bỏ hình nền",
       "loadFailed": "Không đọc được ảnh — thử ảnh khác hoặc dùng URL"
     }
