@@ -98,7 +98,7 @@ sendbox 自定义）重贴回去。
 按 `self-update-script-engineering` 技能的审计视角做了一遍，现状：
 
 | 环节 | 状态 | 说明 |
-|---|---|---|
+| --- | --- | --- |
 | 分发目录 | ✅ 已修 | `/dl/sui-agent-linux-amd64` 原来是 **25.8MB 的残缺拼接物**（分片 part-00/01 拼出来的，与生产 75.7MB 不符）。已换成正确产物：**75,698,488 B，md5 38ee74d65728**，sha256 `fdf7da11…` |
 | 分片 | ✅ 重建 | 24MiB × 3 + 200KB × 1，共 4 片；`.parts`=4；`.sha256` 与完整包一致 |
 | 更新源 | ✅ 已写 | meta 三件套：`agent_release_url=https://sui.example.com/dl/sui-agent-linux-amd64`、`sha256=fdf7da11…`、`version=1.4.2` |
@@ -116,6 +116,7 @@ sendbox 自定义）重贴回去。
 
 **新二进制启动后崩溃时不会自动回滚**——systemd 只会反复重启那个坏二进制。技能里 P0-1
 "失败路径必须恢复服务"要求的是：re-exec 后若 N 秒内没上报成功（面板侧 `core_state=running`
+
 + 新 `agent_ver`），节点侧要自动 `cp sui-agent.old sui-agent` 再启动一次。
 
 另外按技能 P0-2/P0-3，节点侧还缺状态文件与锁（并发点两次"更新"会出问题）。

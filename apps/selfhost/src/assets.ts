@@ -80,6 +80,13 @@ export function createAssets(distDir: string): AssetsBinding {
       });
     }
 
+    // 兜底只给「前端路由」：无扩展名、且不是分发目录里的文件。
+    // 否则 /dl/sui-agent-linux-arm64.parts 这种缺失的分发包会返回 index.html，
+    // 安装脚本把 HTML 当成分片清单读 → 后面报"校验失败"，把"没有这个包"
+    // 误报成"包坏了"（实测 arm64 机器就是这么被误导的）。
+    const isAssetlike = extname(rel) !== "" || rel.startsWith("dl/") || rel.startsWith("dl\\");
+    if (isAssetlike) return new Response("not found", { status: 404 });
+
     // SPA 兜底：未命中的路径交给前端路由
     const index = await readIfFile(join(root, "index.html"));
     if (!index) return new Response("not found", { status: 404 });

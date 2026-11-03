@@ -24,7 +24,17 @@ done
 
 case "$(uname -m)" in
   x86_64|amd64) ARCH=amd64 ;;
-  aarch64|arm64) ARCH=arm64 ;;
+  aarch64|arm64)
+    cat >&2 <<MSG
+暂不支持 ARM64（$(uname -m)）。
+
+原因：目前只发布 amd64 的节点二进制，没有交叉编译过 arm64 产物。
+在补上 arm64 构建与验证之前，脚本不会给你装一个跑不起来的包。
+
+需要 arm64 支持的话，请让维护者先发布 arm64 分发包
+（/dl/sui-agent-linux-arm64.parts），再重跑本脚本。
+MSG
+    exit 2 ;;
   *) echo "不支持的架构: $(uname -m)" >&2; exit 2 ;;
 esac
 
