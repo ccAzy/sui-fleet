@@ -119,7 +119,7 @@ import { useLocale, useTheme } from 'vuetify'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { computed, ref } from 'vue'
-import { languages } from '@/locales'
+import { languages, setLocale } from '@/locales'
 import Data from '@/store/modules/data'
 import { applyThemeMode, savedThemeMode } from '@/plugins/vuetify'
 
@@ -282,10 +282,11 @@ const { locale: i18nLocale } = useI18n()
 const vuetifyLocale = useLocale()
 const theme = useTheme()
 
-const changeLocale = (l: string) => {
+const changeLocale = async (l: string) => {
+  // 词条是按需加载的：先 ensure，再切，最后 reload（reload 后 main.ts 会再 ensure 一次）
+  await setLocale(l)
   i18nLocale.value = l
   vuetifyLocale.current.value = l
-  localStorage.setItem('locale', l)
   window.location.reload()
 }
 const isActiveLocale = (l: string) => i18nLocale.value === l

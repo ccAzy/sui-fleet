@@ -568,3 +568,9 @@
   color: var(--ink-3);
   font-size: var(--fs-sm);
 }
+
+/* 表头不换行：中文表头（如「入站管理」）在窄列里会被逐字折成 3 行，
+   把整行表头撑高。列宽交给内容自适应，超出时由表格横向滚动处理。 */
+.v-data-table__th {
+  white-space: nowrap !important;
+}

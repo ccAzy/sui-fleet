@@ -27,7 +27,7 @@ import { applyThemeMode, savedThemeMode } from '@/plugins/vuetify'
 import { applyWp, initWallpaper, readWp } from '@/plugins/wallpaper'
 
 // Locale
-import { i18n } from '@/locales'
+import { ensureLocale, i18n } from '@/locales'
 
 // Notivue
 import { createNotivue } from 'notivue'
@@ -56,6 +56,7 @@ void initWallpaper()
 const app = createApp(App)
 app.provide('loading', loading)
 
+await ensureLocale(i18n.global.locale.value as string)
 registerPlugins(app)
 
 app

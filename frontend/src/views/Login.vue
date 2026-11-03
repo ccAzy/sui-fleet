@@ -81,7 +81,7 @@
 
           <label class="login-lang">
             <span class="sr-only">Language</span>
-            <select v-model="$i18n.locale" @change="changeLocale(($i18n.locale as string))">
+            <select :value="$i18n.locale" @change="changeLocale(($event.target as HTMLSelectElement).value)">
               <option v-for="l in languages" :key="l.value" :value="l.value">{{ l.title }}</option>
             </select>
           </label>
@@ -94,7 +94,7 @@
 <script lang="ts" setup>
 import { ref } from 'vue'
 import { useLocale } from 'vuetify'
-import { i18n, languages } from '@/locales'
+import { i18n, languages, setLocale } from '@/locales'
 import { useRouter } from 'vue-router'
 import HttpUtil from '@/plugins/httputil'
 
@@ -172,9 +172,9 @@ const finish = (obj: any) => {
   router.push(obj?.must_change ? '/admins' : '/')
 }
 
-const changeLocale = (l: string) => {
-  locale.current.value = l ?? 'en'
-  localStorage.setItem('locale', locale.current.value)
+const changeLocale = async (l: string) => {
+  await setLocale(l ?? 'en')       // 先加载词条再切，避免闪 key 名
+  locale.current.value = l ?? 'en' // Vuetify 自己的语言（分页/表格等内置文案）
 }
 </script>
 
