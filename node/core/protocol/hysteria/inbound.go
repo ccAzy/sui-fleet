@@ -86,7 +86,7 @@ func NewInbound(ctx context.Context, router adapter.Router, logger log.ContextLo
 		ConnReceiveWindow:   options.ReceiveWindowConn,
 		StreamReceiveWindow: options.ReceiveWindowClient,
 		MaxIncomingStreams:  int64(options.MaxConnClient),
-		DisableMTUDiscovery: options.DisableMTUDiscovery,
+
 	})
 	if err != nil {
 		return nil, err
@@ -155,7 +155,7 @@ func (h *Inbound) NewPacketConnectionEx(ctx context.Context, conn N.PacketConn, 
 	h.router.RoutePacketConnectionEx(ctx, conn, metadata, onClose)
 }
 
-func (h *Inbound) Start(stage adapter.StartStage) error {
+func (h *Inbound) Start(stage adapter.StartStage, _ *adapter.Scope) error {
 	if stage != adapter.StartStateStart {
 		return nil
 	}

@@ -85,9 +85,9 @@ func NewInbound(ctx context.Context, router adapter.Router, logger log.ContextLo
 			}
 			inbound.fallbackAddrTLSNextProto = fallbackAddrNextProto
 		}
-		fallbackHandler = adapter.NewUpstreamContextHandlerEx(inbound.fallbackConnection, nil)
+		fallbackHandler = adapter.NewUpstreamContextHandler(inbound.fallbackConnection, nil)
 	}
-	service := trojan.NewService[int](adapter.NewUpstreamContextHandlerEx(inbound.newConnection, inbound.newPacketConnection), fallbackHandler, logger)
+	service := trojan.NewService[int](adapter.NewUpstreamContextHandler(inbound.newConnection, inbound.newPacketConnection), fallbackHandler, logger)
 	err := service.UpdateUsers(common.MapIndexed(options.Users, func(index int, it option.TrojanUser) int {
 		return index
 	}), common.Map(options.Users, func(it option.TrojanUser) string {
@@ -117,7 +117,7 @@ func NewInbound(ctx context.Context, router adapter.Router, logger log.ContextLo
 	return inbound, nil
 }
 
-func (h *Inbound) Start(stage adapter.StartStage) error {
+func (h *Inbound) Start(stage adapter.StartStage, _ *adapter.Scope) error {
 	if stage != adapter.StartStateStart {
 		return nil
 	}
@@ -163,6 +163,12 @@ func (h *Inbound) Close() error {
 		h.tlsConfig,
 		h.transport,
 	)
+}
+
+// NewConnection 是 v1.14 的 adapter.ConnectionHandler 接口名；
+// 旧名 NewConnectionEx 仍被 sing-quic 的 ServerHandler 要求，两个都要留。
+func (h *Inbound) NewConnection(ctx context.Context, conn net.Conn, metadata adapter.InboundContext, onClose N.CloseHandlerFunc) {
+	h.NewConnectionEx(ctx, conn, metadata, onClose)
 }
 
 func (h *Inbound) NewConnectionEx(ctx context.Context, conn net.Conn, metadata adapter.InboundContext, onClose N.CloseHandlerFunc) {
@@ -259,7 +265,7 @@ func (h *inboundTransportHandler) NewConnectionEx(ctx context.Context, conn net.
 	metadata.InboundDetour = h.listener.ListenOptions().Detour
 	//nolint:staticcheck
 	h.logger.InfoContext(ctx, "inbound connection from ", metadata.Source)
-	(*Inbound)(h).NewConnectionEx(ctx, conn, metadata, onClose)
+	(*Inbound)(h).NewConnection(ctx, conn, metadata, onClose)
 }
 
 // userName 取用户显示名，越界返回空串（调用方会用索引字符串兜底）。

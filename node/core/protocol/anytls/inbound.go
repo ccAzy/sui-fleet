@@ -79,7 +79,7 @@ func NewInbound(ctx context.Context, router adapter.Router, logger log.ContextLo
 	return inbound, nil
 }
 
-func (h *Inbound) Start(stage adapter.StartStage) error {
+func (h *Inbound) Start(stage adapter.StartStage, _ *adapter.Scope) error {
 	if stage != adapter.StartStateStart {
 		return nil
 	}
@@ -94,6 +94,12 @@ func (h *Inbound) Start(stage adapter.StartStage) error {
 
 func (h *Inbound) Close() error {
 	return common.Close(h.listener, h.tlsConfig)
+}
+
+// NewConnection 是 v1.14 的 adapter.ConnectionHandler 接口名；
+// 旧名 NewConnectionEx 仍被 sing-quic 的 ServerHandler 要求，两个都要留。
+func (h *Inbound) NewConnection(ctx context.Context, conn net.Conn, metadata adapter.InboundContext, onClose N.CloseHandlerFunc) {
+	h.NewConnectionEx(ctx, conn, metadata, onClose)
 }
 
 func (h *Inbound) NewConnectionEx(ctx context.Context, conn net.Conn, metadata adapter.InboundContext, onClose N.CloseHandlerFunc) {

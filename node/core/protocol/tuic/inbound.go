@@ -145,7 +145,7 @@ func (h *Inbound) NewPacketConnectionEx(ctx context.Context, conn N.PacketConn, 
 	h.router.RoutePacketConnectionEx(ctx, conn, metadata, onClose)
 }
 
-func (h *Inbound) Start(stage adapter.StartStage) error {
+func (h *Inbound) Start(stage adapter.StartStage, _ *adapter.Scope) error {
 	if stage != adapter.StartStateStart {
 		return nil
 	}

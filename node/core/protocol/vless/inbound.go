@@ -59,7 +59,7 @@ func NewInbound(ctx context.Context, router adapter.Router, logger log.ContextLo
 		return nil, err
 	}
 	inbound.users.Store(&options.Users)
-	service := vless.NewService[int](logger, adapter.NewUpstreamContextHandlerEx(inbound.newConnectionEx, inbound.newPacketConnectionEx))
+	service := vless.NewService[int](logger, adapter.NewUpstreamContextHandler(inbound.newConnectionEx, inbound.newPacketConnectionEx))
 	service.UpdateUsers(common.MapIndexed(options.Users, func(index int, _ option.VLESSUser) int {
 		return index
 	}), common.Map(options.Users, func(it option.VLESSUser) string {
@@ -99,7 +99,7 @@ func NewInbound(ctx context.Context, router adapter.Router, logger log.ContextLo
 	return inbound, nil
 }
 
-func (h *Inbound) Start(stage adapter.StartStage) error {
+func (h *Inbound) Start(stage adapter.StartStage, _ *adapter.Scope) error {
 	if stage != adapter.StartStateStart {
 		return nil
 	}
@@ -146,6 +146,12 @@ func (h *Inbound) Close() error {
 		h.tlsConfig,
 		h.transport,
 	)
+}
+
+// NewConnection 是 v1.14 的 adapter.ConnectionHandler 接口名；
+// 旧名 NewConnectionEx 仍被 sing-quic 的 ServerHandler 要求，两个都要留。
+func (h *Inbound) NewConnection(ctx context.Context, conn net.Conn, metadata adapter.InboundContext, onClose N.CloseHandlerFunc) {
+	h.NewConnectionEx(ctx, conn, metadata, onClose)
 }
 
 func (h *Inbound) NewConnectionEx(ctx context.Context, conn net.Conn, metadata adapter.InboundContext, onClose N.CloseHandlerFunc) {
@@ -219,7 +225,7 @@ func (h *inboundTransportHandler) NewConnectionEx(ctx context.Context, conn net.
 	metadata.InboundDetour = h.listener.ListenOptions().Detour
 	//nolint:staticcheck
 	h.logger.InfoContext(ctx, "inbound connection from ", metadata.Source)
-	(*Inbound)(h).NewConnectionEx(ctx, conn, metadata, onClose)
+	(*Inbound)(h).NewConnection(ctx, conn, metadata, onClose)
 }
 
 // userName 取用户显示名，越界返回空串（调用方会用索引字符串兜底）。
