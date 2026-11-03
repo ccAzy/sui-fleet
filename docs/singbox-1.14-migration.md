@@ -208,3 +208,47 @@ qemu 运行验证需要先注册 binfmt（shenzhou 已注册）：
 
 **未验证的**：真 arm 硬件上没跑过（只有 qemu）。真机若起不来，先看
 `journalctl -u sui-agent`，常见是 libc/内核版本不匹配。
+
+## 端口跳跃：服务端已实现并单台验证通过
+
+面板侧本来就有：入站编辑的「拨号」(out_json) 能填 `server_ports`，
+`links.ts` 也会生成 `mport=...` 的分享链接。缺的只是服务端 NAT。
+
+新增 `node/core/port_hop.go`（`f243a2e`）：读 `hysteria/hysteria2/tuic` 入站的
+`out_json.server_ports` + `listen_port`，生成独立表 `inet sui_hop` 的 dnat 规则，
+`Core.Start()` 成功后重建（nft 规则不持久化），失败只告警。
+
+### 单台实测（hk）
+
+```text
+INFO - 端口跳跃已生效： 1 条规则（表 inet  sui_hop ）
+
+table inet sui_hop {
+	chain prerouting {
+		type nat hook prerouting priority dstnat; policy accept;
+		udp dport 40000-42000 dnat to :44368
+	}
+}
+```
+
+### ⚠️ 踩到的坑：手工改库必须写 blob，不能写 text
+
+用 JS 把 `out_json` 存成字符串时：
+
+```text
+agent: restart core: sql: Scan error on column index 5, name "out_json":
+unsupported Scan, storing driver.Value type string into type *json.RawMessage
+```
+
+gorm 的 `json.RawMessage` 要求 **blob（[]byte）**，写 text 会让整个内核重启失败
+（当时 hk 真的短暂断流）。改成 `Buffer.from(json)` 即正常。
+
+**结论：不要手工改 s-ui 的库来验证配置 —— 走面板 API（有正确的序列化）。
+手工改还有个副作用：agent 会从面板拉配置覆盖回去。**
+
+### 现状（未启用）
+
+- 代码在 master，单台验证过，但 hk 已**回滚**（`out_json=NULL`），
+  因为 40000-42000 段的安全组/防火墙还没放通 —— 先开口子再启用，否则客户端
+  跳过去就是丢包，比不开更差。
+- 新 agent（75,678,000 B，md5 24a10fd31c65）尚未发布到 `/dl`，其余 9 台仍是旧版。
