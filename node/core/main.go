@@ -93,6 +93,9 @@ func (c *Core) Start(sbConfig []byte) error {
 	router = service.FromContext[adapter.Router](globalCtx)
 
 	c.isRunning = true
+	// 内核起来了再重建端口跳跃规则：nft 规则不持久化，agent 每次启动都要重来一遍。
+	// 失败只告警，不影响已启动的内核（见 port_hop.go 的设计约束）。
+	syncPortHopping()
 	return nil
 }
 

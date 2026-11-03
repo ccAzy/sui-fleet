@@ -196,7 +196,7 @@ qemu 运行验证需要先注册 binfmt（shenzhou 已注册）：
 ### 产物与验证
 
 | 项 | 值 |
-|---|---|
+| --- | --- |
 | 大小 | 70,287,936 B（门禁 ≥70MB 通过） |
 | 架构 | `ELF 64-bit LSB executable, ARM aarch64` |
 | md5 | e497a0446445 |
