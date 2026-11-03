@@ -138,7 +138,7 @@ alias.go:957
 已排除的因素（逐项实测）：
 
 | 变量 | 试过的值 | 结果 |
-|---|---|---|
+| --- | --- | --- |
 | Go 版本 | 宿主 1.27.2 / 容器 golang:1.27.3 / golang:1.27.2 | 同错 |
 | GOEXPERIMENT | 空 / `jsonv2` | 同错 |
 | 模块模式 | `-mod=mod` / `-mod=readonly` | 同错 |
@@ -152,6 +152,7 @@ alias.go:957
 比 arm64 更该先修。
 
 修法（按彻底程度）：
+
 1. `go mod vendor` —— 依赖固化进仓库，clone 即编（体积 +几十 MB，但最可靠）
 2. pin `go-json-experiment/json` 到与 Go 1.27 API 匹配的版本（要验证 sing-box 是否兼容）
 3. 统一工具链镜像 + `-mod=readonly`（治标：换机器仍可能漂）
