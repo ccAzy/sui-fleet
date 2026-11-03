@@ -4,7 +4,13 @@
 <head>
   <meta charset="UTF-8" />
   <link rel="icon" href="assets/favicon.ico" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- viewport-fit=cover：让页面铺到刘海/圆角区域，再靠 env(safe-area-inset-*) 把内容缩回来
+       interactive-widget=resizes-content：安卓软键盘弹起时压缩布局视口，100dvh 和底部输入才跟着让位 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
+  <!-- 状态栏/浏览器工具栏取色必须跟页面顶端一致：明暗各一条，否则深色模式下顶上是白的 -->
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f6f5f1" />
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#121211" />
+  <meta name="color-scheme" content="light dark" />
   <!-- 私有面板：不进搜索引擎。CSP 由 Worker 响应头下发（script-src 'self'） -->
   <meta name="robots" content="noindex, nofollow" />
   <script src="/boot.js"></script>

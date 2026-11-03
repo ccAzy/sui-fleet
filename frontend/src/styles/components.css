@@ -465,6 +465,29 @@
   gap: var(--s2);
 }
 
+/* 窄屏：标题那行必须能折行。
+   实测 390px（iPhone 12）：.page-head 是不换行的 flex，「1 服务器管理」被挤成
+   竖排单字、右侧 4 个按钮宽 494px 直接溢出到屏幕外（父级 overflow 裁掉，
+   连横向滚动都没有 → 按钮根本点不到）。 */
+@media (max-width: 700px) {
+  .page-head {
+    flex-wrap: wrap;
+    align-items: center;
+    row-gap: var(--s2);
+  }
+
+  .page-head .page-head-note {
+    white-space: nowrap;
+  }
+
+  .page-head .page-head-actions {
+    margin-left: 0;
+    width: 100%;
+    flex-wrap: wrap;
+    row-gap: var(--s1);
+  }
+}
+
 /* 账簿行里的次要信息（地址、备注）用同一行铺开 */
 .ledger-meta .sep {
   color: var(--rule-strong);
@@ -533,18 +556,23 @@
   letter-spacing: 0;
 }
 
-.toolbar-ghost:hover {
-  color: var(--ink);
-  background: var(--accent-soft);
+/* 触屏没有 hover：不加门禁的话，点一下按钮 :hover 会「粘住」直到点别处 */
+@media (hover: hover) and (pointer: fine) {
+  .toolbar-ghost:hover {
+    color: var(--ink);
+    background: var(--accent-soft);
+  }
 }
 
 .toolbar-danger {
   color: var(--error);
 }
 
-.toolbar-danger:hover {
-  color: var(--error);
-  background: var(--error-soft);
+@media (hover: hover) and (pointer: fine) {
+  .toolbar-danger:hover {
+    color: var(--error);
+    background: var(--error-soft);
+  }
 }
 
 /* 名录行内被赋予 role="button" 的图标：<i> 默认没有指针光标，

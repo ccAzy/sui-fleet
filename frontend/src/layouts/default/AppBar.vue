@@ -338,8 +338,10 @@ const changeTheme = (m: ThemeMode) => {
   cursor: pointer;
   transition: color 0.15s ease, border-color 0.15s ease;
 }
-.node-sort__btn:hover {
-  color: rgba(var(--v-theme-on-surface), 0.8);
+@media (hover: hover) and (pointer: fine) {
+  .node-sort__btn:hover {
+    color: rgba(var(--v-theme-on-surface), 0.8);
+  }
 }
 .node-sort__btn.is-on {
   color: rgb(var(--v-theme-on-surface));
@@ -409,9 +411,15 @@ const changeTheme = (m: ThemeMode) => {
   opacity: 0;
   transition: opacity 0.15s ease;
 }
-.node-row:hover .node-grip,
+/* focus-visible 不门禁：键盘用户也要看到把手 */
 .node-row:focus-visible .node-grip {
   opacity: 0.45;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .node-row:hover .node-grip {
+    opacity: 0.45;
+  }
 }
 /* 触屏设备没有 hover：把手必须常显，否则手机上永远看不到、也就无法拖动排序。 */
 @media (hover: none) {

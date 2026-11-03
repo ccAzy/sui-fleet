@@ -181,7 +181,7 @@ const changeLocale = async (l: string) => {
 <style scoped>
 /* 扉页：不要卡片框，直接排版在纸面上 */
 .login-page {
-  min-height: 100vh;
+  min-height: 100svh;   /* 不用 100vh：手机上 100vh 是地址栏收起后的高度，会被裁 */
   display: grid;
   place-items: center;
   padding: 48px 24px;

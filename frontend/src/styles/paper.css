@@ -90,6 +90,70 @@ body,
   text-rendering: optimizeLegibility;
 }
 
+/* ---------- 移动端基线（照着「像原生」那套平台层一条条补） ----------
+ * 这台面板平时在电脑上用，但手机上要能用：侧栏会收成抽屉、表格会切 mobile 卡。
+ * 平台层的默认行为不改的话，手机上会有一串「这明显是个网页」的破绽。 */
+html {
+  /* 点按时的灰色高亮方块：最响的「这是网页」信号，且会盖掉我们自己设计的按压反馈 */
+  -webkit-tap-highlight-color: transparent;
+  /* 横屏时浏览器别自己放大字号 */
+  -webkit-text-size-adjust: 100%;
+  /* 滚到顶部的下拉刷新会劫持手势：面板有自己的滚动容器，不要整页回弹 */
+  overscroll-behavior: none;
+}
+
+/* iOS Safari 聚焦字号 < 16px 的输入框会强制放大页面，而且退出焦点也不缩回来。
+   正确解法是把输入字号提到 16px，而不是用 maximum-scale=1 禁掉缩放（那是无障碍事故）。 */
+@media (pointer: coarse) {
+  input,
+  textarea,
+  select,
+  .v-field__input {
+    font-size: 16px !important;
+  }
+}
+
+/* 控件文字可选中是内容，按钮文字不是：长按不该弹出选择/复制菜单 */
+button,
+a,
+[role='button'],
+.v-btn,
+.v-tab,
+.v-list-item,
+.chip,
+.ledger-actions {
+  touch-action: manipulation; /* 告诉浏览器「这里不会双击缩放」，点击立即生效，没有 300ms 延迟 */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* 上面把系统的点按高亮关掉了，就得补自己的按压反馈：
+   原生按钮在手指落下那一刻就响应，等 click（手指抬起）才变形读起来就是卡。 */
+.v-btn,
+.toolbar-ghost,
+.toolbar-danger,
+button,
+[role='button'] {
+  transition: background-color 120ms cubic-bezier(0.16, 1, 0.3, 1),
+    color 120ms cubic-bezier(0.16, 1, 0.3, 1), transform 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.v-btn:active,
+button:active,
+[role='button']:active {
+  transform: scale(0.98);
+}
+
+/* 刘海/圆角/Home 指示条：顶栏与底部内容要躲开安全区，否则会被切掉 */
+.v-app-bar {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.v-main,
+.v-navigation-drawer {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
 /* 纸面质感：极淡的一层纹理，避免大片纯色显得空洞（不引图，纯 CSS） */
 .v-application::before {
   content: "";
@@ -433,8 +497,10 @@ body .v-overlay__content.v-tooltip {
   transition: background-color 160ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.ledger-row:hover {
-  background: var(--accent-soft);
+@media (hover: hover) and (pointer: fine) {
+  .ledger-row:hover {
+    background: var(--accent-soft);
+  }
 }
 
 .ledger-row.is-lead {
@@ -517,9 +583,15 @@ body .v-overlay__content.v-tooltip {
   transition: opacity 140ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.ledger-row:hover .ledger-actions,
+/* focus-within 不门禁：键盘 Tab 进来也要露出操作按钮 */
 .ledger-row:focus-within .ledger-actions {
   opacity: 1;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ledger-row:hover .ledger-actions {
+    opacity: 1;
+  }
 }
 
 .ledger-section-title {
