@@ -280,6 +280,13 @@ iptables(ip nat) 都挂 prerouting/dstnat，**谁先命中取决于内核注册�
 `clients.links[].uri`（`objects` 表里存好的字符串），而那是上次 `recomputeLinks()`
 （`panel/src/objects.ts:154`，由 `api-write.ts:82` 在保存客户端时触发）生成的旧值。
 
-**结论：改 inbound 的拨号参数后，必须重算 client links，否则订阅不会变。**
-本次用脚本直接补齐存量 uri；今后客户端再保存时会走 `genLinks` 自动带上 mport。
-**这是面板的一个设计缺陷（inbound 变更不会触发 link 重算），值得在上游修。**
+**更正：这不是面板缺陷。** `objects.ts:428` 的 `saveObject()` 在保存 `inbounds` /
+`clients` / `tls` 之后会自动 `await recomputeLinks(...)` —— 走 UI 保存的话订阅会立刻更新。
+
+出现"改了没变"是因为**用脚本直接改库，绕过了 `saveObject`**，自然没有重算。
+所以：脚本改库（运维手段）必须自己补一次重算；正常从界面改不受影响。
+
+另外实测 `genLinks()` 是**对的**：传入 `out_json.server_ports = ["40000:42000"]`
+时它输出 `mport=40000:42000`（完整范围）。我曾经因为它只显示 `mport=40000`
+误判成截断 bug —— 实际是我 `slice(0,170)` 把调试输出截短了。**调试输出不要截断
+被验证的字段。**
