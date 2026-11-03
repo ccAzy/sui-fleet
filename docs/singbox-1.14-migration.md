@@ -160,3 +160,51 @@ alias.go:957
 arm64 本身不是问题：`scripts/build-wsl.sh` 里早就有 `GOARCH=arm64 CC=aarch64-linux-gnu-gcc`
 分支，qemu binfmt 也已在 shenzhou 注册好（`docker run --platform linux/arm64` 能跑 aarch64）。
 构建一旦可复现，arm64 只是加一行 GOARCH。
+
+## arm64 适配：完成（2026-11）
+
+**根因不是架构，是 Go 版本。** `go-json-experiment/json@v0.0.0-20250813024750`
+用的是 Go **1.26** 的 `encoding/json/v2` 实验 API（`SkipFunc`、
+`DiscardUnknownMembers`），**Go 1.27 把它们移除了** —— 所以同一份源码在
+Go 1.27.2 上 amd64 也编不过（和架构无关）。
+
+> 这个约束其实早就写在 `scripts/build-wsl.sh` 里了：
+> “go.mod 要求 go 1.26.5；用 1.27 编译会在 go-json-experiment/json 上炸”。
+> 这次因为没先读构建脚本，绕了一大圈才发现。**下次改构建先读脚本。**
+
+### 构建方法（arm64）
+
+宿主 Go 用 1.26.5，交叉编译器由容器提供（shenzhou 上没有 aarch64 gcc）：
+
+```bash
+docker run --rm --network host \
+  -v "$PWD/node":/src -w /src \
+  -v "$HOME/.local/go1265":/opt/hostgo:ro \
+  -v "$HOME/go/pkg/mod":/gomod \
+  -e GOMODCACHE=/gomod -e GOFLAGS=-mod=mod -e GOTOOLCHAIN=local \
+  -e GOPROXY=https://mirrors.aliyun.com/goproxy/,direct \
+  golang:1.27.2 bash -c 'apt-get install -y gcc-aarch64-linux-gnu
+    export PATH=/opt/hostgo/bin:$PATH
+    CGO_ENABLED=1 GOOS=linux GOARCH=arm64 CC=aarch64-linux-gnu-gcc \
+      go build -tags "with_quic,with_grpc,with_utls,with_acme,with_gvisor,badlinkname,tfogo_checklinkname0,with_tailscale" \
+      -ldflags "-w -s -checklinkname=0" -o /src/sui-agent-arm64 .'
+```
+
+qemu 运行验证需要先注册 binfmt（shenzhou 已注册）：
+`docker run --privileged --rm tonistiigi/binfmt --install arm64`
+
+### 产物与验证
+
+| 项 | 值 |
+|---|---|
+| 大小 | 70,287,936 B（门禁 ≥70MB 通过） |
+| 架构 | `ELF 64-bit LSB executable, ARM aarch64` |
+| md5 | e497a0446445 |
+| 符号门禁 | tailscale 68 处、uTLS 6 处 |
+| qemu 实跑 | `S-UI Panel 1.4.2 / Sing-Box v1.13.18` |
+| 发布 | `/dl/sui-agent-linux-arm64`（完整包）+ 3 分片 + `.parts` + `.sha256`（1a3956cc…） |
+
+`install.sh` 已撤掉「暂不支持 ARM64」的拦截，arm64 机器现在走正常安装路径。
+
+**未验证的**：真 arm 硬件上没跑过（只有 qemu）。真机若起不来，先看
+`journalctl -u sui-agent`，常见是 libc/内核版本不匹配。
