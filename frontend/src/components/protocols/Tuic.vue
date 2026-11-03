@@ -40,15 +40,6 @@
     <v-row>
       <v-col cols="12" sm="6" md="4" v-if="direction == 'in'">
         <v-text-field
-          :label="$t('in.portHop')"
-          :hint="$t('in.portHopHint')"
-          placeholder="43000:45000"
-          persistent-hint
-          v-model="hopPorts">
-        </v-text-field>
-      </v-col>
-      <v-col cols="12" sm="6" md="4" v-if="direction == 'in'">
-        <v-text-field
         :label="$t('types.tuic.authTimeout')"
         hide-details
         type="number"
@@ -84,32 +75,6 @@ export default {
     }
   },
   computed: {
-
-    hopPorts: {
-
-      get(): string {
-
-        const sp = this.$props.data.out_json?.server_ports
-
-        return Array.isArray(sp) ? sp.join(',') : (typeof sp === 'string' ? sp : '')
-
-      },
-
-      set(v: string) {
-
-        const d = this.$props.data
-
-        if (!d.out_json) d.out_json = {}
-
-        const t = (v ?? '').trim()
-
-        if (t) d.out_json.server_ports = [t]
-
-        else delete d.out_json.server_ports
-
-      }
-
-    },
     auth_timeout: {
       get() { return this.$props.data.auth_timeout ? parseInt(this.$props.data.auth_timeout.replace('s','')) : '' },
       set(newValue:number) { this.$props.data.auth_timeout = newValue ? newValue + 's' : '' }
