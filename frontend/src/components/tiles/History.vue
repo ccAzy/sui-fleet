@@ -15,6 +15,7 @@ import {
   Filler,
 } from 'chart.js'
 import { HumanReadable } from '@/plugins/utils'
+import { chartInk, chartGrid } from '@/plugins/chartTheme'
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -125,6 +126,16 @@ export default {
   },
   computed: {
     options() {
+      // 主题变了要重算：Chart.js 的刻度和网格颜色来自这里的对象。
+      // 之前没设置 tick 颜色，Chart.js 用默认 #666 —— 在深色纸面 #121211 上只有 3.0:1。
+      const dark = this.$vuetify.theme.current.dark
+      for (const o of [this.options1, this.optionsNet] as any[]) {
+        const y = o?.scales?.y
+        if (y?.ticks) y.ticks.color = chartInk(dark)
+        if (y?.grid) y.grid.color = chartGrid(dark)
+        const x = o?.scales?.x
+        if (x?.ticks) x.ticks.color = chartInk(dark)
+      }
       switch (this.$props.type){
         case "h-net":
           this.optionsNet.scales.y.ticks.callback = (label:any, index: number) => {

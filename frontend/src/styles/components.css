@@ -90,12 +90,14 @@
   height: 6px;
   margin-right: 8px;
   border-radius: 50%;
-  background: #30d158;
+  /* 走 --ok：原来写死 #30d158，深色下虽然亮但和 --ok 的深绿语义色不一致；
+     统一后两种主题都由 token 决定。 */
+  background: var(--ok);
   vertical-align: 1px;
 }
 
 .server-switch--remote .server-dot {
-  background: #ffd60a;
+  background: var(--warn);
 }
 
 /* 首页快捷动作：一排等距的轻量按钮，不再用行内 margin 拼 */

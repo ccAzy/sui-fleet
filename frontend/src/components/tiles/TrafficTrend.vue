@@ -51,6 +51,8 @@
     Tooltip,
   } from 'chart.js'
   import HttpUtils from '@/plugins/httputil'
+  import { useTheme } from 'vuetify'
+  import { chartInk, chartGrid } from '@/plugins/chartTheme'
 
   ChartJS.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip)
 
@@ -75,6 +77,8 @@
   }
 
   // 把字节数压到 0-100 的纵轴，轴标签再换算回人类单位
+  const theme = useTheme()
+  const dark = computed(() => theme.current.value.dark)
   const scale = computed(() => {
     const max = Math.max(1, ...bars.value.map((b) => (b.up || 0) + (b.down || 0)))
     return { max, factor: max / 100 }
@@ -116,16 +120,16 @@
       },
     },
     scales: {
-      x: { stacked: true, grid: { display: false }, ticks: { color: '#8a8a8a', font: { size: 10 } } },
+      x: { stacked: true, grid: { display: false }, ticks: { color: chartInk(dark.value), font: { size: 10 } } },
       y: {
         stacked: true,
         beginAtZero: true,
         max: 100,
-        grid: { color: 'rgba(0,0,0,0.06)', drawTicks: false },
+        grid: { color: chartGrid(dark.value), drawTicks: false },
         border: { display: false },
         ticks: {
           stepSize: 25,
-          color: '#8a8a8a',
+          color: chartInk(dark.value),
           font: { size: 10 },
           callback: (v: any) => hz(Number(v) * scale.value.factor),
         },

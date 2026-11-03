@@ -38,6 +38,7 @@
 <script lang="ts">
 import { i18n } from '@/locales'
 import HttpUtils from '@/plugins/httputil'
+import { chartInk, chartGrid } from '@/plugins/chartTheme'
 import { HumanReadable } from '@/plugins/utils'
 import {
   Chart as ChartJS,
@@ -112,9 +113,7 @@ export default {
         },
         scales: {
           y: {
-            grid: {
-              color: '#777777',
-            },
+            grid: {},
             beginAtZero: true,
             ticks: {
               callback: (label:any, index: number) => label == 0 ? 0 : HumanReadable.sizeFormat(label,0),
@@ -125,6 +124,16 @@ export default {
       },
       usage: ref(<any>{}),
     }
+  },
+  created() {
+    // Chart.js 画在 canvas 上，读不到 CSS 变量，只能在这里按主题刷一遍。
+    // 原来写死 #777777：浅色纸面上只有 4.10:1（低于 AA），深色下偏亮但语义不对。
+    const dark = this.$vuetify.theme.current.dark
+    const opts = this.options as any
+    const grid = opts?.scales?.y?.grid
+    if (grid) grid.color = chartGrid(dark)
+    const ticks = opts?.scales?.y?.ticks
+    if (ticks) ticks.color = chartInk(dark)
   },
   methods: {
     async loadData() {

@@ -362,7 +362,9 @@ const changeTheme = (m: ThemeMode) => {
   background: rgba(var(--v-theme-on-surface), 0.25);
 }
 .node-dot.is-on {
-  background: #2e7d32;
+  /* 走 --ok token：深色主题下 #2e7d32 在 #121211 上几乎看不出（对比度 2.1:1），
+     而 --ok 在浅色是 #2f6b4f、深色是 #86c2a1，两边都够。 */
+  background: var(--ok);
 }
 .node-name {
   font-size: 14px;
@@ -409,5 +411,11 @@ const changeTheme = (m: ThemeMode) => {
 .node-row:hover .node-grip,
 .node-row:focus-visible .node-grip {
   opacity: 0.45;
+}
+/* 触屏设备没有 hover：把手必须常显，否则手机上永远看不到、也就无法拖动排序。 */
+@media (hover: none) {
+  .node-grip {
+    opacity: 0.45;
+  }
 }
 </style>
