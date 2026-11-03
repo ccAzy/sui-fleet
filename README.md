@@ -250,6 +250,26 @@ SUI_DB=./data/sui.db SUI_DIST=../../panel/frontend-dist \
 
 TLS：`apps/selfhost/scripts/enable-tls.sh` 装一个单文件 Caddy 反代到 8788；Cloudflare 后面用 Origin Certificate（zone 是 strict 时自签会被拒）。
 
+### 代码备份（唯一一份提交历史 = 单点故障）
+
+GitHub 账号不可用时，提交历史只剩本地一个磁盘。留一份异地裸库，一条命令就能推：
+
+```bash
+# 首次：在任一台自己的机器上建裸库
+ssh -p 6688 root@<host> 'mkdir -p /opt/git && git init --bare /opt/git/sui-cf.git'
+git remote add offsite ssh://root@<host>:6688/opt/git/sui-cf.git
+
+# 每次收工后
+git push offsite --all && git push offsite --tags
+```
+
+校验（不要只看 push 成功）：
+
+```bash
+git ls-remote offsite | head -1   # 远端 HEAD 应等于本地 git rev-parse HEAD
+git clone ssh://root@<host>:6688/opt/git/sui-cf.git /tmp/chk && git -C /tmp/chk rev-list --count HEAD
+```
+
 ## 审计与修复记录
 
 `docs/audit-fixes-2026-11-01.md` 记录了两轮独立只读审计指出问题的逐条修复：现象、根因、改法、
