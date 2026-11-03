@@ -121,3 +121,41 @@ sendbox 自定义）重贴回去。
 
 另外按技能 P0-2/P0-3，节点侧还缺状态文件与锁（并发点两次"更新"会出问题）。
 这两项要在真正启用自动更新之前做完。
+
+## 意外发现：构建不可复现（比 arm64 更基础）
+
+做 arm64 适配时撞上的，与架构无关：
+
+同一份 **master 源码**、同一个 go.mod/go.sum，在 shenzhou 上 **amd64 也编不过**：
+
+```text
+github.com/go-json-experiment/json@v0.0.0-20250813024750-ebf49471dced/alias.go:618
+  undefined: json.SkipFunc
+alias.go:957
+  undefined: json.DiscardUnknownMembers
+```
+
+已排除的因素（逐项实测）：
+
+| 变量 | 试过的值 | 结果 |
+|---|---|---|
+| Go 版本 | 宿主 1.27.2 / 容器 golang:1.27.3 / golang:1.27.2 | 同错 |
+| GOEXPERIMENT | 空 / `jsonv2` | 同错 |
+| 模块模式 | `-mod=mod` / `-mod=readonly` | 同错 |
+| 架构 | amd64 / arm64 | 同错 |
+
+结论：`go-json-experiment/json` 这个版本要求比 Go 1.27 更新的标准库实验 API。
+线上那份 75,698,488 B 的二进制是 11-02 在**另一个缓存环境**里编出来的 ——
+说明 `go.sum` 没能真正锁住依赖树，`-mod=mod` 在不同机器上会解析到不同版本。
+
+影响：开源后别人 clone 大概率也编不出来。这是"别人达不到同样水准"最硬的障碍，
+比 arm64 更该先修。
+
+修法（按彻底程度）：
+1. `go mod vendor` —— 依赖固化进仓库，clone 即编（体积 +几十 MB，但最可靠）
+2. pin `go-json-experiment/json` 到与 Go 1.27 API 匹配的版本（要验证 sing-box 是否兼容）
+3. 统一工具链镜像 + `-mod=readonly`（治标：换机器仍可能漂）
+
+arm64 本身不是问题：`scripts/build-wsl.sh` 里早就有 `GOARCH=arm64 CC=aarch64-linux-gnu-gcc`
+分支，qemu binfmt 也已在 shenzhou 注册好（`docker run --platform linux/arm64` 能跑 aarch64）。
+构建一旦可复现，arm64 只是加一行 GOARCH。
