@@ -224,10 +224,10 @@ qemu 运行验证需要先注册 binfmt（shenzhou 已注册）：
 INFO - 端口跳跃已生效： 1 条规则（表 inet  sui_hop ）
 
 table inet sui_hop {
-	chain prerouting {
-		type nat hook prerouting priority dstnat; policy accept;
-		udp dport 40000-42000 dnat to :44368
-	}
+ chain prerouting {
+  type nat hook prerouting priority dstnat; policy accept;
+  udp dport 40000-42000 dnat to :44368
+ }
 }
 ```
 
@@ -248,7 +248,38 @@ gorm 的 `json.RawMessage` 要求 **blob（[]byte）**，写 text 会让整个�
 
 ### 现状（未启用）
 
-- 代码在 master，单台验证过，但 hk 已**回滚**（`out_json=NULL`），
++ 代码在 master，单台验证过，但 hk 已**回滚**（`out_json=NULL`），
   因为 40000-42000 段的安全组/防火墙还没放通 —— 先开口子再启用，否则客户端
   跳过去就是丢包，比不开更差。
-- 新 agent（75,678,000 B，md5 24a10fd31c65）尚未发布到 `/dl`，其余 9 台仍是旧版。
++ 新 agent（75,678,000 B，md5 24a10fd31c65）尚未发布到 `/dl`，其余 9 台仍是旧版。
+
+## 端口跳跃：全量上线完成（10 台）
+
+### 改用 iptables（不是 nft）
+
+最初用 nft `inet sui_hop`，但节点上早就有历史 dnat 规则（我们自己早期脚本配的，
+持久化在 `/etc/iptables/rules.v4`，`netfilter-persistent` 开机恢复）。nft(inet) 与
+iptables(ip nat) 都挂 prerouting/dstnat，**谁先命中取决于内核注册顺序、不可控** →
+会出现「面板改了端口但实际走老规则」。统一到 iptables，并把 `SUI_HOP` 用
+`-I PREROUTING 1` 插到第 1 位，顺序才确定（顺带消除 vn 上「同一段两条 dnat」的歧义，
+不必删历史规则）。
+
+### 实测结果
+
+| 项 | 结果 |
+| --- | --- |
+| 10 台 agent | 全部 `active` + `sing-box started`，旧二进制备份 `sui-agent.old2` |
+| 规则 | 10/10 台 `dnat=2`（hysteria2 `40000:42000`、tuic `43000:45000`）、`PREROUTING` 第 1 位 |
+| **外部发包实测** | 从本机向 hk 40001/40099/43001/44999 发 UDP → 两条规则 `pkts` 各 0→2、字节 120/2=60（32 payload+28 头）完全对上 |
+| 持久化 | `netfilter-persistent save` → `/etc/iptables/rules.v4` 3 行 |
+| 订阅链接 | `/sub/all` 里 **10 条** hysteria2 链接全部带 `mport=40000%3A42000` |
+
+### ⚠️ 踩到的第二个坑：订阅返回的是「存下来的 uri」，不是实时生成
+
+改完 inbound 的 `out_json.server_ports` 后订阅**毫无变化**。根因：`/sub/*` 直接吐出
+`clients.links[].uri`（`objects` 表里存好的字符串），而那是上次 `recomputeLinks()`
+（`panel/src/objects.ts:154`，由 `api-write.ts:82` 在保存客户端时触发）生成的旧值。
+
+**结论：改 inbound 的拨号参数后，必须重算 client links，否则订阅不会变。**
+本次用脚本直接补齐存量 uri；今后客户端再保存时会走 `genLinks` 自动带上 mport。
+**这是面板的一个设计缺陷（inbound 变更不会触发 link 重算），值得在上游修。**
