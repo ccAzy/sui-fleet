@@ -611,3 +611,30 @@
   font-size: var(--fs-xs);
   color: var(--ink-3);
 }
+
+/* ---------------------------------------------------------------------------
+ * 侧栏菜单可读性（2026-11 用户实测「字是糊的」）
+ *
+ * 量出来的两件事，都不是颜色问题：
+ *   1. .v-list-item-title 的实际字号是 **10.56px**（Vuetify 在 rail 展开态用
+ *      text-body-2 压到 0.875rem 再乘 0.75 的结果）。Windows 1x 屏上 11px 以下的
+ *      中文必然发虚 —— 这才是「糊」的主因。
+ *   2. 全局 -webkit-font-smoothing: antialiased 会关掉 ClearType 亚像素渲染，
+ *      等于在全站文字上再糊一层。Vuetify 自己的样式里也带这条，必须显式改回 auto。
+ * ------------------------------------------------------------------------- */
+.v-navigation-drawer .v-list-item-title {
+  font-size: 13px;
+  letter-spacing: 0;
+}
+
+.v-navigation-drawer .v-list-item {
+  /* 字号上来后行高要跟着给，否则字挤在一起又显得糊 */
+  min-height: 40px;
+}
+
+html,
+body,
+.v-application {
+  -webkit-font-smoothing: auto;
+  -moz-osx-font-smoothing: auto;
+}
