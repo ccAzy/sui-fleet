@@ -109,6 +109,43 @@ html[data-wallpaper='on'] .page-shell {
   border-radius: 0;
 }
 
+/* ---------- 浮层式 chrome 必须有不透明度 ----------
+ * 侧栏有两种形态：桌面常驻（rail，56px，给 v-main 让出 padding，**不与内容重叠**）
+ * 和窄屏/抽屉（`--mobile` / `--temporary`，**盖在内容上面**）。
+ * 后者如果也全透明，主页文字就会和菜单文字叠在一起 —— 实测 1000px 宽时
+ * 抽屉的 background 是 rgba(0,0,0,0)，两套文字直接压在一起。
+ * 所以：常驻侧栏保持透明（图标浮在壁纸上），浮层侧栏与顶栏改成磨砂纸 + 深墨。 */
+html[data-wallpaper='on'] .v-navigation-drawer--mobile,
+html[data-wallpaper='on'] .v-navigation-drawer--temporary {
+  background: color-mix(in srgb, var(--surface) 94%, transparent) !important;
+  /* 上面的"面板全透明"块用了 !important，这里必须也带 !important 才压得回来 */
+  backdrop-filter: blur(20px) saturate(1.05) !important;
+  /* 纸面上必须是深墨：壁纸模式全局把墨翻白了，这里要翻回来 */
+  --ink: #1a1a19;
+  --ink-2: #57564f;
+  --ink-3: #6b6961;
+  --rule: #dcdad3;
+  --rule-strong: #c3c0b6;
+  --accent: #2c4a6e;
+  --ok: #2f6b4f;
+  --error: #a63a2e;
+  --warn: #8a6a1f;
+  --v-theme-on-surface: 26, 26, 25;
+  text-shadow: none;
+}
+
+/* 顶栏同理：它是 fixed，页面滚动时内容会从它下面穿过。
+   不做遮挡就会出现"标题和正文糊在一起"。磨砂纸 74% + 深墨，壁纸仍然透得出来。 */
+html[data-wallpaper='on'] .v-app-bar {
+  background: color-mix(in srgb, var(--paper) 74%, transparent) !important;
+  backdrop-filter: blur(18px) saturate(1.05) !important;
+  --ink: #1a1a19;
+  --ink-2: #57564f;
+  --ink-3: #6b6961;
+  --v-theme-on-surface: 26, 26, 25;
+  text-shadow: none;
+}
+
 /* 浮层（弹窗、菜单）仍然要实心：它们盖在内容上，透过去就没边了 */
 html[data-wallpaper='on'] .v-overlay .v-card,
 html[data-wallpaper='on'] .v-overlay .v-sheet,
