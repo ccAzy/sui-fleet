@@ -1,3 +1,142 @@
+---
+version: alpha
+name: s-ui Cloud 账簿
+description: 纸面、墨、一条细线分层的工作账簿。颜色只做三件事：分层、标记选中（墨靛）、标记异常（朱红）。双主题是同一套 token 的明暗两版。
+colors:
+  primary: "#1a1a19"
+  secondary: "#57564f"
+  tertiary: "#2c4a6e"
+  neutral: "#f6f5f1"
+  paper: "#f6f5f1"
+  surface: "#fffefb"
+  surface-2: "#eeede8"
+  ink: "#1a1a19"
+  ink-2: "#57564f"
+  ink-3: "#6b6961"
+  rule: "#dcdad3"
+  rule-strong: "#c3c0b6"
+  accent: "#2c4a6e"
+  error: "#a63a2e"
+  ok: "#2f6b4f"
+  warn: "#8a6a1f"
+typography:
+  display:
+    fontFamily: "Source Han Serif SC"
+    fontSize: 26px
+    fontWeight: 600
+    lineHeight: 1.25
+  heading:
+    fontFamily: "Source Han Serif SC"
+    fontSize: 19px
+    fontWeight: 600
+    lineHeight: 1.3
+  body:
+    fontFamily: "Segoe UI Variable Text"
+    fontSize: 13px
+    fontWeight: 400
+    lineHeight: 1.55
+  label:
+    fontFamily: "Segoe UI Variable Text"
+    fontSize: 12px
+    fontWeight: 400
+    lineHeight: 1.4
+  micro:
+    fontFamily: "Segoe UI Variable Text"
+    fontSize: 11px
+    fontWeight: 400
+    lineHeight: 1.4
+  data:
+    fontFamily: "Cascadia Mono"
+    fontSize: 13px
+    fontWeight: 400
+    lineHeight: 1.5
+    fontFeature: "tnum"
+rounded:
+  sm: 2px
+  md: 2px
+  lg: 2px
+spacing:
+  s1: 4px
+  s2: 8px
+  s3: 12px
+  s4: 16px
+  s6: 24px
+  s8: 32px
+  s12: 48px
+components:
+  button-primary:
+    backgroundColor: "{colors.accent}"
+    textColor: "{colors.surface}"
+    typography: "{typography.body}"
+    rounded: "{rounded.sm}"
+    padding: 8px
+    height: 32px
+  button-ghost:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.ink-2}"
+    typography: "{typography.body}"
+    rounded: "{rounded.sm}"
+    padding: 8px
+    height: 32px
+  field:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.ink}"
+    typography: "{typography.body}"
+    rounded: "{rounded.sm}"
+    height: 40px
+  rule-divider:
+    backgroundColor: "{colors.rule}"
+    size: 1px
+  ledger-row:
+    backgroundColor: "{colors.paper}"
+    textColor: "{colors.ink}"
+    typography: "{typography.body}"
+    padding: 9px
+  ledger-row-hover:
+    backgroundColor: "{colors.surface-2}"
+    textColor: "{colors.ink}"
+  ledger-mark:
+    backgroundColor: "{colors.ok}"
+    size: 6px
+  ledger-mark-down:
+    backgroundColor: "{colors.paper}"
+    size: 6px
+  ledger-meta:
+    backgroundColor: "{colors.paper}"
+    textColor: "{colors.ink-2}"
+    typography: "{typography.data}"
+  ledger-state:
+    backgroundColor: "{colors.paper}"
+    textColor: "{colors.ink-3}"
+    typography: "{typography.micro}"
+  alert-error:
+    backgroundColor: "{colors.paper}"
+    textColor: "{colors.error}"
+    typography: "{typography.label}"
+  alert-ok:
+    backgroundColor: "{colors.paper}"
+    textColor: "{colors.ok}"
+    typography: "{typography.label}"
+  alert-warn:
+    backgroundColor: "{colors.paper}"
+    textColor: "{colors.warn}"
+    typography: "{typography.label}"
+  panel-title:
+    backgroundColor: "{colors.paper}"
+    textColor: "{colors.ink}"
+    typography: "{typography.heading}"
+  placeholder:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.ink-3}"
+    typography: "{typography.label}"
+  page-background:
+    backgroundColor: "{colors.neutral}"
+    textColor: "{colors.ink}"
+  section-divider:
+    backgroundColor: "{colors.rule-strong}"
+    size: 1px
+---
+
 # DESIGN.md — s-ui Cloud
 
 > 从已建成的实现反写的视觉系统，不是预先设定的规则书。改动界面时以本文件为准。
@@ -21,7 +160,7 @@
 | `--surface-2` | `#eeede8` | `#101010` | 侧栏、工具栏（第二层中性） |
 | `--ink` | `#1a1a19` | `#e9e7e1` | 正文（15.2:1） |
 | `--ink-2` | `#57564f` | `#a8a59c` | 说明文字（7.4:1） |
-| `--ink-3` | `#6b6961` | `#7e7b73` | 占位、三级（4.6:1，AA 下限） |
+| `--ink-3` | `#6b6961` | `#908d84` | 占位、三级（浅 5.45:1 / 深 5.30:1） |
 | `--rule` | `#dcdad3` | `#2b2b29` | 1px 分隔线 |
 | `--rule-strong` | `#c3c0b6` | `#3d3d3a` | 需要更明确的分界 |
 | `--accent` | `#2c4a6e` | `#8fb2da` | 主操作、当前选中、链接 |
@@ -51,12 +190,12 @@
 
 `.ledger` / `.ledger-row`（`styles/paper.css`）是全站最有辨识度的结构，用于所有「同类对象列表」（入站、节点、用户、规则）：
 
-```
+```text
 ◦ vless-reality-46250     :46250 · vless · TLS · 1 用户
 ◦ hysteria2-50381         :50381 · hysteria2 · TLS · 1 用户
 ```
 
-四列固定：状态墨点（14px）、名称（衬线）、参数（等宽数字 + `·` 分隔）、状态文字。行高 36–40px，1px 细线分隔，hover 时整行染 `--accent-soft`，操作按钮默认透明、hover 才出现（账目不需要满屏图标）。
+四列固定：状态列（轨道 14px，墨点本体 6px）、名称（衬线）、参数（等宽数字 + `·` 分隔）、状态文字。行高 36–40px，1px 细线分隔，hover 时整行染 `--accent-soft`，操作按钮默认透明、hover 才出现（账目不需要满屏图标）。
 
 状态不靠颜色单独传达：实心墨点 = 在线，空心 = 离线，另配文字。
 
