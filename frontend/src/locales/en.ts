@@ -427,7 +427,7 @@ export default {
       "glass": "Translucent panels",
       "glassWarn": "Glass fights the ledger look; off by default",
       "structure": "Layout",
-      "structureHint": "The photo fills a full-height window on the right; the ledger is a sheet on the left (a top band on narrow screens)",
+      "structureHint": "Photo is the screen and panels are transparent; this faint wash only keeps 13px text readable on bright areas",
       "clear": "Remove wallpaper",
       "loadFailed": "Could not read that image — try another or use a URL"
     },

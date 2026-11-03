@@ -4,8 +4,18 @@
 //   #777777 只有 4.10:1；而 rgba(0,0,0,.06) 的网格线在深色主题下几乎不可见
 // 所以统一走这里，值与 paper.css 的 --ink-3 / --rule 对齐：
 //   浅色 --ink-3 #6b6961（5.04:1）  深色 --ink-3 #908d84（5.65:1）
-export const chartInk = (dark: boolean): string => (dark ? "#908d84" : "#6b6961");
+/** 开了壁纸时，文字/坐标改走"白字 + 暗投影"那一套（canvas 里拿不到 CSS token，只能在这里判）。 */
+const wallpaperOn = (): boolean =>
+  typeof document !== "undefined" &&
+  document.documentElement.getAttribute("data-wallpaper") === "on";
+
+export const chartInk = (dark: boolean): string =>
+  wallpaperOn() ? "rgba(255,255,255,0.92)" : dark ? "#908d84" : "#6b6961";
 
 // 网格线：浅色用黑 6%，深色必须用白（黑在 #121211 上看不见）
 export const chartGrid = (dark: boolean): string =>
-  dark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.06)";
+  wallpaperOn()
+    ? "rgba(255,255,255,0.18)"
+    : dark
+      ? "rgba(255,255,255,0.10)"
+      : "rgba(0,0,0,0.06)";

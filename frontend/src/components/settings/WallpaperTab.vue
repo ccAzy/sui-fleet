@@ -74,13 +74,16 @@
       </div>
     </div>
 
-    <!-- 模糊 / 遮罩浓度 / 纸张通透度 / 玻璃档 四个滑块已删除：
-         它们做的是同一件事——降低照片的信息量好让纸面赢。现在靠几何让位
-         （照片占右侧满高竖窗，纸在左边），不再靠把照片模糊/压灰。 -->
+    <!-- 面板全透明（照片就是屏幕），可读性只靠这一层很淡的纸色 + 文字投影。
+         拖到 0 = 照片完全原样；拖到 70 = 几乎回到纸面。默认 22%。 -->
     <div class="wp-line">
-      <div class="wp-key">{{ $t('setting.wallpaper.structure') }}</div>
-      <div class="wp-ctrl">
+      <div class="wp-key">
+        {{ $t('setting.wallpaper.veil') }}
         <span class="wp-note">{{ $t('setting.wallpaper.structureHint') }}</span>
+      </div>
+      <div class="wp-ctrl wp-ctrl--slider">
+        <v-slider v-model="wp.veil" :min="0" :max="70" :step="1" thumb-label hide-details density="compact" :aria-label="$t('setting.wallpaper.veil')"></v-slider>
+        <span class="wp-val mono">{{ wp.veil }}%</span>
       </div>
     </div>
 

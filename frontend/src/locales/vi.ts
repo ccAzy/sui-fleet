@@ -297,7 +297,7 @@ export default {
       "glass": "Bảng bán trong suốt",
       "glassWarn": "Hiệu ứng kính xung đột với phong cách “sổ giấy”; mặc định tắt",
       "structure": "Bố cục",
-      "structureHint": "Ảnh chiếm một cửa sổ cao hết bên phải; sổ nằm trên tờ giấy bên trái",
+      "structureHint": "Ảnh chính là màn hình, các bảng trong suốt; lớp phủ rất nhạt này chỉ để chữ 13px còn đọc được",
       "clear": "Bỏ hình nền",
       "loadFailed": "Không đọc được ảnh — thử ảnh khác hoặc dùng URL"
     }
