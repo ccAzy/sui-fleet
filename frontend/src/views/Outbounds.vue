@@ -41,6 +41,9 @@
     </v-col>
   </v-row>
   <v-row>
+    <v-col v-if="!outbounds.length" cols="12" class="list-empty">
+      {{ $t('emptyList') }}
+    </v-col>
     <v-col cols="12" sm="4" md="3" lg="2" v-for="(item, index) in <any[]>outbounds" :key="item.tag">
       <v-card rounded="lg" elevation="0" min-width="200" :title="item.tag">
         <v-card-subtitle v-if="item.type !== item.tag">

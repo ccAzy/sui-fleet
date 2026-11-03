@@ -558,3 +558,13 @@
   outline-offset: 2px;
   border-radius: 2px;
 }
+
+/* 列表空态：五个页面共用一套。
+   以前只有 Relay / Servers 有空态，Inbounds / Outbounds / Rules / Endpoints /
+   Services 在空库时就是一片空白 —— 用户分不清"没有数据"和"加载失败"。 */
+.list-empty {
+  padding: var(--s6) 0;
+  text-align: center;
+  color: var(--ink-3);
+  font-size: var(--fs-sm);
+}

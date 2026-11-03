@@ -1,4 +1,5 @@
 export default {
+  "emptyList": "Nothing here yet. Use the action at the top right.",
   "a11y": {
     "moreActions": "More actions",
     "filter": "Filter",

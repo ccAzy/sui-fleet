@@ -16,6 +16,9 @@
     </v-col>
   </v-row>
   <v-row>
+    <v-col v-if="!services.length" cols="12" class="list-empty">
+      {{ $t('emptyList') }}
+    </v-col>
     <v-col cols="12" sm="4" md="3" lg="2" v-for="(item, index) in <any[]>services" :key="item.tag">
       <v-card rounded="xl" elevation="5" min-width="200" :title="item.tag">
         <v-card-subtitle style="margin-top: -15px;">

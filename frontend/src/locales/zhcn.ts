@@ -1,4 +1,5 @@
 export default {
+  "emptyList": "这里还没有内容。点右上角新建。",
   "a11y": {
     "moreActions": "更多操作",
     "filter": "筛选",

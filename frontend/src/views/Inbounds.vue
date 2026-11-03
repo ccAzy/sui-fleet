@@ -67,6 +67,7 @@
     </v-col>
   </v-row>
   <div class="ledger">
+    <div v-if="!inbounds.length" class="list-empty">{{ $t('emptyList') }}</div>
     <div
       v-for="(item, index) in <any[]>inbounds"
       :key="item.tag"

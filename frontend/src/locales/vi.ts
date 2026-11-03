@@ -1,4 +1,5 @@
 export default {
+  "emptyList": "Chưa có gì ở đây. Dùng nút ở góc trên bên phải.",
   "a11y": {
     "moreActions": "Thao tác khác",
     "filter": "Bộ lọc",
