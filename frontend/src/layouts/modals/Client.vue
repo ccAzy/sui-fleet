@@ -68,7 +68,7 @@
                     <div>
                       {{ $t('stats.usage') }}: {{ total }}<sup dir="ltr" v-if="percent>0">({{ percent }}%)</sup>
                     </div>
-                    <v-btn density="compact" variant="text" icon="mdi-restore" @click="resetUsage">
+                    <v-btn density="compact" variant="text" icon="mdi-restore" :aria-label="$t('reset')" @click="resetUsage">
                       <v-tooltip activator="parent" location="top">
                         {{ $t('reset') }}
                       </v-tooltip>

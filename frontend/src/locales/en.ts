@@ -1,4 +1,10 @@
 export default {
+  "a11y": {
+    "moreActions": "More actions",
+    "filter": "Filter",
+    "qrcode": "Subscription QR code",
+    "usageChart": "Usage chart"
+  },
   "success": "success",
   "failed": "failed",
   "enable": "Enable",
@@ -248,6 +254,9 @@ export default {
     "promoteHint": "Install the panel on the target, import current data and start it (DNS untouched). Run the check first.",
     "promoteTarget": "Target host",
     "promoteDry": "Dry run",
+    "promoteLogDry": "… checking (nothing will be changed)",
+    "promoteLogRun": "… running (installs and starts the panel)",
+    "requestFailed": "Request failed: {e}",
     "promoteRun": "Promote now",
     "promoteDone": "Ready. Point the domain at this host (or let the arbiter switch) to finish.",
     "promoteNoExecutor": "This panel runs on Cloudflare, so there is no local executor. Use the self-hosted panel.",
@@ -332,7 +341,8 @@ export default {
     "username": "Username",
     "unRules": "Username can not be empty",
     "password": "Password",
-    "pwRules": "Password can not be empty"
+    "pwRules": "Password can not be empty",
+    "tagline": "Nodes · Config push · Subscription delivery"
   },
   "menu": {
     "group": {

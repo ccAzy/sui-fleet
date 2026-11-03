@@ -1,4 +1,10 @@
 export default {
+  "a11y": {
+    "moreActions": "Thao tác khác",
+    "filter": "Bộ lọc",
+    "qrcode": "Mã QR đăng ký",
+    "usageChart": "Biểu đồ sử dụng"
+  },
   "success": "Thành công",
   "failed": "Thất bại",
   "enable": "Kích hoạt",
@@ -163,6 +169,7 @@ export default {
     "updateStarted": "Đã bắt đầu cập nhật. Panel sẽ tự khởi động lại — làm mới trang sau một hai phút."
   },
   "login": {
+    "tagline": "Quản lý nút · Đẩy cấu hình · Phân phối đăng ký",
     "title": "Đăng nhập",
     "username": "Tên người dùng",
     "unRules": "Tên người dùng không thể trống",
@@ -739,6 +746,9 @@ export default {
     "mint": "Bạc hà"
   },
   "server": {
+    "promoteLogDry": "… đang kiểm tra (không thay đổi gì)",
+    "promoteLogRun": "… đang chạy (cài đặt và khởi động panel)",
+    "requestFailed": "Yêu cầu thất bại: {e}",
     "restartAll": "Khởi động lại tất cả",
     "updateAll": "Cập nhật tất cả",
     "add": "Thêm máy chủ",

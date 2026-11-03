@@ -515,3 +515,44 @@
 .page-toolbar .v-btn {
   margin: 0 !important;
 }
+
+/* 工具条里的「最轻」动作：DESIGN.md「动作在最右侧，用最轻的 text 按钮」。
+   这两个类在 19 处调用，但此前 CSS 里零定义——所有调用都是静默 no-op，
+   作者以为在调轻重，实际什么都没发生。这里把意图补上：
+   去掉 text 按钮的默认内边距块感，只留墨色文字 + hover 的纸面染色。 */
+/* 注意：选择器**不能**限定在 .page-toolbar 下 —— 19 处调用里只有 7 处在
+   .page-toolbar 里，其余 12 处分别在 .page-head-actions（Servers）、
+   .sheet-actions（Main）、以及 Settings 的卡片行里。限定的后果是同样的 class
+   在不同页面渲染成不同内边距（7 处 8px、12 处 Vuetify 默认 14px），
+   比"全部没定义"更糟：看起来像 bug。所以这里定义成全局类。 */
+.toolbar-ghost {
+  padding-inline: var(--s2) !important;
+  color: var(--ink-2);
+  letter-spacing: 0;
+}
+
+.toolbar-ghost:hover {
+  color: var(--ink);
+  background: var(--accent-soft);
+}
+
+.toolbar-danger {
+  color: var(--error);
+}
+
+.toolbar-danger:hover {
+  color: var(--error);
+  background: var(--error-soft);
+}
+
+/* 名录行内被赋予 role="button" 的图标：<i> 默认没有指针光标，
+   键盘可达后必须同时给出可点击的视觉信号。焦点环由 paper.css:117 的
+   全局 :focus-visible 提供，无需重复定义。 */
+.icon-action {
+  cursor: pointer;
+}
+
+.icon-action:focus-visible {
+  outline-offset: 2px;
+  border-radius: 2px;
+}

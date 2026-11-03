@@ -1,4 +1,10 @@
 export default {
+  "a11y": {
+    "moreActions": "更多操作",
+    "filter": "筛选",
+    "qrcode": "订阅二维码",
+    "usageChart": "用量图表"
+  },
   "success": "成功",
   "failed": "失败",
   "enable": "启用",
@@ -248,6 +254,9 @@ export default {
     "promoteHint": "在目标机上安装面板、导入当前数据并启动（不改 DNS）。建议先「体检」看一遍再执行。",
     "promoteTarget": "目标机",
     "promoteDry": "先体检",
+    "promoteLogDry": "… 正在体检（不改任何东西）",
+    "promoteLogRun": "… 正在执行（会安装并启动面板）",
+    "requestFailed": "请求失败：{e}",
     "promoteRun": "确认移交",
     "promoteDone": "已就绪。接下来把域名解析指到这台机（或由仲裁者切换）即可完成移交。",
     "promoteNoExecutor": "当前面板跑在 Cloudflare 上，没有本机执行器，无法一键移交。需要用自托管面板。",
@@ -332,7 +341,8 @@ export default {
     "username": "用户名",
     "unRules": "用户名不能为空",
     "password": "密码",
-    "pwRules": "密码不能为空"
+    "pwRules": "密码不能为空",
+    "tagline": "节点管理 · 配置下发 · 订阅分发"
   },
   "menu": {
     "group": {

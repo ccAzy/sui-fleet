@@ -4,7 +4,7 @@
       <div class="login-sheet">
         <header class="login-head">
           <h1 class="login-title">s-ui cloud</h1>
-          <p class="login-sub">节点管理 · 配置下发 · 订阅分发</p>
+          <p class="login-sub">{{ $t('login.tagline') }}</p>
         </header>
 
         <form v-if="step === 'pass'" class="login-form" autocomplete="on" @submit.prevent="login">

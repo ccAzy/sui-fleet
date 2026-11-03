@@ -43,7 +43,7 @@
       <v-btn color="primary" @click="showRulesetModal(-1)" style="margin: 0 5px;">{{ $t('ruleset.add') }}</v-btn>
       <v-menu v-model="actionMenu" :close-on-content-click="false" location="bottom center">
         <template v-slot:activator="{ props }">
-          <v-btn v-bind="props" hide-details variant="text" icon>
+          <v-btn v-bind="props" hide-details variant="text" icon :aria-label="$t('a11y.moreActions')">
             <v-icon icon="mdi-tools" color="primary" />
           </v-btn>
         </template>

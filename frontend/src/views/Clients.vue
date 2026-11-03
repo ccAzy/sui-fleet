@@ -42,7 +42,7 @@
     <v-col cols="auto">
       <v-menu v-model="actionMenu" :close-on-content-click="false" location="bottom center">
         <template v-slot:activator="{ props }">
-          <v-btn v-bind="props" hide-details variant="text" icon>
+          <v-btn v-bind="props" hide-details variant="text" icon :aria-label="$t('a11y.moreActions')">
             <v-icon icon="mdi-tools" color="primary" />
           </v-btn>
         </template>
@@ -65,7 +65,7 @@
     <v-col cols="auto">
       <v-menu v-model="filterMenu" :close-on-content-click="false" location="bottom center">
         <template v-slot:activator="{ props }">
-          <v-btn v-bind="props" hide-details variant="text" icon>
+          <v-btn v-bind="props" hide-details variant="text" icon :aria-label="$t('a11y.filter')">
             <v-icon :icon="filterSettings.enabled ? 'mdi-filter-check-outline' : 'mdi-filter-menu-outline'" :color="filterSettings.enabled ? 'primary' : ''" />
           </v-btn>
         </template>
@@ -108,14 +108,14 @@
             <v-card-actions>
               <v-spacer></v-spacer>
               <v-btn
-                color="blue-darken-1"
+                color="primary"
                 variant="outlined"
                 @click="clearFilter"
               >
                 {{ $t('actions.del') }}
               </v-btn>
               <v-btn
-                color="blue-darken-1"
+                color="primary"
                 variant="tonal"
                 @click="doFilter"
               >
@@ -189,9 +189,16 @@
           </div>
         </template>
         <template v-slot:item.actions="{ item }">
+        <!-- 这四个动作用 role/tabindex + 键盘等价补齐：v-icon 本身不是控件，
+             键盘用户原先无法 Tab 到「改配置」和「复制订阅」，等于主任务不可达。 -->
         <v-icon
-          class="me-2"
+          class="me-2 icon-action"
+          role="button"
+          tabindex="0"
+          :aria-label="$t('actions.edit')"
           @click="showModal(item.id)"
+          @keydown.enter.prevent="showModal(item.id)"
+          @keydown.space.prevent="showModal(item.id)"
         >
           mdi-pencil
         </v-icon>
@@ -202,8 +209,11 @@
         >
           <template v-slot:activator="{ props }">
             <v-icon
-              class="me-2"
+              class="me-2 icon-action"
               color="error"
+              role="button"
+              tabindex="0"
+              :aria-label="$t('actions.del')"
               v-bind="props"
             >
               mdi-delete
@@ -219,12 +229,27 @@
           </v-card>
         </v-menu>
         <v-icon
-          class="me-2"
+          class="me-2 icon-action"
+          role="button"
+          tabindex="0"
+          :aria-label="$t('a11y.qrcode')"
           @click="showQrCode(item.id)"
+          @keydown.enter.prevent="showQrCode(item.id)"
+          @keydown.space.prevent="showQrCode(item.id)"
         >
           mdi-qrcode
         </v-icon>
-        <v-icon icon="mdi-chart-line" @click="showStats(item.name)" v-if="Data().enableTraffic">
+        <v-icon
+          icon="mdi-chart-line"
+          class="icon-action"
+          role="button"
+          tabindex="0"
+          :aria-label="$t('a11y.usageChart')"
+          @click="showStats(item.name)"
+          @keydown.enter.prevent="showStats(item.name)"
+          @keydown.space.prevent="showStats(item.name)"
+          v-if="Data().enableTraffic"
+        >
           <v-tooltip activator="parent" location="top" :text="$t('stats.graphTitle')"></v-tooltip>
         </v-icon>
       </template>

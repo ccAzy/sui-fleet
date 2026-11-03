@@ -212,7 +212,7 @@ const runPromote = async (dry: boolean) => {
   if (!promote.value.target || promote.value.running) return
   promote.value.running = true
   promote.value.done = false
-  promote.value.log = (dry ? '… 正在体检（不改任何东西）' : '… 正在执行（会安装并启动面板）') + String.fromCharCode(10)
+  promote.value.log = (dry ? i18n.global.t('server.promoteLogDry') : i18n.global.t('server.promoteLogRun')) + String.fromCharCode(10)
   try {
     const res = await fetch(
       `api/ops/promote?target=${encodeURIComponent(promote.value.target)}${dry ? '&dry=1' : ''}`,
@@ -221,7 +221,7 @@ const runPromote = async (dry: boolean) => {
     promote.value.log = await res.text()
     promote.value.done = !dry && promote.value.log.includes('[DONE exit=0]')
   } catch (e) {
-    promote.value.log = `请求失败：${String(e)}`
+    promote.value.log = i18n.global.t('server.requestFailed', { e: String(e) })
   } finally {
     promote.value.running = false
   }

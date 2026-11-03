@@ -1,4 +1,10 @@
 export default {
+  "a11y": {
+    "moreActions": "更多操作",
+    "filter": "篩選",
+    "qrcode": "訂閱二維碼",
+    "usageChart": "用量圖表"
+  },
   "success": "成功",
   "failed": "失敗",
   "enable": "啟用",
@@ -163,6 +169,7 @@ export default {
     "updateStarted": "更新已開始,面板會自行重啟。約 1-2 分鐘後手動重新整理頁面即可。"
   },
   "login": {
+    "tagline": "節點管理 · 配置下發 · 訂閱分發",
     "title": "登錄",
     "username": "用戶名",
     "unRules": "用戶名不能為空",
@@ -739,6 +746,9 @@ export default {
     "mint": "薄荷青"
   },
   "server": {
+    "promoteLogDry": "… 正在體檢（不改任何東西）",
+    "promoteLogRun": "… 正在執行（會安裝並啟動面板）",
+    "requestFailed": "請求失敗：{e}",
     "restartAll": "全部重啟",
     "updateAll": "全部更新",
     "add": "新增伺服器",
