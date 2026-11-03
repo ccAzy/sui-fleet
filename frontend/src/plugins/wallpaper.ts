@@ -34,6 +34,8 @@ export interface WpConfig {
   contrast: number
   saturate: number
   veil: number
+  /** 纸面不透明度（%）。100 = 实心纸，越低壁纸越透出来。它是「壁纸感」的主旋钮。 */
+  paper: number
   fit: WpFit
   glass: boolean
 }
@@ -57,6 +59,9 @@ export const DEFAULT_WP: WpConfig = {
   contrast: 100,
   saturate: 100,
   veil: 30,
+  // 84 是「照片能当桌面、字还能读」的交点：再往下 ink-3 的说明文字在亮部会掉到
+  // 4.5:1 以下（实测 60% 时 2.43:1）。想更透自己在设置里往下拖，界面会实时报警。
+  paper: 84,
   fit: 'cover',
   glass: false,
 }
@@ -180,12 +185,17 @@ export function applyWp(c: WpConfig) {
   const pat = c.builtin !== 'none' ? CSS_BUILTIN[c.builtin] : null
   const active = c.on && !!(pat || src || thumb)
 
-  root.style.setProperty('--wp-image', pat ? pat.image : thumb ? `url("${thumb}")` : 'none')
+  // 这里原来写的是 `thumb ? url(thumb) : 'none'`，而 `src`（降采样后的正图）
+  // 算出来却从没用上 —— 结果壁纸永远是那张 32px 缩略图被拉满全屏，
+  // 无论原图多清晰都是一片糊。正图优先，缩略图只在正图还没从 IndexedDB
+  // 取回来时做首帧兜底。
+  root.style.setProperty('--wp-image', pat ? pat.image : src ? `url("${src}")` : thumb ? `url("${thumb}")` : 'none')
   root.style.setProperty('--wp-size', pat ? pat.size : c.fit)
   root.style.setProperty('--wp-blur', `${c.blur}px`)
   root.style.setProperty('--wp-contrast', `${c.contrast}%`)
   root.style.setProperty('--wp-saturate', `${c.saturate}%`)
   root.style.setProperty('--wp-veil', String(c.veil / 100))
+  root.style.setProperty('--wp-paper', String(c.paper ?? 84))
   root.style.setProperty('--wp-fit', c.fit)
   // 双纹理叠一起会脏：开壁纸就把纸纹压到几乎看不见
   root.style.setProperty('--wp-grain', active ? '0.008' : '0.025')
@@ -310,17 +320,32 @@ export async function prepareImage(input: File | string): Promise<PreparedImage>
 /* ----------------------------------------------------------- 对比度 */
 
 const PAPER = { light: [246, 245, 241], dark: [18, 18, 17] }
-const INK = { light: [26, 26, 25], dark: [233, 231, 225] }
+const SURFACE = { light: [255, 254, 251], dark: [25, 25, 24] }
+// 用 --ink-3（说明文字/占位）而不是 --ink 当参考：正文颜色对比度永远够，
+// 真正会被壁纸压垮的是这一档。
+const INK = { light: [107, 105, 97], dark: [144, 141, 132] }
 
-/** 遮罩把「最亮格」往纸色拉，返回估算对比度（最坏区域） */
-export function estimateContrast(lum: number, veil: number, dark: boolean): number {
+/**
+ * 估算「正文压在最坏区域」时的对比度。
+ *
+ * 两步混合，缺一不可：
+ *   1. 遮罩：图片亮度往纸色拉 → 壁纸本身的亮度
+ *   2. 纸面：正文坐在 .page-shell 上，而 shell 现在是半透明的
+ *      → alpha 份的 surface + (1-alpha) 份的壁纸亮度
+ *
+ * 第 2 步是「纸张通透度」这个旋钮存在之后才必须的：只算遮罩、不算纸面透明度，
+ * 滑块拖到 60% 时估算还报 5:1，实际截图里 ink-3 只有 2.43:1（实测过）。
+ */
+export function estimateContrast(lum: number, veil: number, dark: boolean, paperAlpha = 100): number {
   if (lum < 0) return -1
-  const paper = PAPER[dark ? 'dark' : 'light']
-  const paperLum = srgbLum(paper[0], paper[1], paper[2])
+  const t = dark ? 'dark' : 'light'
+  const paperLum = srgbLum(...(PAPER[t] as [number, number, number]))
+  const surfaceLum = srgbLum(...(SURFACE[t] as [number, number, number]))
   const v = Math.min(1, Math.max(0, veil / 100))
-  // 亮度按遮罩比例线性混合（近似：遮罩是一层不透明纸色）
-  const mixed = lum * (1 - v) + paperLum * v
-  const ink = INK[dark ? 'dark' : 'light']
+  const wallpaperLum = lum * (1 - v) + paperLum * v
+  const alpha = Math.min(1, Math.max(0, paperAlpha / 100))
+  const mixed = surfaceLum * alpha + wallpaperLum * (1 - alpha)
+  const ink = INK[t]
   const inkLum = srgbLum(ink[0], ink[1], ink[2])
   const a = Math.max(mixed, inkLum)
   const b = Math.min(mixed, inkLum)

@@ -9,7 +9,7 @@
     <div v-if="!bars.length" class="trend-empty">{{ $t('main.trend.empty') }}</div>
     <template v-else>
       <div class="trend-chart">
-        <Bar :data="chartData" :options="chartOptions" />
+        <Bar :data="chartData" :options="chartOptions" :plugins="[valueLabels]" />
       </div>
       <div class="trend-total">
         ↓ {{ hz(totalDown) }} · ↑ {{ hz(totalUp) }}
@@ -104,6 +104,37 @@
     ],
   }))
 
+  /**
+   * 柱子顶上的数值标签。
+   *
+   * 原来只有 tooltip：想知道「前天到底用了多少」必须把鼠标挪上去，触屏上要长按，
+   * 而「近 7 天流量」这个读数的意义就是扫一眼能读出每天的绝对值。所以把总量
+   * 直接画在柱顶，tooltip 保留（它还能拆出上行/下行）。
+   *
+   * 画在 afterDatasetsDraw：此时坐标变换已经就绪，直接拿每根柱子的像素坐标，
+   * 不用自己重算比例尺。
+   */
+  const valueLabels = {
+    id: 'valueLabels',
+    afterDatasetsDraw(chart: any) {
+      const { ctx } = chart
+      const totals = bars.value.map((b) => (b.up || 0) + (b.down || 0))
+      const upMeta = chart.getDatasetMeta(chart.data.datasets.length - 1)
+      if (!upMeta?.data?.length) return
+      ctx.save()
+      ctx.font = '600 10px ui-monospace, "Cascadia Mono", Consolas, monospace'
+      ctx.fillStyle = chartInk(dark.value)
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'bottom'
+      upMeta.data.forEach((el: any, i: number) => {
+        const v = totals[i] || 0
+        if (v <= 0) return                       // 0 流量不画，免得顶上堆一排 0
+        ctx.fillText(hz(v), el.x, Math.max(10, el.y - 3))
+      })
+      ctx.restore()
+    },
+  }
+
   const chartOptions = computed(() => ({
     responsive: true,
     maintainAspectRatio: false,
@@ -155,7 +186,7 @@
   .trend-range { font-size: var(--fs-sm, 12px); color: var(--ink-3, #8a8a8a); margin-inline-start: 6px; font-weight: 400; }
   .trend-refresh { margin-inline-start: 6px; cursor: pointer; opacity: 0.5; vertical-align: -1px; }
   .trend-refresh:hover { opacity: 1; }
-  .trend-chart { height: 132px; margin: 6px 0 2px; }
+  .trend-chart { height: 156px; margin: 8px 0 2px; }
   .trend-total { font-size: var(--fs-sm, 12px); color: var(--ink-3, #8a8a8a); text-align: end; }
   .trend-empty { font-size: var(--fs-sm, 12px); color: var(--ink-3, #8a8a8a); padding: 6px 0; }
   .trend-sub {

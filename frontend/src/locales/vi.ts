@@ -268,7 +268,7 @@ export default {
     "wallpaper": {
       "title": "Giao diện",
       "enable": "Hình nền",
-      "hint": "Chỉ lấp nền trang; các bảng vẫn đục",
+      "hint": "Ảnh chính là màn hình nền; tờ giấy nằm bên trên",
       "source": "Ảnh",
       "urlPlaceholder": "Dán URL ảnh https://…",
       "useUrl": "Dùng URL",
@@ -283,6 +283,8 @@ export default {
       "contrast": "Độ nét · tương phản",
       "saturate": "Độ nét · độ bão hòa",
       "veil": "Lớp phủ",
+      "paper": "Độ đục của giấy",
+      "paperHint": "100% là giấy đặc; giảm xuống để hình nền xuyên qua — quá thấp sẽ khó đọc",
       "fit": "Cách khớp",
       "fitCover": "Phủ kín",
       "fitContain": "Vừa khung",

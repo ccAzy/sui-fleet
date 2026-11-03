@@ -1,12 +1,14 @@
 /**
  * styles/wallpaper.css
  *
- * 壁纸只铺「桌面」，不铺「纸」。
+ * 壁纸 = 那张照片就是桌面本身，纸浮在上面。
  *
- * 页面上有两层纸：页面底 `--paper`（桌面）与内容面板 `--surface`（纸）。
- * 壁纸只替换桌面。所有承载文字的面板保持不透明——半透明面板会同时带来
- * 两件事：对比度不可控，以及这个世界（1px 线、无阴影、无玻璃）被破坏。
- * 需要玻璃效果时开 `data-wallpaper="glass"`，那是显式选择的另一套外观。
+ * 口径修正（2026-11，阿柴：之前那种「只在四周露一条」只能叫背景）：
+ * 只把图片铺在底层、纸面 94% 不透明，等于花 90% 的屏幕去挡那张图。
+ * 现在两种强度都由 CSS 变量控制，图片要真的能透过纸看出来：
+ *   data-wallpaper="on"    纸 70%（磨砂纸，能看见照片的明暗与色块）
+ *   data-wallpaper="glass" 纸 56%（薄玻璃，照片轮廓清楚）
+ * 对比度靠 blur + 遮罩保底，不靠把纸做成实心。
  */
 
 #wp-layer,
@@ -83,15 +85,17 @@ html[data-wallpaper='on'] .page-shell,
 html[data-wallpaper='glass'] .page-shell {
   /* 94% 而非 100%：留一点点"薄纸"的通透感，壁纸的明暗会渗进纸面，
      但不影响正文对比度（这是与玻璃档 86% 之间的中间档）。 */
-  background: color-mix(in srgb, var(--surface) 94%, transparent);
-  backdrop-filter: blur(10px) saturate(1.05);
+  background: color-mix(in srgb, var(--surface) calc(var(--wp-paper, 84) * 1%), transparent);
+  backdrop-filter: blur(26px) saturate(1.18);
   border: 1px solid var(--rule);
   border-radius: 2px;
   /* 桌面要留得出来，纸才像"摊在桌上"：
      视口再宽也至少露出 60px 桌面，内容宽度收在 1080 —— 之前是 56px/1240，
      纸几乎顶满视口，壁纸只剩顶上一条，看着像横幅而不是背景。 */
-  width: min(1080px, calc(100% - 120px));
-  margin: 22px auto 44px;
+  /* 960 而不是 1080：纸越窄，四周露出的桌面越多，才像「一张纸摊在桌面上」，
+     而不是「屏风挡住墙」。 */
+  width: min(960px, calc(100% - 180px));
+  margin: 26px auto 52px;
   padding: 26px 30px 56px;
   /* 壁纸模式下唯一允许的阴影：给纸一点离地高度，
      否则它和背景之间是一条硬切边，观感像"屏风挡住墙"而不是"纸上写字"。
@@ -103,8 +107,8 @@ html[data-wallpaper='glass'] .page-shell {
    86% 而不是 78%：再透就和正文抢对比度了——实测 78% 时照片亮部会把
    --ink-3 的说明文字压到 3:1 附近，正文 13px 看着发虚。 */
 html[data-wallpaper='glass'] .page-shell {
-  background: color-mix(in srgb, var(--surface) 86%, transparent);
-  backdrop-filter: blur(22px) saturate(1.15);
+  background: color-mix(in srgb, var(--surface) 56%, transparent);
+  backdrop-filter: blur(30px) saturate(1.2);
 }
 
 /* 顶栏与侧栏也要让壁纸透出来。
@@ -112,14 +116,14 @@ html[data-wallpaper='glass'] .page-shell {
    这正是"壁纸只在中间露一条横幅"的根因。 */
 html[data-wallpaper='on'] .v-app-bar,
 html[data-wallpaper='glass'] .v-app-bar {
-  background: color-mix(in srgb, var(--paper) 76%, transparent) !important;
-  backdrop-filter: blur(16px) saturate(1.05);
+  background: color-mix(in srgb, var(--paper) calc((var(--wp-paper, 84) - 32) * 1%), transparent) !important;
+  backdrop-filter: blur(22px) saturate(1.12);
 }
 
 html[data-wallpaper='on'] .v-navigation-drawer,
 html[data-wallpaper='glass'] .v-navigation-drawer {
-  background: color-mix(in srgb, var(--surface-2) 84%, transparent) !important;
-  backdrop-filter: blur(16px) saturate(1.05);
+  background: color-mix(in srgb, var(--surface-2) calc((var(--wp-paper, 84) - 26) * 1%), transparent) !important;
+  backdrop-filter: blur(22px) saturate(1.12);
 }
 
 @media (max-width: 960px) {

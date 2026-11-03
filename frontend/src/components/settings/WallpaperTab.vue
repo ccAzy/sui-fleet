@@ -81,6 +81,17 @@
           </div>
 
           <div class="wp-line">
+            <div class="wp-key">
+              {{ $t('setting.wallpaper.paper') }}
+              <span class="wp-note">{{ $t('setting.wallpaper.paperHint') }}</span>
+            </div>
+            <div class="wp-ctrl wp-ctrl--slider">
+              <v-slider v-model="wp.paper" :min="60" :max="100" :step="1" thumb-label hide-details density="compact" :aria-label="$t('setting.wallpaper.paper')"></v-slider>
+              <span class="wp-val mono">{{ wp.paper }}%</span>
+            </div>
+          </div>
+
+          <div class="wp-line">
             <div class="wp-key">{{ $t('setting.wallpaper.fit') }}</div>
             <div class="wp-ctrl">
               <v-btn-toggle v-model="wp.fit" density="compact" mandatory variant="outlined" divided>
@@ -161,7 +172,7 @@ onUnmounted(() => clearInterval(themeTick))
 
 const wpContrast = computed(() => {
   const lum = wpDark.value ? wp.value.lumDark : wp.value.lumLight
-  return estimateContrast(lum, wp.value.veil, wpDark.value)
+  return estimateContrast(lum, wp.value.veil, wpDark.value, wp.value.paper)
 })
 const wpOk = computed(() => wpContrast.value < 0 || wpContrast.value >= 4.5)
 

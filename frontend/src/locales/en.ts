@@ -398,7 +398,7 @@ export default {
     "wallpaper": {
       "title": "Appearance",
       "enable": "Wallpaper",
-      "hint": "Fills the page background only; panels stay opaque",
+      "hint": "The photo is the desktop; the paper sits on top of it (margins on all sides, adjustable paper opacity)",
       "source": "Image",
       "urlPlaceholder": "Paste an image URL https://…",
       "useUrl": "Use URL",
@@ -413,6 +413,8 @@ export default {
       "contrast": "Clarity · contrast",
       "saturate": "Clarity · saturation",
       "veil": "Veil",
+      "paper": "Paper opacity",
+      "paperHint": "100% is solid paper; lower it to let the wallpaper show through — too low hurts readability",
       "fit": "Fit",
       "fitCover": "Cover",
       "fitContain": "Contain",

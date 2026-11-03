@@ -398,7 +398,7 @@ export default {
     "wallpaper": {
       "title": "外观",
       "enable": "启用壁纸",
-      "hint": "只铺页面底，内容面板保持不透明",
+      "hint": "壁纸就是这张照片当桌面，纸浮在上面（四周留白，纸面带通透度）",
       "source": "图片来源",
       "urlPlaceholder": "粘贴图片链接 https://…",
       "useUrl": "用这个链接",
@@ -413,6 +413,8 @@ export default {
       "contrast": "清晰度·对比",
       "saturate": "清晰度·饱和",
       "veil": "遮罩浓度",
+      "paper": "纸张通透度",
+      "paperHint": "100% 是实心纸；调低壁纸会透过纸面 —— 太低正文会读不清",
       "fit": "贴合方式",
       "fitCover": "填充",
       "fitContain": "完整",
