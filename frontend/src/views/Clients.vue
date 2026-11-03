@@ -130,12 +130,12 @@
   <v-row>
     <v-col cols="12">
       <v-data-table
+        :no-data-text="$t('emptyList')"
         :headers="headers"
         :items="filterSettings.enabled ? filterSettings.filteredClients : clients"
         :hide-default-footer="filterSettings.enabled ? filterSettings.filteredClients.length<=10 : clients.length<=10"
         :items-per-page="itemPerPage"
         @update:items-per-page="setItemPerPage($event)"
-        hide-no-data
         fixed-header
         item-value="name"
         :mobile="smAndDown"

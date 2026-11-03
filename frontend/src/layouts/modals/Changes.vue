@@ -49,6 +49,7 @@
           </v-col>
         </v-row>
         <v-data-table
+        :no-data-text="$t('emptyList')"
           :headers="changesHeaders"
           :items="changes"
           item-value="id"

@@ -22,6 +22,7 @@
           </v-col>
         </v-row>
         <v-data-table
+        :no-data-text="$t('emptyList')"
           v-if="outbounds.length>0"
           :items="outbounds"
           :loading="loading"

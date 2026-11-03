@@ -48,9 +48,7 @@
       <v-btn variant="text" class="toolbar-ghost toolbar-danger" prepend-icon="mdi-delete-sweep" :loading="clearLoading" @click="clearConfirm = true">{{ $t('quickTemplate.clearAll') }}</v-btn>
     </v-col>
   </v-row>
-  <v-row v-if="relays.length === 0">
-    <v-col cols="12" style="text-align: center; opacity: 0.6; margin-top: 30px;">{{ $t('relay.empty') }}</v-col>
-  </v-row>
+  <div v-if="relays.length === 0" class="list-empty">{{ $t('relay.empty') }}</div>
   <v-row>
     <v-col cols="12" sm="6" md="4" lg="3" v-for="(r, index) in relays" :key="r.outbound">
       <v-card rounded="xl" elevation="5" min-width="200" :title="r.outbound">

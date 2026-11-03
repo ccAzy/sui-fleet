@@ -106,7 +106,7 @@
     </div>
   </div>
 
-  <div v-if="servers.length === 0" class="servers-empty">{{ $t('server.empty') }}</div>
+  <div v-if="servers.length === 0" class="list-empty">{{ $t('server.empty') }}</div>
 
   <div v-else class="ledger ledger--servers">
     <div
@@ -425,12 +425,6 @@ const delServer = async () => {
 
 .ledger-actions {
   margin-left: var(--s2);
-}
-
-.servers-empty {
-  padding: var(--s6) 0;
-  color: var(--ink-3);
-  font-size: var(--fs-sm);
 }
 
 .del-warn {
