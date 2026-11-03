@@ -59,6 +59,13 @@ html[data-wallpaper='glass'] #wp-veil {
   opacity: var(--wp-veil, 0.22);
 }
 
+/* 遮罩颜色必须跟主题走。--paper 定义在 :root 与 .v-theme--* 两层，而 #wp-veil
+   在 .v-application 外面，读到的永远是 :root 的浅色值 —— 深色主题下这层白纸
+   会把照片提亮，于是「深色顶栏 + 亮内容 + 白字」看着很割裂（用户实测）。 */
+html[data-wallpaper='on'][data-theme='dark'] #wp-veil {
+  background: #0d0d0c;
+}
+
 /* 应用主体浮在壁纸之上 */
 #app {
   position: relative;
@@ -117,10 +124,16 @@ html[data-wallpaper='on'] .page-shell {
  * 所以：常驻侧栏保持透明（图标浮在壁纸上），浮层侧栏与顶栏改成磨砂纸 + 深墨。 */
 html[data-wallpaper='on'] .v-navigation-drawer--mobile,
 html[data-wallpaper='on'] .v-navigation-drawer--temporary {
-  background: color-mix(in srgb, var(--surface) 94%, transparent) !important;
-  /* 上面的"面板全透明"块用了 !important，这里必须也带 !important 才压得回来 */
-  backdrop-filter: blur(20px) saturate(1.05) !important;
-  /* 纸面上必须是深墨：壁纸模式全局把墨翻白了，这里要翻回来 */
+  background: color-mix(in srgb, var(--surface) 97%, transparent) !important;
+  /* 不用 backdrop-filter：它会让元素自身内容进入合成层，菜单字会发虚
+     （用户实测「菜单字体是糊的」）。底色做到 97% 就够挡内容，字回到清晰栅格。 */
+  backdrop-filter: none !important;
+  text-shadow: none;
+}
+
+/* 墨色跟主题走：写死深墨会在深色主题下变成黑底黑字 */
+html[data-wallpaper='on'][data-theme='light'] .v-navigation-drawer--mobile,
+html[data-wallpaper='on'][data-theme='light'] .v-navigation-drawer--temporary {
   --ink: #1a1a19;
   --ink-2: #57564f;
   --ink-3: #6b6961;
@@ -131,19 +144,36 @@ html[data-wallpaper='on'] .v-navigation-drawer--temporary {
   --error: #a63a2e;
   --warn: #8a6a1f;
   --v-theme-on-surface: 26, 26, 25;
-  text-shadow: none;
+}
+
+html[data-wallpaper='on'][data-theme='dark'] .v-navigation-drawer--mobile,
+html[data-wallpaper='on'][data-theme='dark'] .v-navigation-drawer--temporary {
+  --ink: #e9e7e1;
+  --ink-2: #a8a59c;
+  --ink-3: #908d84;
+  --v-theme-on-surface: 233, 231, 225;
 }
 
 /* 顶栏同理：它是 fixed，页面滚动时内容会从它下面穿过。
-   不做遮挡就会出现"标题和正文糊在一起"。磨砂纸 74% + 深墨，壁纸仍然透得出来。 */
+   不用 backdrop-filter（同上，标题会发虚），改用 90% 底色 + 分主题墨色。 */
 html[data-wallpaper='on'] .v-app-bar {
-  background: color-mix(in srgb, var(--paper) 74%, transparent) !important;
-  backdrop-filter: blur(18px) saturate(1.05) !important;
+  background: color-mix(in srgb, var(--paper) 90%, transparent) !important;
+  backdrop-filter: none !important;
+  text-shadow: none;
+}
+
+html[data-wallpaper='on'][data-theme='light'] .v-app-bar {
   --ink: #1a1a19;
   --ink-2: #57564f;
   --ink-3: #6b6961;
   --v-theme-on-surface: 26, 26, 25;
-  text-shadow: none;
+}
+
+html[data-wallpaper='on'][data-theme='dark'] .v-app-bar {
+  --ink: #e9e7e1;
+  --ink-2: #a8a59c;
+  --ink-3: #908d84;
+  --v-theme-on-surface: 233, 231, 225;
 }
 
 /* 浮层（弹窗、菜单）仍然要实心：它们盖在内容上，透过去就没边了 */
