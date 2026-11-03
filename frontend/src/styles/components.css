@@ -574,3 +574,12 @@
 .v-data-table__th {
   white-space: nowrap !important;
 }
+
+/* 键下小注：账簿式排布里，标题下面那行 12px 灰字（外观 / 安全两个面板共用，
+   原来写在外观面板的 scoped 里，拆组件后安全面板拿不到 → 由内联变块级、行高错乱） */
+.wp-note {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--fs-xs);
+  color: var(--ink-3);
+}
