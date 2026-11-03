@@ -86,7 +86,9 @@ body,
   font-family: var(--sans);
   font-size: var(--fs-base);
   line-height: 1.55;
-  -webkit-font-smoothing: antialiased;
+  /* 删掉 -webkit-font-smoothing: antialiased —— 它在 Windows 上会关掉
+     亚像素渲染（ClearType），13px 中文直接发虚。macOS 默认渲染本来就是灰度抗锯齿，
+     不需要这条。 */
   text-rendering: optimizeLegibility;
 }
 

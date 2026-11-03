@@ -122,18 +122,22 @@ html[data-wallpaper='on'] .page-shell {
  * 后者如果也全透明，主页文字就会和菜单文字叠在一起 —— 实测 1000px 宽时
  * 抽屉的 background 是 rgba(0,0,0,0)，两套文字直接压在一起。
  * 所以：常驻侧栏保持透明（图标浮在壁纸上），浮层侧栏与顶栏改成磨砂纸 + 深墨。 */
-html[data-wallpaper='on'] .v-navigation-drawer--mobile,
-html[data-wallpaper='on'] .v-navigation-drawer--temporary {
-  background: color-mix(in srgb, var(--surface) 97%, transparent) !important;
+html[data-wallpaper='on'] .v-navigation-drawer {
+  /* 实测：桌面 rail 展开（expand-on-hover）走不到 --mobile 规则，
+     于是拿到壁纸模式的白墨 + 黑投影 + Vuetify 自带浅底 = 浅底白字，糊成一团。
+     现在所有形态一律实底 + 分主题深墨。 */
+  background: var(--surface) !important;
+  /* Vuetify 组件用 rgb(var(--v-theme-primary)) 上色，不是我们的 --accent：
+     不覆盖它，菜单项会拿到壁纸模式的浅靛（#cfe0f5）压在浅底上 —— 实测就是这个值。 */
+  --v-theme-primary: 44, 74, 110;
   /* 不用 backdrop-filter：它会让元素自身内容进入合成层，菜单字会发虚
      （用户实测「菜单字体是糊的」）。底色做到 97% 就够挡内容，字回到清晰栅格。 */
   backdrop-filter: none !important;
-  text-shadow: none;
+  text-shadow: none !important;
 }
 
 /* 墨色跟主题走：写死深墨会在深色主题下变成黑底黑字 */
-html[data-wallpaper='on'][data-theme='light'] .v-navigation-drawer--mobile,
-html[data-wallpaper='on'][data-theme='light'] .v-navigation-drawer--temporary {
+html[data-wallpaper='on'][data-theme='light'] .v-navigation-drawer {
   --ink: #1a1a19;
   --ink-2: #57564f;
   --ink-3: #6b6961;
@@ -146,8 +150,7 @@ html[data-wallpaper='on'][data-theme='light'] .v-navigation-drawer--temporary {
   --v-theme-on-surface: 26, 26, 25;
 }
 
-html[data-wallpaper='on'][data-theme='dark'] .v-navigation-drawer--mobile,
-html[data-wallpaper='on'][data-theme='dark'] .v-navigation-drawer--temporary {
+html[data-wallpaper='on'][data-theme='dark'] .v-navigation-drawer {
   --ink: #e9e7e1;
   --ink-2: #a8a59c;
   --ink-3: #908d84;
