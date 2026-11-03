@@ -1,11 +1,16 @@
 <template>
+  <!--
+    侧栏展开方式必须按「指针能力」而不是「屏幕宽度」判断：
+    宽屏触屏设备（平板、触屏笔记本）走的是桌面分支，而 expand-on-hover 在
+    触屏上没有 hover 可用 —— 菜单文字永远打不开。coarse 指针（手指）时改成点击展开。
+  -->
   <v-navigation-drawer
     v-model="showDrawer"
     :temporary="isMobile"
-    :expand-on-hover="!isMobile"
-    :rail="!isMobile"
+    :expand-on-hover="!isMobile && !coarse"
+    :rail="!isMobile && !railOpen"
     :permanent="!isMobile"
-    @click="isMobile ? $emit('toggleDrawer') : null"
+    @click="onDrawerClick"
   >
     <!-- 品牌区：rail 时只剩图标，展开时露出字 -->
     <div class="brand">
@@ -48,11 +53,41 @@
 </template>
 
 <script lang="ts" setup>
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import router from '@/router'
 import { logout } from '@/plugins/httputil'
 
 const props = defineProps(['isMobile', 'displayDrawer'])
+const emit = defineEmits(['toggleDrawer'])
+
+/**
+ * 触屏没有 hover：宽屏触屏设备上 expand-on-hover 等于菜单永远打不开。
+ * 这里用 (pointer: coarse) 判断"主要输入是手指"，改成点击展开。
+ */
+const coarse = ref(false)
+const railOpen = ref(false)
+let mq: MediaQueryList | null = null
+const onMq = (e: MediaQueryListEvent) => {
+  coarse.value = e.matches
+  if (!e.matches) railOpen.value = false
+}
+onMounted(() => {
+  mq = window.matchMedia('(pointer: coarse)')
+  coarse.value = mq.matches
+  mq.addEventListener('change', onMq)
+})
+onUnmounted(() => mq?.removeEventListener('change', onMq))
+
+const onDrawerClick = (e: MouseEvent) => {
+  if (props.isMobile) {
+    emit('toggleDrawer')
+    return
+  }
+  if (!coarse.value) return
+  // 点菜单项 → 收起；点侧栏空白 → 切换
+  const el = e.target as HTMLElement | null
+  railOpen.value = el?.closest?.('.v-list-item') ? false : !railOpen.value
+}
 
 const showDrawer = computed((): boolean => {
   return props.displayDrawer

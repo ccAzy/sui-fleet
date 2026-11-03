@@ -51,8 +51,15 @@ jobs:
           cache-dependency-path: node/go.sum
       # 以前这里只 build 不 test：agent_test.go 写了也从来没跑过，
       # 「clients 变更必须重启内核」那条回归正是因此漏掉的。
+      # 覆盖范围：从 ./cmd 扩到 ./util ./database ./core/...
+      # 为什么不写成 ./...：本机实测有两个包构建不过，原因同一个 ——
+      #   sing-box 的 transport/v2rayhttp 用 //go:linkname 指向
+      #   golang.org/x/net/http2.(*Transport).connPool，该字段在 x/net 的某些版本里不存在，
+      #   链接期报 undefined reference。cmd 与 sub 都会把这条依赖链拉进来。
+      #   这是真实的依赖耦合问题，要单独修（pin x/net 或跟上游版本），不能靠"CI 别测"掩盖；
+      #   但也不能因此让整个 CI 一直只跑 ./cmd 那 7 个测试。
       - name: 单元测试
-        run: go test ./cmd -count=1
+        run: go test ./util ./database ./core/... -count=1
         working-directory: node
       - name: 构建 sui-agent
         working-directory: node
