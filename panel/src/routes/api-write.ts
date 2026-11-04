@@ -179,7 +179,11 @@ export function registerApiWrite(app: Hono<{ Bindings: Env }>) {
     // 对象内容做结构体检（端口范围/原型污染键/尺寸上限）。
     // 少了这一步，一个非法端口会一路传到节点，渲染出的内核配置不合法 → 节点断流，
     // 而面板显示"保存成功"。
-    if (obj !== "servers") {
+    //
+    // 但删除类 action 的 data 是 **tag 字符串**（前端 `save("inbounds", "del", tag)`），
+    // 不是对象。无条件体检会报「对象内容校验失败：必须是 JSON 对象」，导致删不掉任何对象。
+    const DEL_ACTIONS = new Set(["del", "delbulk", "delete_bulk", "delete"]);
+    if (obj !== "servers" && !DEL_ACTIONS.has(action)) {
       try {
         data = sanitizeObjectData(data);
       } catch (e) {

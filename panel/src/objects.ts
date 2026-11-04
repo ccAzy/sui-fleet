@@ -296,6 +296,36 @@ export async function saveObject(
             );
           }
         }
+
+        // 连带回收 TLS：一键生成的每个入站都有自己的 TLS（名字带端口，1:1）。
+        // 不回收的话，删了入站 TLS 却留在库里，下次再生成就叠一层 ——
+        // 实测 10 台累积了 32 个没任何入站引用的孤儿 TLS。
+        // 只删“删完之后再没任何入站引用”的那些，共用 TLS 不会被误删。
+        const allIbs = await listObjects(db, nodeId, "inbounds");
+        const droppedTls = new Set<number>();
+        for (const ib of allIbs) {
+          if (!ids.includes(num(ib.id))) continue;
+          const tid = num(ib.tls_id);
+          if (tid > 0) droppedTls.add(tid);
+        }
+        if (droppedTls.size > 0) {
+          const stillUsed = new Set<number>();
+          for (const ib of allIbs) {
+            if (ids.includes(num(ib.id))) continue;
+            const tid = num(ib.tls_id);
+            if (tid > 0) stillUsed.add(tid);
+          }
+          for (const tid of droppedTls) {
+            if (stillUsed.has(tid)) continue;
+            stmts.push(
+              db
+                .prepare(
+                  "DELETE FROM objects WHERE node_id = ? AND kind = 'tls' AND obj_id = ?",
+                )
+                .bind(nodeId, tid),
+            );
+          }
+        }
       }
       if (kind === "tls") {
         const inbounds = await listObjects(db, nodeId, "inbounds");
