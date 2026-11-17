@@ -3,7 +3,33 @@ import { createRouter, createWebHistory } from 'vue-router'
 import Login from '@/views/Login.vue'
 import Data from '@/store/modules/data'
 
+// 组件对照页（/devui）只在 `npm run dev` 时可访问。
+//
+// 开关用 vite.config.mts 注入的构建期常量 __DEV_UI__：
+//   serve → true，注册路由
+//   build → false，整个三元表达式静态折叠成 []，DevUi 那个 55 kB 的 chunk
+//           和动态 import 一起被摇掉，不进生产产物（已验证）。
+//
+// 为什么不用 import.meta.env：实测 Vite 8 + Rolldown 在 dev 下没替换它，
+// 连 import.meta.env.PROD 都被算成真值 —— 结果本地 /devui 不注册、还被
+// 轮询的 401 挤到 /login。别在这条路上再试。
+const isLocalDev = __DEV_UI__ && !['sui.example.com', 'hksui.example.com', 'panel.example.org'].includes(location.hostname)
+
 const routes = [
+  ...(isLocalDev
+    ? [
+        {
+          // 必须是单层路径：全局 API 用的是相对路径（`api/load`），
+          // 在 `/dev/ui` 这种二级路径下会被解析成 `/dev/api/load`，
+          // 打不中 vite proxy 的 /api 规则，退回 index.html，
+          // 于是 `_respToMsg` 拿到 HTML 报 `unknown data: <!DOCTYPE html>`。
+          path: '/devui',
+          name: 'dev.ui',
+          meta: { skipPoll: true },
+          component: () => import('@/views/DevUi.vue'),
+        },
+      ]
+    : []),
   {
     path: '/login',
     name: 'pages.login',
@@ -111,7 +137,7 @@ router.beforeEach((to) => {
   }
 
   // Load default data
-  if (to.path !== '/login') {
+  if (to.path !== '/login' && !to.meta.skipPoll) {
     loadDataInterval()
   } else {
     if (intervalId) {

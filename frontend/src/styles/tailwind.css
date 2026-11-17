@@ -1,0 +1,122 @@
+/**
+ * src/styles/tailwind.css
+ *
+ * Tailwind 4 与 Vuetify 4 共存。
+ *
+ * 两个要点：
+ *
+ * 1) 不引入 Tailwind 的 preflight（base 层）。
+ *    preflight 会把 button / input / ul / heading 全部 reset 掉，
+ *    Vuetify 的组件外观会直接被击穿（按钮变裸文本、表单掉边线）。
+ *    只取 theme + utilities 两层。
+ *
+ * 2) 显式声明层的全序。
+ *    Vuetify 4 自己用了 `@layer vuetify-core { @layer reset, base }` 与
+ *    `@layer vuetify-components`。这里把顺序一次写死：
+ *      Vuetify 的 reset/base → Vuetify 组件 → Tailwind theme → Tailwind utilities
+ *    这样 utilities 永远能覆盖 Vuetify（用于局部微调），
+ *    而 Vuetify 的基础 reset 仍然先于一切生效。
+ */
+
+@layer vuetify-core, vuetify-components, theme, base, components, utilities;
+
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+
+/*
+ * shadcn-vue 的语义变量 → 映射到 paper.css 已有的设计 token。
+ * shadcn 组件默认是「灰白 + Inter + 圆角」，这里全部接到「纸面/墨/细线」，
+ * 换组件不换视觉语言。
+ *
+ * 深色主题的对应值在 paper.css 的 .v-theme--dark 里，变量名相同，
+ * 所以这里只做一层转发，不需要再写一遍深色。
+ */
+:root {
+  --background: var(--paper);
+  --foreground: var(--ink);
+
+  --card: var(--surface);
+  --card-foreground: var(--ink);
+
+  --popover: var(--surface);
+  --popover-foreground: var(--ink);
+
+  --primary: var(--accent);
+  --primary-foreground: var(--surface);
+
+  --secondary: var(--surface-2);
+  --secondary-foreground: var(--ink-2);
+
+  --muted: var(--surface-2);
+  --muted-foreground: var(--ink-3);
+
+  --accent: var(--accent-soft);
+  --accent-foreground: var(--accent);
+
+  --destructive: var(--error);
+  --destructive-foreground: var(--surface);
+
+  --border: var(--rule);
+  --input: var(--rule-strong);
+  --ring: var(--accent);
+
+  /* 账簿风格是「纸 + 细线」，不是卡片堆叠：圆角克制 */
+  --radius: 0.25rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+
+  /* 字体沿用 DESIGN.md：标题思源宋，正文系统字，数据等宽 */
+  --font-serif: var(--serif);
+}
+
+@layer base {
+  /*
+   * 组件内的原生 <button>：清掉浏览器默认外观。
+   *
+   * 这个项目没引 Tailwind preflight（它会 reset button/input/ul，把 Vuetify 打穿），
+   * 于是原生 button 会带着 UA 的灰底和 2px 边框跑出来 —— 弹窗右上角的关闭按钮
+   * 就变成一个「带边框的小方块」。
+   * 所以不在全局 reset，改成需要的地方显式挂 .ui-reset。
+   *
+   * 放 base 层而不是 utilities 层：utilities 里的 bg-[var(--ink)] 这类类名
+   * 必须能盖过它，否则按钮会被重置成透明底（踩过）。
+   */
+  .ui-reset {
+    appearance: none;
+    background: transparent;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+  }
+
+  .ui-reset:disabled {
+    cursor: not-allowed;
+  }
+}

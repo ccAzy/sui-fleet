@@ -34,9 +34,9 @@
 
           <p v-if="error" class="login-error">{{ error }}</p>
 
-          <button class="login-submit" type="submit" :disabled="loading">
+          <Button type="submit" :disabled="loading" class="mt-[6px] w-full">
             {{ loading ? '…' : $t('actions.submit') }}
-          </button>
+          </Button>
         </form>
 
 
@@ -64,9 +64,9 @@
 
           <p v-if="error" class="login-error">{{ error }}</p>
 
-          <button class="login-submit" type="submit" :disabled="loading">
+          <Button type="submit" :disabled="loading" class="mt-[6px] w-full">
             {{ loading ? '…' : $t('actions.submit') }}
-          </button>
+          </Button>
 
           <div class="login-alt">
             <button type="button" class="linkish" @click="toggleRecovery">
@@ -97,6 +97,7 @@ import { useLocale } from 'vuetify'
 import { i18n, languages, setLocale } from '@/locales'
 import { useRouter } from 'vue-router'
 import HttpUtil from '@/plugins/httputil'
+import Button from '@/components/ui/button/Button.vue'
 
 const locale = useLocale()
 const username = ref('')
@@ -273,29 +274,8 @@ const changeLocale = async (l: string) => {
   color: var(--error);
 }
 
-.login-submit {
-  margin-top: 6px;
-  height: 40px;
-  border: 1px solid var(--ink);
-  border-radius: 2px;
-  background: var(--ink);
-  color: var(--paper);
-  font-family: var(--sans);
-  font-size: var(--fs-base);
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  cursor: pointer;
-  transition: opacity 160ms cubic-bezier(0.16, 1, 0.3, 1);
-}
 
-.login-submit:hover:not(:disabled) {
-  opacity: 0.88;
-}
 
-.login-submit:disabled {
-  opacity: 0.55;
-  cursor: progress;
-}
 
 .login-foot {
   margin-top: 44px;

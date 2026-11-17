@@ -4,6 +4,11 @@
  * Bootstraps Vuetify and other plugins then mounts the App`
  */
 
+// Tailwind 必须最先加载：它的 @layer 语句用来定死全序
+// （vuetify-core → vuetify-components → theme → utilities），
+// 晚于 Vuetify 样式加载就排不进去。详见该文件顶部注释。
+import '@/styles/tailwind.css'
+
 // Composables
 import { createApp, ref } from 'vue'
 
