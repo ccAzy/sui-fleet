@@ -1,9 +1,18 @@
 <template>
   <v-app>
     <div class="login-page">
-      <div class="login-sheet">
+      <div class="login-glow login-glow--a" aria-hidden="true"></div>
+      <div class="login-glow login-glow--b" aria-hidden="true"></div>
+
+      <div class="login-card">
         <header class="login-head">
-          <h1 class="login-title">s-ui cloud</h1>
+          <div class="login-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round">
+              <path d="M12 2L3 7v10l9 5 9-5V7z" />
+              <path d="M12 12l9-5M12 12v10M12 12L3 7" />
+            </svg>
+          </div>
+          <h1 class="login-title">s-ui <i>cloud</i></h1>
           <p class="login-sub">{{ $t('login.tagline') }}</p>
         </header>
 
@@ -34,11 +43,21 @@
 
           <p v-if="error" class="login-error">{{ error }}</p>
 
-          <Button type="submit" :disabled="loading" class="mt-[6px] w-full">
-            {{ loading ? '…' : $t('actions.submit') }}
-          </Button>
+          <button type="submit" class="login-submit" :disabled="loading">
+            <span v-if="loading" class="login-spinner" aria-hidden="true"></span>
+            {{ loading ? '' : $t('actions.submit') }}
+            <svg
+              v-if="!loading"
+              class="login-arrow"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.2"
+            >
+              <path d="M5 12h13M13 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </button>
         </form>
-
 
         <!-- 第二步：二次验证。密码只换到一张 120 秒的票据，真正的会话在这里才发。 -->
         <form v-else class="login-form" autocomplete="off" @submit.prevent="submitOtp">
@@ -54,7 +73,7 @@
               :class="{ 'field-input--code': !useRecovery }"
               :name="useRecovery ? 'recovery' : 'otp'"
               :inputmode="useRecovery ? 'text' : 'numeric'"
-              :autocomplete="useRecovery ? 'one-time-code' : 'one-time-code'"
+              autocomplete="one-time-code"
               :maxlength="useRecovery ? 12 : 6"
               spellcheck="false"
               autofocus
@@ -64,9 +83,10 @@
 
           <p v-if="error" class="login-error">{{ error }}</p>
 
-          <Button type="submit" :disabled="loading" class="mt-[6px] w-full">
-            {{ loading ? '…' : $t('actions.submit') }}
-          </Button>
+          <button type="submit" class="login-submit" :disabled="loading">
+            <span v-if="loading" class="login-spinner" aria-hidden="true"></span>
+            {{ loading ? '' : $t('actions.submit') }}
+          </button>
 
           <div class="login-alt">
             <button type="button" class="linkish" @click="toggleRecovery">
@@ -78,7 +98,7 @@
         </form>
 
         <footer class="login-foot">
-
+          <span class="login-sep" aria-hidden="true"></span>
           <label class="login-lang">
             <span class="sr-only">Language</span>
             <select :value="$i18n.locale" @change="changeLocale(($event.target as HTMLSelectElement).value)">
@@ -97,7 +117,6 @@ import { useLocale } from 'vuetify'
 import { i18n, languages, setLocale } from '@/locales'
 import { useRouter } from 'vue-router'
 import HttpUtil from '@/plugins/httputil'
-import Button from '@/components/ui/button/Button.vue'
 
 const locale = useLocale()
 const username = ref('')
@@ -180,55 +199,106 @@ const changeLocale = async (l: string) => {
 </script>
 
 <style scoped>
-/* 扉页：不要卡片框，直接排版在纸面上 */
+/* 扉页：纸上的一张卡片，两侧各一团光晕做纵深 */
 .login-page {
-  min-height: 100svh;   /* 不用 100vh：手机上 100vh 是地址栏收起后的高度，会被裁 */
+  position: relative;
+  min-height: 100svh;
   display: grid;
   place-items: center;
   padding: 48px 24px;
+  overflow: hidden;
   background: var(--paper);
 }
 
-.login-sheet {
+.login-glow {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  pointer-events: none;
+}
+.login-glow--a {
+  width: 620px;
+  height: 420px;
+  left: -140px;
+  top: -120px;
+  background: radial-gradient(circle, var(--glow-1), transparent 66%);
+}
+.login-glow--b {
+  width: 560px;
+  height: 380px;
+  right: -120px;
+  bottom: -140px;
+  background: radial-gradient(circle, var(--glow-2), transparent 66%);
+}
+
+.login-card {
+  position: relative;
+  z-index: 1;
   width: 100%;
-  max-width: 340px;
+  max-width: 372px;
+  padding: 30px 28px 18px;
+  border-radius: 16px;
+  border: 1px solid var(--card-line);
+  background: var(--card-bg);
+  box-shadow: var(--card-shadow), 0 30px 70px -30px rgba(0, 0, 0, 0.45);
 }
 
 .login-head {
-  margin-bottom: 40px;
+  margin-bottom: 24px;
+}
+
+.login-mark {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(
+    140deg,
+    color-mix(in srgb, var(--accent) 70%, #fff),
+    var(--accent) 45%,
+    var(--accent-2)
+  );
+  box-shadow: 0 0 22px -2px var(--accent), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  margin-bottom: 16px;
+}
+.login-mark svg {
+  width: 17px;
+  height: 17px;
 }
 
 .login-title {
+  margin: 0;
   font-family: var(--serif);
-  font-size: var(--fs-2xl);
+  font-size: 25px;
   font-weight: 600;
   line-height: 1.2;
   letter-spacing: 0.01em;
-  color: var(--ink);
-  margin: 0;
+  background: linear-gradient(180deg, var(--ink), color-mix(in srgb, var(--ink) 55%, var(--ink-3)));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
-
-/* 标题下的一条短线，全站统一的纸面语言 */
-.login-title::after {
-  content: "";
-  display: block;
-  width: 28px;
-  height: 1px;
-  margin-top: 14px;
-  background: var(--ink);
+.login-title i {
+  font-style: normal;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  -webkit-text-fill-color: var(--ink-3);
+  margin-left: 6px;
 }
 
 .login-sub {
-  margin: 14px 0 0;
-  font-size: var(--fs-sm);
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
   color: var(--ink-3);
-  letter-spacing: 0.02em;
 }
 
 .login-form {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 14px;
 }
 
 .field {
@@ -237,90 +307,119 @@ const changeLocale = async (l: string) => {
 
 .field-label {
   display: block;
-  font-size: var(--fs-xs);
-  letter-spacing: 0.09em;
+  margin-bottom: 6px;
+  font-size: 9.5px;
+  letter-spacing: 0.15em;
   text-transform: uppercase;
   color: var(--ink-3);
-  margin-bottom: 2px;
+  font-weight: 700;
 }
 
 .field-input {
   width: 100%;
-  background: transparent;
-  border: 0;
-  border-bottom: 1px solid var(--rule-strong);
-  border-radius: 0;
-  padding: 0;
-  height: 30px;
-  line-height: 30px;
-  font-family: var(--sans);
-  font-size: var(--fs-lg);
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 9px;
+  border: 1px solid var(--rule-strong);
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
   color: var(--ink);
+  font-size: 13.5px;
+  font-family: var(--sans);
   outline: none;
-  transition: border-color 160ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
 }
-
-.field-input:focus {
-  border-bottom-color: var(--accent);
-}
-
 .field-input::placeholder {
   color: var(--ink-3);
 }
+.field-input:hover {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--rule-strong));
+}
+.field-input:focus {
+  border-color: var(--accent);
+  background: var(--surface);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.field-input--code {
+  font-family: var(--mono);
+  letter-spacing: 0.4em;
+  text-align: center;
+}
 
 .login-error {
-  margin: -8px 0 0;
-  font-size: var(--fs-sm);
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.5;
   color: var(--error);
-}
-
-
-
-
-.login-foot {
-  margin-top: 44px;
-  padding-top: 16px;
-  border-top: 1px solid var(--rule);
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 16px;
-}
-
-.login-lang select {
-  background: transparent;
-  border: 1px solid var(--rule-strong);
-  border-radius: 2px;
-  color: var(--ink-2);
-  font-family: var(--sans);
-  font-size: var(--fs-xs);
-  padding: 4px 6px;
-  cursor: pointer;
-}
-
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
+  padding: 7px 10px;
+  border-radius: 7px;
+  background: var(--error-soft);
+  border: 1px solid color-mix(in srgb, var(--error) 26%, transparent);
 }
 
 .login-note {
-  margin: 0 0 20px;
-  font-size: var(--fs-sm);
+  margin: 0;
+  font-size: 12px;
   line-height: 1.6;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
-/* 6 位码用等宽 + 字距，一眼看清每一位 */
-.field-input--code {
-  font-family: var(--mono);
-  font-size: var(--fs-xl);
-  letter-spacing: 0.32em;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
+.login-submit {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 40px;
+  margin-top: 4px;
+  border: 0;
+  border-radius: 9px;
+  cursor: pointer;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent) 72%, #fff),
+    var(--accent) 42%,
+    var(--accent-2)
+  );
+  box-shadow: 0 10px 26px -10px var(--accent), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transition: transform 0.16s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.16s ease, opacity 0.16s ease;
+}
+.login-submit:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 32px -10px var(--accent), inset 0 1px 0 rgba(255, 255, 255, 0.36);
+}
+.login-submit:active:not(:disabled) {
+  transform: translateY(0) scale(0.995);
+}
+.login-submit:disabled {
+  cursor: progress;
+  opacity: 0.75;
+}
+
+.login-arrow {
+  width: 15px;
+  height: 15px;
+  transition: transform 0.16s ease;
+}
+.login-submit:hover:not(:disabled) .login-arrow {
+  transform: translateX(2px);
+}
+
+.login-spinner {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  animation: login-spin 0.7s linear infinite;
+}
+@keyframes login-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .login-alt {
@@ -328,29 +427,68 @@ const changeLocale = async (l: string) => {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  margin-top: 18px;
-  font-size: var(--fs-sm);
-  color: var(--ink-3);
+  margin-top: 2px;
 }
-
 .linkish {
-  padding: 0;
   border: 0;
   background: none;
-  color: var(--ink-2);
-  font-size: var(--fs-sm);
+  padding: 0;
   cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  text-decoration-color: var(--rule-strong);
+  font-size: 12px;
+  color: var(--ink-3);
+  transition: color 0.15s ease;
 }
-
 .linkish:hover {
   color: var(--accent);
-  text-decoration-color: var(--accent);
+}
+.dot {
+  color: var(--ink-3);
+  opacity: 0.6;
 }
 
-.login-alt .dot {
-  color: var(--rule-strong);
+.login-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 22px;
+  padding-top: 14px;
+  border-top: 1px solid var(--rule);
+}
+.login-sep {
+  flex: 1;
+}
+.login-lang select {
+  border: 0;
+  background: transparent;
+  color: var(--ink-3);
+  font-size: 11.5px;
+  cursor: pointer;
+  outline: none;
+  padding: 2px 0;
+}
+.login-lang select:hover {
+  color: var(--ink-2);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 480px) {
+  .login-card {
+    padding: 26px 20px 16px;
+    border-radius: 14px;
+  }
+  .login-title {
+    font-size: 22px;
+  }
 }
 </style>

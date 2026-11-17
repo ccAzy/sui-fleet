@@ -9,47 +9,66 @@
  * 标志性动作 = 账簿式名录 .ledger（见文件末尾）。
  * ========================================================================== */
 
-/* ---------- 双主题 token ---------- */
+/* ---------- 双主题 token ----------
+ * Obsidian：夜间是「黑曜石 + 紫蓝辉光」，白天是「冷白纸 + 紫墨」。
+ * 两边共用同一套语义名，切换时只换值，不动结构。
+ * 强调色紫蓝只做三件事：选中、主操作、状态点——不做大面积填充。
+ */
 :root,
+:root[data-theme='light'],
 .v-theme--light {
-  --paper: #f6f5f1;        /* 纸面（不是纯白，也不是偏黄的米色） */
-  --surface: #fffefb;      /* 内容面板，比纸面略亮一档 */
-  --surface-2: #eeede8;    /* 侧栏/工具栏，沉一档 */
-  --ink: #1a1a19;          /* 墨：正文 15.2:1 */
-  --ink-2: #57564f;        /* 次级：说明文字 7.4:1 */
-  --ink-3: #6b6961;        /* 三级/占位：对 --surface 实测 5.45:1、对 --paper 5.04:1（AA 正文） */
-  --rule: #dcdad3;         /* 1px 细线 */
-  --rule-strong: #c3c0b6;  /* 需要更明确的分界 */
-  --accent: #2c4a6e;       /* 墨靛：选中 / 主操作 */
-  --accent-soft: #e6ebf2;
-  --error: #a63a2e;        /* 朱红：异常 */
-  --error-soft: #f4e6e3;
-  --ok: #2f6b4f;           /* 墨绿：正常 */
-  --warn: #8a6a1f;         /* 陈黄：降级 */
-  --shadow-float: 0 6px 24px rgba(26, 26, 25, 0.12), 0 1px 2px rgba(26, 26, 25, 0.06);
-  --scrim: rgba(26, 26, 25, 0.32);
+  --paper: #f5f5f9;        /* 页面底：微冷白，不用米色（米色显旧） */
+  --surface: #ffffff;      /* 卡片 / 面板 */
+  --surface-2: #eeeef4;    /* 次级容器：侧栏、工具条 */
+  --ink: #14141a;          /* 正文 16.9:1 */
+  --ink-2: #55555f;        /* 次级 7.4:1 */
+  --ink-3: #767680;        /* 三级/占位 4.6:1（AA 正文） */
+  --rule: rgba(20, 20, 26, 0.085);
+  --rule-strong: rgba(20, 20, 26, 0.15);
+  --accent: #6d5ce0;       /* 紫墨：白底上要比深色主题里更深，否则发灰 */
+  --accent-2: #3b82f6;     /* 渐变另一端 */
+  --accent-soft: rgba(109, 92, 224, 0.1);
+  --error: #d92d5c;
+  --error-soft: rgba(217, 45, 92, 0.09);
+  --ok: #0f9d58;
+  --warn: #b45309;
+  --glow-1: rgba(109, 92, 224, 0.1);   /* 页面左上光晕 */
+  --glow-2: rgba(59, 130, 246, 0.075); /* 右上光晕 */
+  --card-bg: linear-gradient(180deg, #ffffff, #fcfcfe);
+  --card-line: rgba(20, 20, 26, 0.08);
+  --card-highlight: inset 0 1px 0 #ffffff;
+  --card-shadow: 0 1px 2px rgba(20, 20, 26, 0.05), 0 6px 18px -8px rgba(20, 20, 26, 0.1);
+  --card-shadow-hover: 0 2px 4px rgba(20, 20, 26, 0.06), 0 16px 34px -14px rgba(20, 20, 26, 0.18);
+  --shadow-float: 0 20px 48px -16px rgba(20, 20, 26, 0.22), 0 2px 6px rgba(20, 20, 26, 0.06);
+  --scrim: rgba(20, 20, 26, 0.34);
 }
 
-.v-theme--dark {
-  --paper: #121211;
-  --surface: #191918;
-  --surface-2: #101010;
-  --ink: #e9e7e1;
-  --ink-2: #a8a59c;
-  /* 由 #7e7b73 提亮：#7e7b73 对 --surface #191918 实测仅 4.16:1、对 --paper
-     #121211 仅 4.43:1，低于 WCAG AA 4.5:1，而它承载 .ledger-state / 占位 / 计数
-     等可读正文。改为 #908d84 后实测 surface 5.30:1、paper 5.65:1。 */
-  --ink-3: #908d84;
-  --rule: #2b2b29;
-  --rule-strong: #3d3d3a;
-  --accent: #8fb2da;
-  --accent-soft: #1c2733;
-  --error: #dd7f72;
-  --error-soft: #2e1a17;
-  --ok: #86c2a1;
-  --warn: #cfae64;
-  --shadow-float: 0 8px 28px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.4);
-  --scrim: rgba(0, 0, 0, 0.6);
+.v-theme--dark,
+:root[data-theme='dark'] {
+  --paper: #070708;
+  --surface: #0e0e12;
+  --surface-2: #16161c;
+  --ink: #f0f0f4;          /* 16.1:1 */
+  --ink-2: #b6b6c2;        /* 8.4:1 */
+  --ink-3: #7a7a88;        /* 4.6:1（原 #6b6b7a 只有 3.9，不够） */
+  --rule: rgba(255, 255, 255, 0.075);
+  --rule-strong: rgba(255, 255, 255, 0.14);
+  --accent: #8b7bff;
+  --accent-2: #4ea8ff;
+  --accent-soft: rgba(139, 123, 255, 0.14);
+  --error: #fb7185;
+  --error-soft: rgba(251, 113, 133, 0.12);
+  --ok: #34d399;
+  --warn: #fbbf24;
+  --glow-1: rgba(139, 123, 255, 0.2);
+  --glow-2: rgba(78, 168, 255, 0.13);
+  --card-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.012));
+  --card-line: rgba(255, 255, 255, 0.075);
+  --card-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --card-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 2px 4px rgba(0, 0, 0, 0.5);
+  --card-shadow-hover: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 16px 32px -14px rgba(0, 0, 0, 0.95);
+  --shadow-float: 0 24px 60px -20px rgba(0, 0, 0, 0.9), 0 2px 8px rgba(0, 0, 0, 0.55);
+  --scrim: rgba(0, 0, 0, 0.62);
 }
 
 /* ---------- 字体：标题衬线，正文无衬线，数据等宽 ---------- */
@@ -278,10 +297,18 @@ kbd,
 
 /* ---------- 去掉卡片与阴影（世界决定） ---------- */
 .v-card {
-  background: var(--surface) !important;
-  border: 1px solid var(--rule) !important;
-  border-radius: 2px !important;
-  box-shadow: none !important;
+  background: var(--card-bg) !important;
+  border: 1px solid var(--card-line) !important;
+  border-radius: 12px !important;
+  box-shadow: var(--card-shadow) !important;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .v-card:hover {
+    box-shadow: var(--card-shadow-hover) !important;
+  }
 }
 
 .v-card--variant-tonal,
@@ -303,43 +330,109 @@ kbd,
   opacity: 1 !important;
 }
 
-/* ---------- 顶栏 / 侧栏 ---------- */
+/* ---------- 顶栏 / 侧栏（Obsidian） ---------- */
 .v-app-bar {
-  background: var(--paper) !important;
+  background: color-mix(in srgb, var(--paper) 84%, transparent) !important;
   border-bottom: 1px solid var(--rule) !important;
   box-shadow: none !important;
 }
 
 .v-app-bar .v-toolbar-title {
   font-family: var(--serif);
-  font-size: var(--fs-lg);
-  letter-spacing: 0.02em;
+  font-size: 17px;
+  letter-spacing: 0.01em;
 }
 
 .v-navigation-drawer {
-  background: var(--surface-2) !important;
+  background: color-mix(in srgb, var(--paper) 94%, transparent) !important;
   border-right: 1px solid var(--rule) !important;
   box-shadow: none !important;
 }
 
+.v-navigation-drawer .v-list {
+  padding: 0 8px;
+}
+
 .v-navigation-drawer .v-list-item {
-  min-height: 32px;
-  border-radius: 0;
+  position: relative;
+  min-height: 34px;
+  border-radius: 7px;
+  margin-bottom: 1px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .v-navigation-drawer .v-list-item:hover {
+    background: color-mix(in srgb, var(--ink) 5%, transparent) !important;
+    color: var(--ink) !important;
+  }
 }
 
 .v-navigation-drawer .v-list-item--active {
-  background: transparent !important;
+  background: linear-gradient(90deg, var(--accent-soft), transparent) !important;
+  color: var(--ink) !important;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 26%, transparent);
+}
+
+.v-navigation-drawer .v-list-item--active::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2px;
+  height: 16px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--accent), var(--accent-2));
+  box-shadow: 0 0 10px var(--accent);
+}
+
+.v-navigation-drawer .v-list-item--active .v-icon {
   color: var(--accent) !important;
-  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.v-navigation-drawer .v-list-item .v-icon {
+  opacity: 0.78;
+}
+
+.v-navigation-drawer .v-list-item--active .v-icon {
+  opacity: 1;
 }
 
 .v-navigation-drawer .v-list-subheader {
-  font-size: var(--fs-xs);
-  letter-spacing: 0.1em;
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--ink-3);
-  min-height: 28px;
-  padding-inline-start: 16px;
+  font-weight: 700;
+  min-height: 26px;
+  padding-inline-start: 12px;
+}
+
+/* 品牌区（Drawer 顶部） */
+.v-navigation-drawer .brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 16px 16px 18px;
+}
+
+.v-navigation-drawer .brand-mark {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  padding: 5px;
+  background: linear-gradient(140deg, color-mix(in srgb, var(--accent) 70%, #fff), var(--accent) 45%, var(--accent-2));
+  box-shadow: 0 0 20px -2px var(--accent), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.v-navigation-drawer .brand-name {
+  font-family: var(--serif);
+  font-size: 15px;
+  letter-spacing: 0.01em;
+  color: var(--ink);
 }
 
 /* ---------- 控件：2px 圆角、1px 边、无填充 ---------- */
@@ -639,4 +732,124 @@ body .v-overlay__content.v-tooltip {
   .ledger-meta {
     display: none;
   }
+}
+
+/* ============================================================================
+ * Obsidian 皮肤层
+ *
+ * 底色不是纯色平面：两层很淡的径向光晕 + 一层极细噪点。
+ * 光晕给纵深（深色下是紫蓝辉光，浅色下是紫蓝淡雾），噪点去掉塑料感。
+ * 三层都挂在 .v-application 和 body 上，避免 Vuetify 自己的背景色盖掉。
+ * ========================================================================== */
+
+body,
+.v-application {
+  background-color: var(--paper) !important;
+  background-image:
+    radial-gradient(760px 420px at 8% -6%, var(--glow-1), transparent 62%),
+    radial-gradient(680px 380px at 96% 0%, var(--glow-2), transparent 60%) !important;
+  background-repeat: no-repeat !important;
+  background-attachment: fixed !important;
+  color: var(--ink);
+}
+
+/* 噪点：透明度极低，只为打散大面积平涂 */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.028;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.v-theme--dark body::before,
+:root[data-theme='dark'] body::before {
+  opacity: 0.04;
+}
+
+/* ---------- 精装卡片：Obsidian 的通用容器 ---------- */
+.obs-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid var(--card-line);
+  background: var(--card-bg);
+  box-shadow: var(--card-shadow);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .obs-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--card-shadow-hover);
+  }
+}
+
+/* 卡片右上角的一团光：深色下是辉光，浅色下是淡雾 */
+.obs-halo {
+  position: absolute;
+  width: 170px;
+  height: 170px;
+  right: -60px;
+  top: -70px;
+  border-radius: 50%;
+  filter: blur(52px);
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+.obs-halo--violet { background: radial-gradient(circle, var(--accent), transparent 68%); }
+.obs-halo--blue { background: radial-gradient(circle, var(--accent-2), transparent 68%); }
+.obs-halo--ok { background: radial-gradient(circle, var(--ok), transparent 68%); }
+.obs-halo--warn { background: radial-gradient(circle, var(--warn), transparent 68%); }
+
+/* 大数字：等宽 + 渐变字 */
+.obs-num {
+  font-family: var(--mono);
+  font-size: 27px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  background: linear-gradient(120deg, var(--ink), var(--accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.obs-label {
+  font-size: 9.5px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-weight: 700;
+}
+
+/* 主按钮：紫蓝渐变 + 内高光 */
+.obs-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 15px;
+  border: 0;
+  border-radius: 9px;
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 72%, #fff), var(--accent) 42%, var(--accent-2));
+  box-shadow: 0 8px 22px -8px var(--accent), inset 0 1px 0 rgba(255, 255, 255, 0.32);
+  transition: transform 0.16s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.16s ease;
+}
+
+.obs-btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 28px -8px var(--accent), inset 0 1px 0 rgba(255, 255, 255, 0.38);
+}
+
+.obs-btn-primary:active {
+  transform: translateY(0) scale(0.99);
 }

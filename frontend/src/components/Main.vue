@@ -367,4 +367,131 @@ const restartSingbox = async () => {
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 0 var(--s4);
 }
+
+/* ═══════════════════════════════════════════════════════════════
+ * Obsidian 精装层
+ *
+ * 体检单的结构没动（四列读数 → 曲线 → 两列对账），只是把每一段
+ * 从「靠横线分割的平面」变成「浮在底上的卡片」，读数从 13px 正文
+ * 提升为等宽大数字。数据缺位时保持 '-'，不画空的仪表盘。
+ * ═══════════════════════════════════════════════════════════════ */
+
+:deep(.metres) {
+  gap: 11px;
+  border-bottom: 0;
+  margin-top: 16px;
+}
+
+:deep(.metre) {
+  border: 1px solid var(--card-line);
+  border-radius: 12px;
+  background: var(--card-bg);
+  box-shadow: var(--card-shadow);
+  padding: 14px 15px;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  :deep(.metre:hover) {
+    transform: translateY(-2px);
+    box-shadow: var(--card-shadow-hover);
+  }
+}
+
+:deep(.metre + .metre) {
+  border-left: 1px solid var(--card-line);
+  padding-left: 15px;
+}
+
+:deep(.metre-label) {
+  font-size: 9.5px;
+  letter-spacing: 0.15em;
+  font-weight: 700;
+  color: var(--ink-3);
+}
+
+/* 读数：等宽大数字 */
+:deep(.metre .value),
+:deep(.metre-value) {
+  font-family: var(--mono);
+  font-size: 27px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--ink);
+}
+
+:deep(.sparks) {
+  gap: 11px;
+  margin-top: 11px;
+}
+
+:deep(.spark) {
+  border: 1px solid var(--card-line);
+  border-radius: 12px;
+  background: var(--card-bg);
+  box-shadow: var(--card-shadow);
+  padding: 13px 15px 6px;
+}
+
+:deep(.spark-title) {
+  font-family: var(--serif);
+  font-size: 13.5px;
+  color: var(--ink);
+  letter-spacing: 0.01em;
+}
+
+:deep(.spark-legend) {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+:deep(.sheet-rows) {
+  gap: 11px;
+  margin-top: 11px;
+}
+
+:deep(.sheet-block) {
+  border: 1px solid var(--card-line);
+  border-radius: 12px;
+  background: var(--card-bg);
+  box-shadow: var(--card-shadow);
+  padding: 14px 16px;
+}
+
+:deep(.sheet-block h3) {
+  font-family: var(--serif);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 10px;
+}
+
+:deep(.row-line) {
+  padding: 5px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+:deep(.row-line:last-child) {
+  border-bottom: 0;
+}
+
+:deep(.row-line .k) {
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+:deep(.row-line .v) {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+:deep(.row-line .v.is-text) {
+  font-family: var(--sans);
+}
+
 </style>

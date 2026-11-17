@@ -31,7 +31,12 @@
     参数（等宽 + · 分隔）、操作（默认隐形，hover/聚焦才出现）。
     原来这里是 v-card 网格，每个服务一个框，和站点其余列表页不是同一套语言。
   -->
-  <div v-else class="ledger">
+  <div v-else class="obs-card svc-panel">
+    <div class="svc-panel-head">
+      <span class="svc-panel-title">{{ $t('pages.services') }}</span>
+      <span class="svc-panel-count">{{ services.length }}</span>
+    </div>
+    <div class="ledger svc-ledger">
     <div v-for="item in services" :key="item.tag" class="ledger-row">
       <span class="ledger-mark" :data-state="item.tls_id > 0 ? 'up' : 'down'" aria-hidden="true"></span>
 
@@ -65,6 +70,7 @@
         >
           <Trash2 class="h-3.5 w-3.5" />
         </button>
+        </div>
       </div>
     </div>
   </div>
@@ -148,3 +154,82 @@ const doDelete = async () => {
   }
 }
 </script>
+
+<style scoped>
+/* 服务页：卡片容器的表头 + 账簿行对齐 Obsidian 的圆角与间距 */
+.svc-panel {
+  margin-top: 2px;
+}
+
+.svc-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.svc-panel-title {
+  font-family: var(--serif);
+  font-size: 14.5px;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+}
+
+.svc-panel-count {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--ink-3);
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  padding: 1px 6px;
+  border-radius: 5px;
+}
+
+.svc-ledger {
+  border-top: 0;
+  margin-top: 0;
+  padding: 0 16px;
+}
+
+/* 行高与 hover 竖条：和设计稿的列表一致 */
+.svc-ledger :deep(.ledger-row) {
+  position: relative;
+  /* 名称列限宽，参数紧跟其后——原来是 1.4fr / 2fr 平分，
+     在宽屏上会把名称和参数甩到屏幕两端，中间空一大片 */
+  grid-template-columns: 14px minmax(0, 240px) minmax(0, 1fr) auto;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.svc-ledger :deep(.ledger-row:last-child) {
+  border-bottom: 0;
+}
+
+.svc-ledger :deep(.ledger-row)::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--accent), var(--accent-2));
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .svc-ledger :deep(.ledger-row:hover)::before {
+    opacity: 1;
+  }
+}
+
+.svc-ledger :deep(.ledger-name) {
+  font-size: 13px;
+}
+
+.svc-ledger :deep(.ledger-meta) {
+  font-size: 11.5px;
+}
+</style>
