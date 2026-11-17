@@ -8,8 +8,15 @@
 ## 一条命令装好（自托管）
 
 ```bash
+# 境外 / 有代理
 curl -fsSL https://raw.githubusercontent.com/exampleuser/sui-fleet/main/install.sh | sudo bash
+
+# 国内直连（raw.githubusercontent.com 常被墙，走镜像）
+curl -fsSL https://ghproxy.net/https://raw.githubusercontent.com/exampleuser/sui-fleet/main/install.sh | sudo bash
 ```
+
+> 镜像站是第三方服务，可能失效。失效时用第一种，或把 `install.sh` 下到本机再 `sudo bash install.sh`。
+> 脚本里下载代码用的也是 GitHub 归档地址，国内慢的话加 `HTTP_PROXY` 环境变量。
 
 跑完会打印面板地址和一个随机生成的管理员密码。它做的事：装 Node ≥22.5 → 取代码 → 装依赖 →
 建库建管理员 → 写 systemd → 起服务 → 自检 → 顺便把本机也装成节点。
