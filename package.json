@@ -1,5 +1,5 @@
 {
-  "name": "sui-cf",
+  "name": "sui-fleet",
   "private": true,
   "description": "s-ui Cloud 控制面（面板 + 自托管运行时 + 仲裁者 + 节点 agent）",
   "license": "GPL-3.0-or-later",

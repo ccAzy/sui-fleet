@@ -1,12 +1,40 @@
-# s-ui Cloud
+# sui-fleet
+
+> **Fork 血统**：[alireza0/s-ui](https://github.com/alireza0/s-ui) → [Teminuosi/s-ui](https://github.com/Teminuosi/s-ui) → **本仓库**
+>
+> 上游 s-ui 是「面板 + 订阅 + 内嵌 sing-box 内核」的一体机；本项目把**管理面**和**转发面**拆开，
+> 让一个面板管住散落在各机房的多个节点。协议渲染逻辑没有重写，仍走上游的 `GetAllConfig / addUsers / StartCore`。
+
+## 一条命令装好（自托管）
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/exampleuser/sui-fleet/main/install.sh | sudo bash
+```
+
+跑完会打印面板地址和一个随机生成的管理员密码。它做的事：装 Node ≥22.5 → 取代码 → 装依赖 →
+建库建管理员 → 写 systemd → 起服务 → 自检 → 顺便把本机也装成节点。
+
+<details>
+<summary>可选参数</summary>
+
+| 参数 | 作用 |
+| --- | --- |
+| `--domain panel.example.com` | 装完自动配 Caddy 反代（自签证书，配合 Cloudflare Full 模式） |
+| `--no-agent` | 只装面板，不装本机节点 |
+| `--port 8788` | 面板端口 |
+| `--dir` / `--service` / `--user` | 安装目录 / 服务名 / 服务账号（同机并存多套时用） |
+| `--skip-deps` | 离线环境（包里已带 node_modules） |
+
+要求：Debian/Ubuntu 系的 Linux、有 systemd、root 权限。
+</details>
 
 把 **s-ui 的管理面板**放到 Cloudflare，代理节点仍然跑在你自己的服务器上。
 
 [![License: GPL v3](https://img.shields.io/badge/license-GPL%20V3-blue.svg)](./LICENSE)
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/YOUR_GITHUB_USER/sui-cf/tree/main/panel)
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/exampleuser/sui-fleet/tree/main/panel)
 
 > 上面的按钮：点一下就用你自己的 Cloudflare 账号跑起来。Cloudflare 会 fork 仓库到你的 GitHub、**自动创建 D1 数据库**、构建并部署，最后提示你填 `ADMIN_PASS`。
-> （把 `YOUR_GITHUB_USER` 换成实际仓库地址后才能点。）
+> （已填成本仓库地址，点之前确认你自己 fork 了一份。）
 >
 > 仅用于个人学习与交流，请遵守你所在地区的法律法规。上游版权归原作者所有。
 
@@ -58,7 +86,7 @@
 #### 方式 A：一键（点按钮）
 
 ```markdown
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/YOUR_GITHUB_USER/sui-cf/tree/main/panel)
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/exampleuser/sui-fleet/tree/main/panel)
 ```
 
 Cloudflare 会读仓库里的 `panel/wrangler.toml`，自动创建 D1 并把真实 `database_id` 回填到你克隆出的仓库，然后部署。前端产物（`panel/frontend-dist`）已随仓库提交，所以**部署时不需要构建**。
@@ -256,8 +284,8 @@ GitHub 账号不可用时，提交历史只剩本地一个磁盘。留一份异�
 
 ```bash
 # 首次：在任一台自己的机器上建裸库
-ssh -p 6688 root@<host> 'mkdir -p /opt/git && git init --bare /opt/git/sui-cf.git'
-git remote add offsite ssh://root@<host>:6688/opt/git/sui-cf.git
+ssh -p 6688 root@<host> 'mkdir -p /opt/git && git init --bare /opt/git/sui-fleet.git'
+git remote add offsite ssh://root@<host>:6688/opt/git/sui-fleet.git
 
 # 每次收工后
 git push offsite --all && git push offsite --tags
@@ -267,7 +295,7 @@ git push offsite --all && git push offsite --tags
 
 ```bash
 git ls-remote offsite | head -1   # 远端 HEAD 应等于本地 git rev-parse HEAD
-git clone ssh://root@<host>:6688/opt/git/sui-cf.git /tmp/chk && git -C /tmp/chk rev-list --count HEAD
+git clone ssh://root@<host>:6688/opt/git/sui-fleet.git /tmp/chk && git -C /tmp/chk rev-list --count HEAD
 ```
 
 ## 审计与修复记录

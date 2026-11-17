@@ -2,7 +2,7 @@
 #
 # s-ui Cloud 一键安装 —— 一条命令，从裸机到「打开网址就能登录」
 #
-#   curl -fsSL https://raw.githubusercontent.com/OWNER/sui-cf/main/install.sh | sudo bash
+#   curl -fsSL https://raw.githubusercontent.com/exampleuser/sui-fleet/main/install.sh | sudo bash
 #
 # 装什么：
 #   1. Node ≥ 22.5（没有就装官方二进制，走 npmmirror 镜像）
@@ -38,7 +38,7 @@ dim()  { printf '%s    %s%s\n' "$C_DIM" "$*" "$C_0"; }
 # ---------------------------------------------------------------- 参数
 DOMAIN=""
 PORT="8788"
-SRC="https://github.com/OWNER/sui-cf/archive/refs/heads/main.tar.gz"
+SRC="https://github.com/exampleuser/sui-fleet/archive/refs/heads/main.tar.gz"
 AGENT_URL=""
 WITH_AGENT=1
 FORCE=0
