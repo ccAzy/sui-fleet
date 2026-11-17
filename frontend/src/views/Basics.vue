@@ -240,7 +240,17 @@ const oldConfig = ref({})
 const loading = ref(false)
 
 const appConfig = computed((): Config => {
-  return <Config> Data().config
+  // 配置缺字段时整个页面会炸：模板里写的是 appConfig.log.level 这种裸访问，
+  // 只要 config 是空对象，访问到第二层就抛 TypeError，Vue 直接中断渲染
+  // ——表现是整页全黑（dev 库没造 config 时踩过）。
+  // 这里把三个分组兜成空对象，至少不会崩；具体字段再由 v-if 判断。
+  const c = (Data().config ?? {}) as any
+  return <Config>{
+    ...c,
+    log: c.log ?? {},
+    experimental: c.experimental ?? {},
+    ntp: c.ntp ?? {},
+  }
 })
 
 onBeforeMount(async () => {
