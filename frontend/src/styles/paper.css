@@ -322,7 +322,7 @@ kbd,
 .v-dialog > .v-card,
 .v-menu > .v-overlay__content {
   box-shadow: var(--shadow-float) !important;
-  border-radius: 2px !important;
+  border-radius: 10px !important;
 }
 
 .v-divider {
@@ -435,31 +435,53 @@ kbd,
   color: var(--ink);
 }
 
-/* ---------- 控件：2px 圆角、1px 边、无填充 ---------- */
+/* ---------- 控件：Obsidian 精装 ---------- */
 .v-btn {
-  border-radius: 2px !important;
+  border-radius: 9px !important;
   box-shadow: none !important;
   text-transform: none !important;
   letter-spacing: 0 !important;
-  font-weight: 500;
+  font-weight: 600;
+  font-size: 12.5px !important;
+  transition: background-color 0.16s ease, box-shadow 0.16s ease,
+    transform 0.16s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 
+/* 主操作：紫蓝渐变 + 内高光 */
 .v-btn--variant-flat {
-  border: 1px solid var(--accent);
+  background: linear-gradient(135deg, var(--accent), var(--accent-2)) !important;
+  color: #fff !important;
+  box-shadow: 0 6px 18px -8px var(--accent), inset 0 1px 0 rgba(255, 255, 255, 0.28) !important;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .v-btn--variant-flat:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 24px -8px var(--accent), inset 0 1px 0 rgba(255, 255, 255, 0.34) !important;
+  }
 }
 
 .v-btn--variant-outlined {
   border-color: var(--rule-strong) !important;
+  background: color-mix(in srgb, var(--surface) 55%, transparent) !important;
 }
 
 .v-btn--variant-text {
-  padding-inline: var(--s2);
+  padding-inline: 10px;
 }
 
+@media (hover: hover) and (pointer: fine) {
+  .v-btn--variant-text:hover {
+    background: color-mix(in srgb, var(--ink) 6%, transparent) !important;
+  }
+}
+
+/* 输入框：圆角 + 聚焦光晕 */
 .v-field {
-  border-radius: 2px !important;
-  background: var(--surface) !important;
+  border-radius: 9px !important;
+  background: color-mix(in srgb, var(--surface) 88%, transparent) !important;
   box-shadow: none !important;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease !important;
 }
 
 .v-field--variant-solo-filled .v-field__outline,
@@ -474,6 +496,7 @@ kbd,
 
 .v-field--focused {
   border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px var(--accent-soft) !important;
 }
 
 .v-field input,
@@ -489,10 +512,13 @@ kbd,
   padding-top: 2px;
 }
 
+/* chip */
 .v-chip {
-  border-radius: 2px !important;
-  font-size: var(--fs-xs) !important;
+  border-radius: 6px !important;
+  font-size: 10.5px !important;
   height: 20px !important;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   font-variant-numeric: tabular-nums;
 }
 
@@ -500,8 +526,16 @@ kbd,
   border-color: var(--rule-strong) !important;
 }
 
+/* 表格：整块变成一张卡片，表头不再铺底色 */
+.v-data-table {
+  border: 1px solid var(--card-line);
+  border-radius: 12px !important;
+  overflow: hidden;
+  background: var(--card-bg) !important;
+  box-shadow: var(--card-shadow);
+}
+
 .v-table,
-.v-data-table,
 .v-data-table__wrapper,
 .v-table__wrapper {
   background: transparent !important;
@@ -514,19 +548,27 @@ kbd,
 }
 
 .v-table th {
-  font-size: var(--fs-xs);
-  letter-spacing: 0.06em;
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--ink-3);
-  font-weight: 500;
+  font-weight: 700;
+  background: transparent !important;
 }
 
 .v-table > .v-table__wrapper > table > tbody > tr > td,
 .v-table > .v-table__wrapper > table > thead > tr > th {
   border-bottom: 1px solid var(--rule) !important;
-  padding-block: 6px !important;
+  padding-block: 9px !important;
 }
 
+@media (hover: hover) and (pointer: fine) {
+  .v-table > .v-table__wrapper > table > tbody > tr:hover {
+    background: color-mix(in srgb, var(--ink) 3.5%, transparent) !important;
+  }
+}
+
+/* tabs */
 .v-tabs {
   border-bottom: 1px solid var(--rule);
 }
@@ -544,7 +586,8 @@ kbd,
 }
 
 .v-tabs .v-tab__slider {
-  height: 1px;
+  height: 2px;
+  border-radius: 2px;
 }
 
 /* Tooltip：墨底浅字（纸白主题下 Vuetify 默认是浅底浅字，弹出来像一块空白灰方块） */
@@ -557,8 +600,8 @@ body .v-overlay__content.v-tooltip {
   font-family: var(--sans) !important;
   font-size: var(--fs-xs) !important;
   line-height: 1.5 !important;
-  padding: 5px 9px !important;
-  border-radius: 2px !important;
+  padding: 6px 10px !important;
+  border-radius: 8px !important;
   box-shadow: var(--shadow-float) !important;
   opacity: 1 !important;
   max-width: 340px;
@@ -578,8 +621,13 @@ body .v-overlay__content.v-tooltip {
  * 右侧等宽数字，1px 细线分隔。不是卡片，不是表格，是一本翻开的账。
  * ========================================================================== */
 .ledger {
-  border-top: 1px solid var(--rule);
-  margin-top: var(--s3);
+  border: 1px solid var(--card-line);
+  border-radius: 12px;
+  background: var(--card-bg);
+  box-shadow: var(--card-shadow);
+  padding: 0 16px;
+  margin-top: 2px;
+  overflow: hidden;
 }
 
 .ledger-row {

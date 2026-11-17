@@ -186,7 +186,11 @@ const doDelete = async () => {
 }
 
 .svc-ledger {
-  border-top: 0;
+  /* 外层 .svc-panel 已经是卡片，这里不再套一层 */
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
   margin-top: 0;
   padding: 0 16px;
 }
