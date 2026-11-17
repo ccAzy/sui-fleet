@@ -93,7 +93,7 @@
     <v-col v-if="!rulesets.length" cols="12" class="list-empty">
       {{ $t('emptyList') }}
     </v-col>
-    <v-col cols="12" sm="4" md="3" lg="2" v-for="(item, index) in <any[]>rulesets" :key="item.tag">
+    <v-col cols="12" sm="4" md="3" lg="3" v-for="(item, index) in <any[]>rulesets" :key="item.tag">
       <v-card rounded="xl" elevation="5" min-width="200" :title="item.tag">
         <v-card-subtitle style="margin-top: -15px;">
           <v-row><v-col>{{ $t('ruleset.' + item.type) }}</v-col></v-row>
@@ -130,7 +130,7 @@
     <v-col v-if="!rules.length" cols="12" class="list-empty">
       {{ $t('emptyList') }}
     </v-col>
-    <v-col cols="12" sm="4" md="3" lg="2" v-for="(item, index) in <any[]>rules"
+    <v-col cols="12" sm="4" md="3" lg="3" v-for="(item, index) in <any[]>rules"
         :key="item.id" :draggable="true"
         @dragstart="onDragStart(index)" @dragover.prevent @drop="onDrop(index)">
       <v-card rounded="xl" elevation="5" min-width="200" :title="index+1">

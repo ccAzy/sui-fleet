@@ -590,11 +590,32 @@
 /* 列表空态：五个页面共用一套。
    以前只有 Relay / Servers 有空态，Inbounds / Outbounds / Rules / Endpoints /
    Services 在空库时就是一片空白 —— 用户分不清"没有数据"和"加载失败"。 */
+/* 空状态：不是一段孤零零的灰字，而是一个"待填的框"。
+   虚线边告诉用户这里本该有内容，而不是页面崩了。 */
 .list-empty {
-  padding: var(--s6) 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 190px;
+  margin-top: 12px;
+  padding: var(--s6) var(--s4);
+  border: 1px dashed var(--rule-strong);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface) 40%, transparent);
   text-align: center;
   color: var(--ink-3);
   font-size: var(--fs-sm);
+}
+
+.list-empty::before {
+  content: '';
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  border: 1px dashed var(--rule-strong);
+  background: color-mix(in srgb, var(--ink) 3%, transparent);
 }
 
 /* 表头不换行：中文表头（如「入站管理」）在窄列里会被逐字折成 3 行，
