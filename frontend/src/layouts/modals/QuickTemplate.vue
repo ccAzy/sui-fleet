@@ -82,6 +82,23 @@
  * 文案里的 {n} 直接取这个数组长度，不再用「模板下拉项数 - 1」，
  * 否则一个模板建多个入站时数字会对不上。
  */
+/**
+ * 伪装域名（SNI）的两套默认值 —— 这两种协议对它的要求和用法完全不同：
+ *
+ * · Reality（vless）会**真的去连**这个域名完成一次 TLS 握手，借它的证书
+ *   当面具。所以要挑大众、可达、TLS1.3+H2 齐全的真站，苹果/微软这种
+ *   超大规模 Anycast 天然近，而且封它的代价太大。
+ *
+ * · 自签协议（vmess/hysteria2/tuic/trojan/anytls）**根本不会连**这个域名，
+ *   它只会被写进自签证书的 CN 里，然后明文发给客户端。如果这里填
+ *   www.apple.com，DPI 看到的就是「SNI 说我是苹果，证书却是苹果自己签的」
+ *   —— 真实世界不存在这种组合，等于主动举手。
+ *   所以自签用自己一个闲置域名的子域：看起来像「自建服务的自签证书」，
+ *   不像伪装。static.xxx 这类前缀是 CDN 最常见命名，不需要解析。
+ */
+export const REALITY_SNI = 'www.apple.com'
+export const SELF_SIGNED_SNI = 'static.acagnet.com'
+
 export const BUILD_ALL_PLAN: { type: string; alpn?: string[]; outJson?: any }[] = [
   { type: 'vmess', alpn: ['h2', 'http/1.1'] },
   { type: 'vmess', alpn: ['h2', 'http/1.1'] },
@@ -112,7 +129,7 @@ export default {
       form: {
         clientName: '',
         port: 0,
-        sni: 'www.apple.com',
+        sni: SELF_SIGNED_SNI,
       },
       // Known reliable Reality handshake targets (TLS1.3 + HTTP/2, own infra).
       sniPresets: ['www.apple.com', 'addons.mozilla.org', 'www.amazon.com', 'www.tesla.com', 'www.microsoft.com', 'www.bing.com'],
@@ -121,6 +138,14 @@ export default {
   watch: {
     visible(v: boolean) {
       if (v) this.reset()
+    },
+    // 切模板时把 SNI 默认值跟着换：Reality 用真站、其余用自签域名。
+    // 只在当前值还是「另一套默认值」时才替换，用户手填的不覆盖。
+    selected(v: string) {
+      const want = v === 'vless-reality' ? REALITY_SNI : SELF_SIGNED_SNI
+      if (this.form.sni === REALITY_SNI || this.form.sni === SELF_SIGNED_SNI || !this.form.sni) {
+        this.form.sni = want
+      }
     },
   },
   computed: {
@@ -184,7 +209,7 @@ export default {
       this.form = {
         clientName: 'user-' + RandomUtil.randomLowerAndNum(6),
         port: RandomUtil.randomIntRange(10000, 60000),
-        sni: 'www.apple.com',
+        sni: SELF_SIGNED_SNI,
       }
       this.loading = false
     },
@@ -410,7 +435,8 @@ export default {
 
     // ---- single-protocol templates --------------------------------------
     async buildVlessReality(port: number, clientName: string): Promise<number | null> {
-      const id = await this.inboundReality(port, this.sniOr('www.apple.com'))
+      // Reality 借的是对方的真证书，必须用大众可达的站，不能用自己的域名
+      const id = await this.inboundReality(port, this.sniOr(REALITY_SNI))
       if (!id) return null
       return this.saveClient(clientName, [id], { vless: { name: clientName, uuid: RandomUtil.randomUUID(), flow: 'xtls-rprx-vision' } })
     },
@@ -427,7 +453,7 @@ export default {
 
     // ---- all protocols, one shared client -------------------------------
     async buildAll(clientName: string): Promise<number | null> {
-      const sni = this.sniOr('www.apple.com')
+      const sni = this.sniOr(SELF_SIGNED_SNI)
       const used = new Set<number>(Data().inbounds.map((i: any) => i.listen_port))
       const pickPort = (): number => {
         let p = 0
