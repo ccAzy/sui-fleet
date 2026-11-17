@@ -93,77 +93,82 @@
     <v-col v-if="!rulesets.length" cols="12" class="list-empty">
       {{ $t('emptyList') }}
     </v-col>
-    <v-col cols="12" sm="4" md="3" lg="3" v-for="(item, index) in <any[]>rulesets" :key="item.tag">
-      <v-card rounded="xl" elevation="5" min-width="200" :title="item.tag">
-        <v-card-subtitle style="margin-top: -15px;">
-          <v-row><v-col>{{ $t('ruleset.' + item.type) }}</v-col></v-row>
-        </v-card-subtitle>
-        <v-card-text>
-          <v-row><v-col>{{ $t('ruleset.format') }}</v-col><v-col>{{ item.format }}</v-col></v-row>
-          <v-row><v-col>{{ $t('objects.outbound') }}</v-col><v-col>{{ item.download_detour ?? '-' }}</v-col></v-row>
-          <v-row><v-col>{{ $t('actions.update') }}</v-col><v-col>{{ item.update_interval ?? '-' }}</v-col></v-row>
-        </v-card-text>
-        <v-divider></v-divider>
-        <v-card-actions style="padding: 0;">
-          <v-btn icon="mdi-file-edit" @click="showRulesetModal(index)">
-            <v-icon /><v-tooltip activator="parent" location="top" :text="$t('actions.edit')"></v-tooltip>
-          </v-btn>
-          <v-btn icon="mdi-file-remove" style="margin-inline-start:0;" color="warning" @click="delRulesetOverlay[index] = true">
-            <v-icon /><v-tooltip activator="parent" location="top" :text="$t('actions.del')"></v-tooltip>
-          </v-btn>
-          <v-overlay v-model="delRulesetOverlay[index]" contained class="align-center justify-center">
-            <v-card :title="$t('actions.del')" rounded="lg">
-              <v-divider></v-divider>
-              <v-card-text>{{ $t('confirm') }}</v-card-text>
-              <v-card-actions>
-                <v-btn color="error" variant="flat" @click="delRuleset(index)">{{ $t('yes') }}</v-btn>
-                <v-btn variant="text" class="confirm-cancel" @click="delRulesetOverlay[index] = false">{{ $t('no') }}</v-btn>
-              </v-card-actions>
-            </v-card>
-          </v-overlay>
-        </v-card-actions>
-      </v-card>
-    </v-col>
+    <div class="rules-ledger">
+      <div v-for="(item, index) in <any[]>rulesets" :key="item.tag" class="ledger-row">
+        <span class="ledger-mark" data-state="up" aria-hidden="true"></span>
+        <span class="ledger-name" :title="item.tag">{{ item.tag }}</span>
+        <span class="ledger-meta">
+          {{ $t('ruleset.' + item.type) }}
+          <span class="sep">·</span>{{ item.format }}
+          <span class="sep">·</span>{{ $t('objects.outbound') }} {{ item.download_detour ?? '-' }}
+          <span class="sep">·</span>{{ $t('actions.update') }} {{ item.update_interval ?? '-' }}
+        </span>
+        <div class="ledger-actions">
+          <button type="button" class="ui-reset rs-btn" :title="$t('actions.edit')" @click="showRulesetModal(index)">
+            <v-icon icon="mdi-file-edit" size="16" />
+          </button>
+          <button type="button" class="ui-reset rs-btn rs-btn--danger" :title="$t('actions.del')" @click="delRulesetOverlay[index] = true">
+            <v-icon icon="mdi-file-remove" size="16" />
+          </button>
+        </div>
+        <v-overlay v-model="delRulesetOverlay[index]" contained class="align-center justify-center">
+          <v-card :title="$t('actions.del')">
+            <v-card-text>{{ $t('confirm') }}</v-card-text>
+            <v-card-actions>
+              <v-btn variant="text" class="confirm-cancel" @click="delRulesetOverlay[index] = false">{{ $t('no') }}</v-btn>
+              <v-btn color="error" variant="flat" @click="delRuleset(index)">{{ $t('yes') }}</v-btn>
+            </v-card-actions>
+          </v-card>
+        </v-overlay>
+      </div>
+    </div>
   </v-row>
   <v-row>
     <v-col class="v-card-subtitle" cols="12">{{ $t('pages.rules') }}</v-col>
     <v-col v-if="!rules.length" cols="12" class="list-empty">
       {{ $t('emptyList') }}
     </v-col>
-    <v-col cols="12" sm="4" md="3" lg="3" v-for="(item, index) in <any[]>rules"
-        :key="item.id" :draggable="true"
-        @dragstart="onDragStart(index)" @dragover.prevent @drop="onDrop(index)">
-      <v-card rounded="xl" elevation="5" min-width="200" :title="index+1">
-        <v-card-subtitle style="margin-top: -15px;">
-          <v-row><v-col>{{ item.type != undefined ? $t('rule.logical') + ' (' + item.mode + ')' : $t('rule.simple') }}</v-col></v-row>
-        </v-card-subtitle>
-        <v-card-text>
-          <v-row><v-col>{{ $t('admin.action') }}</v-col><v-col>{{ item.action }}</v-col></v-row>
-          <v-row><v-col>{{ $t('objects.outbound') }}</v-col><v-col>{{ item.outbound ?? '-' }}</v-col></v-row>
-          <v-row><v-col>{{ $t('pages.rules') }}</v-col><v-col>{{ item.rules ? item.rules.length : Object.keys(item).filter(r => !actionKeys.includes(r)).length }}</v-col></v-row>
-          <v-row><v-col>{{ $t('rule.invert') }}</v-col><v-col>{{ $t((item.invert ?? false) ? 'yes' : 'no') }}</v-col></v-row>
-        </v-card-text>
-        <v-divider></v-divider>
-        <v-card-actions style="padding: 0;">
-          <v-btn icon="mdi-file-edit" @click="showRuleModal(index)">
-            <v-icon /><v-tooltip activator="parent" location="top" :text="$t('actions.edit')"></v-tooltip>
-          </v-btn>
-          <v-btn icon="mdi-file-remove" style="margin-inline-start:0;" color="warning" @click="delRuleOverlay[index] = true">
-            <v-icon /><v-tooltip activator="parent" location="top" :text="$t('actions.del')"></v-tooltip>
-          </v-btn>
-          <v-overlay v-model="delRuleOverlay[index]" contained class="align-center justify-center">
-            <v-card :title="$t('actions.del')" rounded="lg">
-              <v-divider></v-divider>
-              <v-card-text>{{ $t('confirm') }}</v-card-text>
-              <v-card-actions>
-                <v-btn color="error" variant="flat" @click="delRule(index)">{{ $t('yes') }}</v-btn>
-                <v-btn variant="text" class="confirm-cancel" @click="delRuleOverlay[index] = false">{{ $t('no') }}</v-btn>
-              </v-card-actions>
-            </v-card>
-          </v-overlay>
-        </v-card-actions>
-      </v-card>
-    </v-col>
+    <div class="rules-ledger">
+      <div
+        v-for="(item, index) in <any[]>rules"
+        :key="item.id"
+        class="ledger-row"
+        draggable="true"
+        @dragstart="onDragStart(index)"
+        @dragover.prevent
+        @drop="onDrop(index)"
+      >
+        <span class="ledger-mark" data-state="up" aria-hidden="true"></span>
+        <span class="ledger-name">
+          {{ index + 1 }} · {{ item.type != undefined ? $t('rule.logical') + ' (' + item.mode + ')' : $t('rule.simple') }}
+        </span>
+        <span class="ledger-meta">
+          {{ $t('admin.action') }} {{ item.action }}
+          <span class="sep">·</span>{{ $t('objects.outbound') }} {{ item.outbound ?? '-' }}
+          <span class="sep">·</span>{{ $t('pages.rules') }} {{ item.rules ? item.rules.length : Object.keys(item).filter(r => !actionKeys.includes(r)).length }}
+          <template v-if="item.invert">
+            <span class="sep">·</span>{{ $t('rule.invert') }}
+          </template>
+        </span>
+        <div class="ledger-actions">
+          <button type="button" class="ui-reset rs-btn" :title="$t('actions.edit')" @click="showRuleModal(index)">
+            <v-icon icon="mdi-file-edit" size="16" />
+          </button>
+          <button type="button" class="ui-reset rs-btn rs-btn--danger" :title="$t('actions.del')" @click="delRuleOverlay[index] = true">
+            <v-icon icon="mdi-file-remove" size="16" />
+          </button>
+        </div>
+        <v-overlay v-model="delRuleOverlay[index]" contained class="align-center justify-center">
+          <v-card :title="$t('actions.del')">
+            <v-card-text>{{ $t('confirm') }}</v-card-text>
+            <v-card-actions>
+              <v-btn variant="text" class="confirm-cancel" @click="delRuleOverlay[index] = false">{{ $t('no') }}</v-btn>
+              <v-btn color="error" variant="flat" @click="delRule(index)">{{ $t('yes') }}</v-btn>
+            </v-card-actions>
+          </v-card>
+        </v-overlay>
+      </div>
+    </div>
   </v-row>
 </template>
 
@@ -323,3 +328,44 @@ function saveImportRulesets(items: any[]) {
   importRulesetsModal.value.visible = false
 }
 </script>
+
+<style scoped>
+/* 规则页：两类列表都用账簿名录（DESIGN.md 的标志性动作），
+   原来是一排 200px 宽的卡片，每个字段竖着占一行。 */
+.rules-ledger {
+  border: 1px solid var(--card-line);
+  border-radius: 12px;
+  background: var(--card-bg);
+  box-shadow: var(--card-shadow);
+  padding: 0 16px;
+  margin-bottom: 4px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.rules-ledger :deep(.ledger-row) {
+  grid-template-columns: 14px minmax(0, 200px) minmax(0, 1fr) auto;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.rs-btn {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  color: var(--ink-3);
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.rs-btn:hover {
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  color: var(--ink);
+}
+
+.rs-btn--danger:hover {
+  background: var(--error-soft);
+  color: var(--error);
+}
+</style>

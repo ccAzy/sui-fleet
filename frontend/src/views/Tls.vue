@@ -13,74 +13,44 @@
     </v-col>
   </v-row>
   <v-row>
-    <v-col cols="12" sm="4" md="3" lg="3" v-for="(item, index) in <any[]>tlsConfigs" :key="item.id">
-      <v-card rounded="xl" elevation="5" min-width="200" :title="item.name">
-        <v-card-subtitle style="margin-top: -15px;">
-          {{ item.server?.server_name?.length>0 ? item.server.server_name : "-" }}
-        </v-card-subtitle>
-        <v-card-text>
-          <v-row>
-            <v-col>{{ $t('pages.inbounds') }}</v-col>
-            <v-col>
-              <template v-if="tlsInbounds(item.id).length>0">
-                <v-tooltip activator="parent" dir="ltr" location="bottom">
-                  <span v-for="i in tlsInbounds(item.id)" :key="i">{{ i }}<br /></span>
-                </v-tooltip>
-                {{ tlsInbounds(item.id).length }}
-              </template>
-              <template v-else>-</template>
-            </v-col>
-          </v-row>
-          <v-row>
-            <v-col>ACME</v-col>
-            <v-col>
-              {{ $t(item.server?.acme == undefined ? 'no' : 'yes') }}
-            </v-col>
-          </v-row>
-          <v-row>
-            <v-col>ECH</v-col>
-            <v-col>
-              {{ $t(item.server?.ech == undefined ? 'no' : 'yes') }}
-            </v-col>
-          </v-row>
-          <v-row>
-            <v-col>Reality</v-col>
-            <v-col>
-              {{ $t(item.server?.reality == undefined ? 'no' : 'yes') }}
-            </v-col>
-          </v-row>
-        </v-card-text>
-        <v-divider></v-divider>
-        <v-card-actions style="padding: 0;">
-          <v-btn icon="mdi-file-edit" @click="showModal(item.id)">
-            <v-icon />
-            <v-tooltip activator="parent" location="top" :text="$t('actions.edit')"></v-tooltip>
-          </v-btn>
-          <v-btn v-if="tlsInbounds(item.id).length == 0" icon="mdi-file-remove" style="margin-inline-start:0;" color="warning" @click="delOverlay[index] = true">
-            <v-icon />
-            <v-tooltip activator="parent" location="top" :text="$t('actions.del')"></v-tooltip>
-          </v-btn>
-          <v-overlay
-            v-model="delOverlay[index]"
-            contained
-            class="align-center justify-center"
+    <div class="tls-ledger">
+      <div v-for="(item, index) in <any[]>tlsConfigs" :key="item.id" class="ledger-row">
+        <span class="ledger-mark" :data-state="item.server?.reality ? 'up' : 'down'" aria-hidden="true"></span>
+        <span class="ledger-name" :title="item.name">{{ item.name }}</span>
+        <span class="ledger-meta">
+          <span class="mono">{{ item.server?.server_name || '-' }}</span>
+          <template v-if="tlsInbounds(item.id).length">
+            <span class="sep">·</span>{{ $t('pages.inbounds') }} <span class="mono">{{ tlsInbounds(item.id).length }}</span>
+          </template>
+          <template v-if="item.server?.acme != undefined"><span class="sep">·</span>ACME</template>
+          <template v-if="item.server?.ech != undefined"><span class="sep">·</span>ECH</template>
+          <template v-if="item.server?.reality != undefined"><span class="sep">·</span>Reality</template>
+        </span>
+        <div class="ledger-actions">
+          <button type="button" class="ui-reset tls-btn" :title="$t('actions.edit')" @click="showModal(item.id)">
+            <v-icon icon="mdi-file-edit" size="16" />
+          </button>
+          <button
+            v-if="tlsInbounds(item.id).length == 0"
+            type="button"
+            class="ui-reset tls-btn tls-btn--danger"
+            :title="$t('actions.del')"
+            @click="delOverlay[index] = true"
           >
-            <v-card :title="$t('actions.del')" rounded="lg">
-              <v-divider></v-divider>
-              <v-card-text>{{ $t('confirm') }}</v-card-text>
-              <v-card-actions>
-                <v-btn color="error" variant="flat" @click="delTls(item.id)">{{ $t('yes') }}</v-btn>
-                <v-btn variant="text" class="confirm-cancel" @click="delOverlay[index] = false">{{ $t('no') }}</v-btn>
-              </v-card-actions>
-            </v-card>
-          </v-overlay>
-          <v-btn icon="mdi-content-duplicate" @click="clone(item)">
-            <v-icon />
-            <v-tooltip activator="parent" location="top" :text="$t('actions.clone')"></v-tooltip>
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-col>
+            <v-icon icon="mdi-file-remove" size="16" />
+          </button>
+        </div>
+        <v-overlay v-model="delOverlay[index]" contained class="align-center justify-center">
+          <v-card :title="$t('actions.del')">
+            <v-card-text>{{ $t('confirm') }}</v-card-text>
+            <v-card-actions>
+              <v-btn variant="text" class="confirm-cancel" @click="delOverlay[index] = false">{{ $t('no') }}</v-btn>
+              <v-btn color="error" variant="flat" @click="delTls(item.id)">{{ $t('yes') }}</v-btn>
+            </v-card-actions>
+          </v-card>
+        </v-overlay>
+      </div>
+    </div>
   </v-row>
 </template>
 
@@ -151,3 +121,42 @@ const delTls = async (id: number) => {
 }
 
 </script>
+
+<style scoped>
+/* 证书页：卡片墙 → 账簿名录 */
+.tls-ledger {
+  border: 1px solid var(--card-line);
+  border-radius: 12px;
+  background: var(--card-bg);
+  box-shadow: var(--card-shadow);
+  padding: 0 16px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.tls-ledger :deep(.ledger-row) {
+  grid-template-columns: 14px minmax(0, 220px) minmax(0, 1fr) auto;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.tls-btn {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  color: var(--ink-3);
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.tls-btn:hover {
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  color: var(--ink);
+}
+
+.tls-btn--danger:hover {
+  background: var(--error-soft);
+  color: var(--error);
+}
+</style>

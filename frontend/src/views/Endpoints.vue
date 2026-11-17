@@ -26,83 +26,55 @@
     </v-col>
   </v-row>
   <v-row>
-    <v-col v-if="!endpoints.length" cols="12" class="list-empty">
+    <div v-if="!endpoints.length" class="list-empty">
       {{ $t('emptyList') }}
-    </v-col>
-    <v-col cols="12" sm="4" md="3" lg="3" v-for="(item, index) in <any[]>endpoints" :key="item.tag">
-      <v-card rounded="xl" elevation="5" min-width="200" :title="item.tag">
-        <v-card-subtitle style="margin-top: -15px;">
-          <v-row>
-            <v-col>{{ item.type }}</v-col>
-          </v-row>
-        </v-card-subtitle>
-        <v-card-text>
-          <v-row>
-            <v-col>{{ $t('in.addr') }}</v-col>
-            <v-col>
-              {{ item.address?.length>0 ? item.address[0] : '-' }}
-            </v-col>
-          </v-row>
-          <v-row>
-            <v-col>{{ $t('in.port') }}</v-col>
-            <v-col>
-              {{ item.listen_port>0 ? item.listen_port : '-' }}
-            </v-col>
-          </v-row>
-          <v-row>
-            <v-col>{{ $t('types.wg.peers') }}</v-col>
-            <v-col>
-              {{ item.peers?.length?? '-'  }}
-            </v-col>
-          </v-row>
-          <v-row>
-            <v-col>{{ $t('online') }}</v-col>
-            <v-col>
-              <template v-if="onlines.includes(item.tag)">
-                <v-chip density="comfortable" size="small" color="success" variant="flat">{{ $t('online') }}</v-chip>
-              </template>
-              <template v-else>-</template>
-            </v-col>
-          </v-row>
-        </v-card-text>
-        <v-divider></v-divider>
-        <v-card-actions style="padding: 0;">
-          <v-btn icon="mdi-file-edit" @click="showModal(item.id)">
-            <v-icon />
-            <v-tooltip activator="parent" location="top" :text="$t('actions.edit')"></v-tooltip>
-          </v-btn>
-          <v-btn icon="mdi-file-remove" style="margin-inline-start:0;" color="warning" @click="delOverlay[index] = true">
-            <v-icon />
-            <v-tooltip activator="parent" location="top" :text="$t('actions.del')"></v-tooltip>
-          </v-btn>
-          <v-overlay
-            v-model="delOverlay[index]"
-            contained
-            class="align-center justify-center"
+    </div>
+    <div class="ep-ledger">
+      <div v-for="(item, index) in <any[]>endpoints" :key="item.tag" class="ledger-row">
+        <span class="ledger-mark" :data-state="onlines.includes(item.tag) ? 'up' : 'down'" aria-hidden="true"></span>
+        <span class="ledger-name" :title="item.tag">{{ item.tag }}</span>
+        <span class="ledger-meta">
+          {{ item.type }}
+          <span class="sep">·</span><span class="mono">{{ item.address?.length > 0 ? item.address[0] : '-' }}</span>
+          <span class="sep">·</span><span class="mono">:{{ item.listen_port > 0 ? item.listen_port : '-' }}</span>
+          <template v-if="item.peers?.length">
+            <span class="sep">·</span>{{ $t('types.wg.peers') }} <span class="mono">{{ item.peers.length }}</span>
+          </template>
+          <template v-if="onlines.includes(item.tag)">
+            <span class="sep">·</span>{{ $t('online') }}
+          </template>
+        </span>
+        <div class="ledger-actions">
+          <button type="button" class="ui-reset ep-btn" :title="$t('actions.edit')" @click="showModal(item.id)">
+            <v-icon icon="mdi-file-edit" size="16" />
+          </button>
+          <button
+            v-if="item.type == 'wireguard' && item.peers?.length > 0"
+            type="button"
+            class="ui-reset ep-btn"
+            title="QR"
+            @click="showQrCode(item.id)"
           >
-            <v-card :title="$t('actions.del')" rounded="lg">
-              <v-divider></v-divider>
-              <v-card-text>{{ $t('confirm') }}</v-card-text>
-              <v-card-actions>
-                <v-btn color="error" variant="flat" @click="delEndpoint(item.tag)">{{ $t('yes') }}</v-btn>
-                <v-btn variant="text" class="confirm-cancel" @click="delOverlay[index] = false">{{ $t('no') }}</v-btn>
-              </v-card-actions>
-            </v-card>
-          </v-overlay>
-          <v-icon
-          class="me-2"
-          v-if="item.type == 'wireguard' && item.peers?.length>0"
-          @click="showQrCode(item.id)"
-        >
-          mdi-qrcode
-        </v-icon>
-          <v-btn icon="mdi-chart-line" @click="showStats(item.tag)" v-if="Data().enableTraffic">
-            <v-icon />
-            <v-tooltip activator="parent" location="top" :text="$t('stats.graphTitle')"></v-tooltip>
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-col>
+            <v-icon icon="mdi-qrcode" size="16" />
+          </button>
+          <button v-if="Data().enableTraffic" type="button" class="ui-reset ep-btn" :title="$t('stats.graphTitle')" @click="showStats(item.tag)">
+            <v-icon icon="mdi-chart-line" size="16" />
+          </button>
+          <button type="button" class="ui-reset ep-btn ep-btn--danger" :title="$t('actions.del')" @click="delOverlay[index] = true">
+            <v-icon icon="mdi-file-remove" size="16" />
+          </button>
+        </div>
+        <v-overlay v-model="delOverlay[index]" contained class="align-center justify-center">
+          <v-card :title="$t('actions.del')">
+            <v-card-text>{{ $t('confirm') }}</v-card-text>
+            <v-card-actions>
+              <v-btn variant="text" class="confirm-cancel" @click="delOverlay[index] = false">{{ $t('no') }}</v-btn>
+              <v-btn color="error" variant="flat" @click="delEndpoint(item.tag)">{{ $t('yes') }}</v-btn>
+            </v-card-actions>
+          </v-card>
+        </v-overlay>
+      </div>
+    </div>
   </v-row>
 </template>
 
@@ -177,3 +149,41 @@ const closeQrCode = () => {
   qrcode.value.visible = false
 }
 </script>
+<style scoped>
+/* 端点页：卡片墙 → 账簿名录 */
+.ep-ledger {
+  border: 1px solid var(--card-line);
+  border-radius: 12px;
+  background: var(--card-bg);
+  box-shadow: var(--card-shadow);
+  padding: 0 16px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.ep-ledger :deep(.ledger-row) {
+  grid-template-columns: 14px minmax(0, 220px) minmax(0, 1fr) auto;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.ep-btn {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  color: var(--ink-3);
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.ep-btn:hover {
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  color: var(--ink);
+}
+
+.ep-btn--danger:hover {
+  background: var(--error-soft);
+  color: var(--error);
+}
+</style>
