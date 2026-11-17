@@ -64,7 +64,7 @@
       border
       density="compact"
       style="margin: 5px;"
-      color="background">
+      color="background" :key="key">
       <v-card-title>
         <v-row>
           <v-col>{{ key }}
@@ -120,7 +120,9 @@ export default {
   computed: {
     version: {
       get() {
-        this.version = this.Inbound.version
+        // 原来 getter 里有一行 `this.version = this.Inbound.version`（自我赋值），
+        // 每次读取都会触发 setter 去删/建 Inbound 字段，等于读一下就改数据。
+        // 初始化已由 mounted 完成，getter 只需返回值。
         return this.Inbound.version
       },
       set(newValue: any) {

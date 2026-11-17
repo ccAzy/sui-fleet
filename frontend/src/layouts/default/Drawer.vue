@@ -32,7 +32,7 @@
           <template v-slot:prepend>
             <v-icon :icon="item.icon"></v-icon>
           </template>
-          <v-list-item-title v-text="$t(item.title)"></v-list-item-title>
+          <v-list-item-title>{{ $t(item.title) }}</v-list-item-title>
         </v-list-item>
       </template>
 
@@ -45,7 +45,7 @@
           <template v-slot:prepend>
             <v-icon icon="mdi-logout-variant"></v-icon>
           </template>
-          <v-list-item-title v-text="$t('menu.logout')"></v-list-item-title>
+          <v-list-item-title>{{ $t('menu.logout') }}</v-list-item-title>
         </v-list-item>
       </v-list>
     </template>

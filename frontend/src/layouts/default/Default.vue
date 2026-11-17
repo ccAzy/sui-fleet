@@ -7,22 +7,25 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import DefaultBar from './AppBar.vue'
 import Drawer from './Drawer.vue'
 import DefaultView from './View.vue'
 import { useDisplay } from 'vuetify'
 
 const { smAndDown } = useDisplay()
-const displayDrawer = ref(false)
+const displayDrawer = ref(!smAndDown.value)
 
 const toggleDrawer = () => {
   displayDrawer.value = !displayDrawer.value
 }
 
-const isMobile = computed( ():boolean =>{
-  displayDrawer.value = !smAndDown.value
-  return smAndDown.value
+// 原来是把 `displayDrawer.value = !smAndDown.value` 写在 computed 的 getter 里，
+// 结果是每读一次 isMobile 就重置一次抽屉开关（桌面端手动关掉后会被重新打开）。
+// 断点变化属于事件，应该用 watch 处理；computed 只负责派生值。
+const isMobile = computed((): boolean => smAndDown.value)
+watch(smAndDown, (v) => {
+  displayDrawer.value = !v
 })
 </script>
 

@@ -128,7 +128,7 @@
                   <v-btn variant="tonal" @click="shuffle()">{{ $t('reset') + ' - ' + $t('all') }}<v-icon icon="mdi-refresh" /></v-btn>
                 </v-col>
               </v-row>
-              <v-row v-for="key in Object.keys(clientConfig)">
+              <v-row v-for="key in Object.keys(clientConfig)" :key="key">
                 <v-col cols="12" md="3" align="end" align-self="center">
                     {{ key }}
                     <v-icon @click="shuffle(key)" icon="mdi-refresh">
@@ -164,7 +164,7 @@
               </v-row>
             </v-window-item>
             <v-window-item value="t3">
-              <v-row v-for="(lnk, index) in links">
+              <v-row v-for="(lnk, index) in links" :key="index">
                 <v-col cols="auto">{{ index + 1 }}</v-col>
                 <v-col style="direction: ltr; overflow-y: hidden; word-break: break-all; overflow-wrap: anywhere;">{{ lnk.uri }}</v-col>
               </v-row>
@@ -173,7 +173,7 @@
                   <v-btn color="primary" @click="extLinks.push({ type: 'external', uri: ''})">{{ $t('actions.add') }} {{ $t('client.external') }}</v-btn>
                 </v-col>
               </v-row>
-              <v-row v-for="(lnk, index) in extLinks">
+              <v-row v-for="(lnk, index) in extLinks" :key="index">
                 <v-col>
                   <v-text-field
                   dir="ltr"
@@ -189,7 +189,7 @@
                   <v-btn color="primary" @click="subLinks.push({ type: 'sub', uri: ''})">{{ $t('actions.add') }} {{ $t('client.sub') }}</v-btn>
                 </v-col>
               </v-row>
-              <v-row v-for="(lnk, index) in subLinks">
+              <v-row v-for="(lnk, index) in subLinks" :key="index">
                 <v-col>
                   <v-text-field
                   dir="ltr"
@@ -310,8 +310,10 @@ export default {
   },
   computed: {
     clientInbounds: {
-      get() { return this.client.inbounds.length>0 ? this.client.inbounds.sort() : [] },
-      set(v:number[]) { this.client.inbounds = v.length == 0 ?  [] : v.sort() }
+      // 展开成新数组再排序：原来的 sort() 在 getter 里原地改 client.inbounds，
+      // 属于在计算属性里修改状态。
+      get() { return this.client.inbounds.length > 0 ? [...this.client.inbounds].sort() : [] },
+      set(v:number[]) { this.client.inbounds = v.length == 0 ?  [] : [...v].sort() }
     },
     expDate: {
       get() { return this.client.expiry},

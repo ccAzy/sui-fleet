@@ -16,7 +16,7 @@
           {{ $t('objects.' + resource) + " : " + tag }}
         </div>
         <v-radio-group v-model="limit" @change="loadData" density="compact" :loading="loading" inline hide-details>
-          <v-radio v-for="p in periods" :label="p.title" :value="p.value"></v-radio>
+          <v-radio v-for="p in periods" :label="p.title" :value="p.value" :key="p.value"></v-radio>
         </v-radio-group>
           <v-container id="container" style="height:40vh;">
             <v-skeleton-loader
@@ -27,7 +27,7 @@
           ></v-skeleton-loader>
           <template v-else>
             <v-alert :text="$t('noData')" type="warning" variant="outlined" v-if="alert"></v-alert>
-            <Line v-if="loaded" :data="usage" :options="<any>options" />
+            <LineChart v-if="loaded" :data="usage" :options="<any>options" />
           </template>
         </v-container>
       </v-card-text>
@@ -52,7 +52,7 @@ import {
   Filler,
 } from 'chart.js'
 import { ref } from 'vue'
-import { Line } from 'vue-chartjs'
+import { Line as LineChart } from 'vue-chartjs'
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -66,7 +66,7 @@ ChartJS.register(
 ChartJS.defaults.font.family = 'Vazirmatn'
 export default {
   components: {
-    Line
+    LineChart
   },
   props: ['visible','resource','tag'],
   data() {

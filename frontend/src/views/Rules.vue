@@ -52,13 +52,13 @@
             <template v-slot:prepend>
               <v-icon icon="mdi-routes"></v-icon>
             </template>
-            <v-list-item-title v-text="$t('rule.import.rulesTitle')"></v-list-item-title>
+            <v-list-item-title>{{ $t('rule.import.rulesTitle') }}</v-list-item-title>
           </v-list-item>
           <v-list-item link @click="showImportRulesets">
             <template v-slot:prepend>
               <v-icon icon="mdi-download-multiple"></v-icon>
             </template>
-            <v-list-item-title v-text="$t('rule.import.title')"></v-list-item-title>
+            <v-list-item-title>{{ $t('rule.import.title') }}</v-list-item-title>
           </v-list-item>
         </v-list>
       </v-menu>

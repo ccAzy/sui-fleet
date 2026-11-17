@@ -48,6 +48,8 @@
                   </v-text-field>
                 </v-col>
               </v-row>
+              <!-- Direct 在 outTypes 里存在但原先漏了渲染分支，选中 direct 时下方是空白 -->
+              <Direct v-if="outbound.type == outTypes.Direct" :data="outbound" />
               <Socks v-if="outbound.type == outTypes.SOCKS" :data="outbound" />
               <Http v-if="outbound.type == outTypes.HTTP" :data="outbound" />
               <Shadowsocks v-if="outbound.type == outTypes.Shadowsocks" direction="out" :data="outbound" />
@@ -118,7 +120,9 @@ import Http from '@/components/protocols/Http.vue'
 import Shadowsocks from '@/components/protocols/Shadowsocks.vue'
 import Vmess from '@/components/protocols/Vmess.vue'
 import Trojan from '@/components/protocols/Trojan.vue'
-import Wireguard from '@/components/protocols/Wireguard.vue'
+// Wireguard 出站：outTypes 里未定义该类型，UI 不可达，故暂不注册。
+// 若以后支持，需先在 types/outbounds.ts 的 outTypes 补键，再恢复这行 import 与 components 注册。
+// import Wireguard from '@/components/protocols/Wireguard.vue'
 import Hysteria from '@/components/protocols/Hysteria.vue'
 import Naive from '@/components/protocols/Naive.vue'
 import ShadowTls from '@/components/protocols/OutShadowTls.vue'
@@ -206,7 +210,7 @@ export default {
   },
   components: { Dial, Multiplex, Transport, OutTLS,
     Direct, Socks, Http, Shadowsocks, Vmess, Trojan,
-    Wireguard, Hysteria, Naive, ShadowTls, Vless, Tuic,
+    Hysteria, Naive, ShadowTls, Vless, Tuic,
     Hysteria2, AnyTls, Tor, Ssh, Selector, UrlTest }
 }
 </script>

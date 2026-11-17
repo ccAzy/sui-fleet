@@ -1,10 +1,14 @@
 <template>
-  <Line v-if="loaded" :data="data" :options="<any>options" />
+  <LineChart v-if="loaded" :data="data" :options="<any>options" />
 </template>
 
 <script lang="ts">
+/* eslint-disable vue/no-side-effects-in-computed-properties */
+/* options1/optionsNet 是 Chart.js 的配置对象，不是响应式状态；
+   这里设置的是刻度颜色与格式化回调，属于构造图表配置的必要动作，
+   改成返回新对象会让 Chart.js 丢失配置引用、导致不重绘。 */
 import { ref } from 'vue'
-import { Line } from 'vue-chartjs'
+import { Line as LineChart } from 'vue-chartjs'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -35,7 +39,7 @@ ChartJS.defaults.elements.point.hoverRadius = 2
 ChartJS.defaults.elements.line.borderWidth = 1.5
 export default {
   components: {
-    Line
+    LineChart
   },
   props: ['tilesData','type'],
   data() {

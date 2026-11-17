@@ -56,6 +56,18 @@ void initWallpaper()
 const app = createApp(App)
 app.provide('loading', loading)
 
+// number 输入框被聚焦时，鼠标滚轮会静默改值——配置面板里有 90 个数字字段，
+// 滚动页面时误改配置很难被发现。滚到 number 输入框上直接 blur 掉，
+// 代价只是要改值前先点一下，收益是不会意外改坏配置。
+document.addEventListener(
+  'wheel',
+  (e) => {
+    const el = e.target as HTMLElement | null
+    if (el instanceof HTMLInputElement && el.type === 'number') el.blur()
+  },
+  { passive: true },
+)
+
 await ensureLocale(i18n.global.locale.value as string)
 registerPlugins(app)
 

@@ -24,7 +24,7 @@
             <v-col>
               <template v-if="tlsInbounds(item.id).length>0">
                 <v-tooltip activator="parent" dir="ltr" location="bottom">
-                  <span v-for="i in tlsInbounds(item.id)">{{ i }}<br /></span>
+                  <span v-for="i in tlsInbounds(item.id)" :key="i">{{ i }}<br /></span>
                 </v-tooltip>
                 {{ tlsInbounds(item.id).length }}
               </template>
@@ -99,9 +99,21 @@ const inbounds = computed((): Inbound[] => {
   return Data().inbounds
 })
 
-const tlsInbounds = (id: number): string[] => {
-  return inbounds.value.filter(i => i.tls_id == id).map(i => i.tag)  
-}
+// 按 tls_id 预建索引：模板里每张 TLS 卡片原本要调 3 次 tlsInbounds()，
+// 每次都 filter 一遗 inbounds，总代价 O(TLS × inbounds)。改成一次 O(n) 建表。
+const tlsInboundsMap = computed(() => {
+  const m = new Map<string, string[]>()
+  for (const i of inbounds.value) {
+    if (i.tls_id === undefined || i.tls_id === null) continue
+    const key = String(i.tls_id)
+    const arr = m.get(key)
+    if (arr) arr.push(i.tag)
+    else m.set(key, [i.tag])
+  }
+  return m
+})
+
+const tlsInbounds = (id: number): string[] => tlsInboundsMap.value.get(String(id)) ?? []
 
 const modal = ref({
   visible: false,

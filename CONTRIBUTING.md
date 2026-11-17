@@ -36,6 +36,35 @@ bash -n $(git ls-files '*.sh')                                # shell 语法
 CI 会校验产物与源码一致，不一致直接红。这条不是形式主义：
 线上部署直接用产物，忘了重建就会出现「CI 全绿、线上还是旧 UI」。
 
+## 表单组件的数据流约定
+
+本仓库的表单组件（`components/protocols/*`、`components/tls/*`、`layouts/modals/*`）
+采用「共享草稿对象」模式：父组件持有配置对象（如 `Inbound.vue` 的 `data.inbound`），
+子组件通过 props 收到它并**直接修改其字段**。
+
+```js
+// 父：inbound 是本地 data，不是 props
+<ShadowTls :data="inbound" />
+
+// 子：直接改 props 对象的字段
+this.$props.data.password = '...'
+```
+
+**为什么这么写**：协议配置是深层嵌套结构（`transport.tls.certificates[0]....`），
+改成 emit 逐层转发会让每处赋值都变成一个事件，可读性和维护成本都会上升。
+全仓库 200+ 处一致使用，属于有意的架构选择，**不是待修的技术债**。
+
+**已知边界**（写新代码时注意）：
+
+1. 父组件若重新创建了这个对象（如切换协议类型时 `createInbound(...)`），
+   子组件此前的修改会丢失。所以**不要在编辑器打开期间重建对象**。
+2. 子组件删字段（`delete data.xxx`）会导致父组件的 `Object.hasOwn` 判断变化，
+   用 `data.xxx != undefined` 判断更稳。
+3. 新增组件若能简单用 `emits: ['update:data']` + `v-model:data` 表达，优先用新写法。
+
+ESLint 的 `vue/no-mutating-props` 因此降为 **warn**：新代码会看到提示，但不阻塞 CI。
+
+
 ## 提交
 
 - 一个提交一件事，commit message 说清「为什么」而不是「改了什么」。

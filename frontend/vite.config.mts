@@ -49,9 +49,16 @@ export default defineConfig({
   },
   server: {
     port: 3000,
+    // 后端路由是 /api/*（见 panel/src/index.ts：app.post("/api/login") ...），
+    // 前端请求写的是相对路径 api/status → 浏览器解析为 /api/status。
+    // 原来这里配的是 '/app/api' → 2095：
+    //   · 路径对不上（/app/api 前缀永远不会命中 /api/*）
+    //   · 2095 是上游 s-ui 的后端端口，本项目自托管是 8788、wrangler dev 是 8787
+    // 结果就是本地 dev 时 API 全部落到 vite 自己身上，登录都进不去。
+    // 想接 wrangler dev：VITE_API_TARGET=http://127.0.0.1:8787 npm run dev
     proxy: {
-      '/app/api': {
-        target: 'http://localhost:2095',
+      '/api': {
+        target: process.env.VITE_API_TARGET || 'http://127.0.0.1:8788',
         changeOrigin: true,
       },
     },

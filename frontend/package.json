@@ -6,7 +6,7 @@
     "dev": "vite --host",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
-    "lint": "eslint . --fix --ignore-path .gitignore",
+    "lint": "eslint .",
     "i18n:missing": "npx tsx scripts/i18n-missing.mts",
     "test:unit": "vitest run"
   },
@@ -29,6 +29,7 @@
     "@babel/types": "^7.29.0",
     "@mdi/font": "7.4.47",
     "@types/node": "^25.9.1",
+    "@typescript-eslint/parser": "^8.73.0",
     "@vitejs/plugin-vue": "^6.0.7",
     "eslint-plugin-vue": "^10.9.1",
     "happy-dom": "^21.0.4",
