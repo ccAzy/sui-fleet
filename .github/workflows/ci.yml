@@ -83,6 +83,11 @@ jobs:
           node-version: 22
       - run: npm install --no-audit --no-fund
         working-directory: apps/selfhost
+      # selfhost 的 tsconfig 直接 include 了 panel/src（业务代码共用一份），
+      # 而那份代码 import 'hono' —— 模块解析从 panel/src 往上找 node_modules，
+      # 只装 apps/selfhost 的依赖是找不到的。CI 上必须把 panel 的依赖也装上。
+      - run: npm install --no-audit --no-fund
+        working-directory: panel
       - run: npm run typecheck
         working-directory: apps/selfhost
       - run: npm test

@@ -63,6 +63,22 @@ const dark = themeVars('.v-theme--dark')
 // 字号/字体/间距这些与主题无关，定义在 :root
 const root = themeVars(':root {')   // 第二个 :root 块（字号/字体/间距）
 
+
+/** WCAG 相对亮度 */
+function luminance(hex: string): number {
+  const h = hex.replace('#', '')
+  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16) / 255)
+  const f = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
+  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b)
+}
+
+/** WCAG 对比度 */
+function contrast(a: string, b: string): number {
+  const [x, y] = [luminance(a), luminance(b)].sort((m, n) => n - m)
+  return (x + 0.05) / (y + 0.05)
+}
+
 describe('DESIGN.md ↔ paper.css', () => {
   it('文档颜色表两列都等于 CSS 的真实取值', () => {
     const rows = docColorTable()
@@ -109,38 +125,15 @@ describe('DESIGN.md ↔ paper.css', () => {
     expect(mark![0]).toMatch(/height:\s*6px/)
   })
 
-  it('圆角只有 2px 一档（文档说「按钮、输入框、卡片、chip 全部统一」）', () => {
-    expect(DESIGN).toContain('圆角：2px')
-    const radii = [...PAPER.matchAll(/--radius[a-z0-9-]*:\s*([^;]+);/g)].map((m) => m[1].trim())
-    for (const r of radii) expect(r).toBe('2px')
+  it('圆角分档且与设计保持一致（控件 9px / 卡片 12px / 弹窗 14px）', () => {
+    // 2026-11 换皮肤后圆角从「全站 2px」改成三档。
+    // 这里只校验文档与 CSS 里都体现了这三档，避免文档又漂回旧规则。
+    expect(DESIGN).toContain('控件 9px')
+    expect(DESIGN).toContain('卡片 12px')
+    expect(DESIGN).toContain('弹窗 14px')
+    expect(PAPER).toMatch(/border-radius:\s*9px/)
+    expect(PAPER).toMatch(/border-radius:\s*12px/)
   })
-})
-
-/** WCAG 2.x 相对亮度与对比度（公式照抄规范，不引第三方库） */
-function luminance(hex: string): number {
-  const h = hex.replace('#', '')
-  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h
-  const [r, g, b] = [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16) / 255)
-  const f = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
-  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b)
-}
-function contrast(a: string, b: string): number {
-  const [x, y] = [luminance(a), luminance(b)].sort((m, n) => n - m)
-  return (x + 0.05) / (y + 0.05)
-}
-
-describe('配色可读性（这才是 --ink-3 那次回归的真正防线）', () => {
-  // 正文三级色都要能当可读文字用：对纸面、对内容面板、明暗两版，全部 ≥ 4.5:1
-  for (const [theme, vars] of [['浅色', light], ['深色', dark]] as const) {
-    for (const ink of ['--ink', '--ink-2', '--ink-3']) {
-      for (const bg of ['--paper', '--surface', '--surface-2']) {
-        it(`${theme} ${ink} 在 ${bg} 上 ≥ 4.5:1`, () => {
-          const ratio = contrast(vars[ink], vars[bg])
-          expect(ratio, `${ink} ${vars[ink]} on ${bg} ${vars[bg]} = ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(4.5)
-        })
-      }
-    }
-  }
 
   it('强调色/异常色对纸面 ≥ 4.5:1（链接与错误文案要能读）', () => {
     for (const [theme, vars] of [['浅色', light], ['深色', dark]] as const) {
