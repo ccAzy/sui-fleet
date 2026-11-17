@@ -1,24 +1,25 @@
 ---
 version: alpha
 name: s-ui Cloud 账簿
-description: 纸面、墨、一条细线分层的工作账簿。颜色只做三件事：分层、标记选中（墨靛）、标记异常（朱红）。双主题是同一套 token 的明暗两版。
+description: 黑曜石 / 冷白纸双主题，紫蓝渐变强调。账簿式名录 + 体检单为结构骨架，卡片靠渐变面与双层阴影立起来。
 colors:
-  primary: "#1a1a19"
-  secondary: "#57564f"
-  tertiary: "#2c4a6e"
-  neutral: "#f6f5f1"
-  paper: "#f6f5f1"
-  surface: "#fffefb"
-  surface-2: "#eeede8"
-  ink: "#1a1a19"
-  ink-2: "#57564f"
-  ink-3: "#6b6961"
-  rule: "#dcdad3"
-  rule-strong: "#c3c0b6"
-  accent: "#2c4a6e"
-  error: "#a63a2e"
-  ok: "#2f6b4f"
-  warn: "#8a6a1f"
+  primary: "#14141a"
+  secondary: "#55555f"
+  tertiary: "#6d5ce0"
+  neutral: "#f5f5f9"
+  paper: "#f5f5f9"
+  surface: "#ffffff"
+  surface-2: "#eeeef4"
+  ink: "#14141a"
+  ink-2: "#55555f"
+  ink-3: "#767680"
+  rule: "rgba(20,20,26,0.085)"
+  rule-strong: "rgba(20,20,26,0.15)"
+  accent: "#6d5ce0"
+  accent-2: "#3b82f6"
+  error: "#d92d5c"
+  ok: "#0f9d58"
+  warn: "#b45309"
 typography:
   display:
     fontFamily: "Source Han Serif SC"
@@ -52,9 +53,10 @@ typography:
     lineHeight: 1.5
     fontFeature: "tnum"
 rounded:
-  sm: 2px
-  md: 2px
-  lg: 2px
+  sm: 6px
+  md: 9px
+  lg: 12px
+  xl: 14px
 spacing:
   s1: 4px
   s2: 8px
@@ -68,21 +70,21 @@ components:
     backgroundColor: "{colors.accent}"
     textColor: "{colors.surface}"
     typography: "{typography.body}"
-    rounded: "{rounded.sm}"
+    rounded: "{rounded.md}"
     padding: 8px
     height: 32px
   button-ghost:
     backgroundColor: "{colors.surface}"
     textColor: "{colors.ink-2}"
     typography: "{typography.body}"
-    rounded: "{rounded.sm}"
+    rounded: "{rounded.md}"
     padding: 8px
     height: 32px
   field:
     backgroundColor: "{colors.surface}"
     textColor: "{colors.ink}"
     typography: "{typography.body}"
-    rounded: "{rounded.sm}"
+    rounded: "{rounded.md}"
     height: 40px
   rule-divider:
     backgroundColor: "{colors.rule}"
@@ -129,6 +131,9 @@ components:
     backgroundColor: "{colors.surface}"
     textColor: "{colors.ink-3}"
     typography: "{typography.label}"
+  card:
+    backgroundColor: "{colors.surface}"
+    rounded: "{rounded.lg}"
   page-background:
     backgroundColor: "{colors.neutral}"
     textColor: "{colors.ink}"
@@ -141,34 +146,43 @@ components:
 
 > 从已建成的实现反写的视觉系统，不是预先设定的规则书。改动界面时以本文件为准。
 
-## 世界
+## 世界（2026-11 改为 Obsidian）
 
-**一本摊开的工作账簿。**
+**白天**：冷白纸（#f5f5f9）+ 紫墨强调（#6d5ce0）。
+**夜间**：黑曜石（#070708）+ 紫蓝辉光（--accent #8b7bff → --accent-2 #4ea8ff）。
 
-纸面、墨、一条细线分层。没有卡片堆叠，没有阴影，没有渐变，没有毛玻璃。颜色只做三件事：分层、标记选中（靛蓝）、标记异常（朱红）。
+和上一版「纸面/账簿」的区别：上一版把「克制」做成了「什么都不画」——
+去掉边框、去掉阴影、去掉颜色，只剩骨架，读起来像毛坯房。这一版承认
+界面需要有质感：
 
-这个世界的来源不是「极简」这个风格词，而是记账这件事本身：账目要能一行行扫过去，数字要对齐，异常要一眼看见，装饰会妨碍核对。
+- 底色不是平涂：两层很淡的径向光晕 + 3% 噪点，给纵深
+- 卡片靠**渐变填充 + 顶部 1px 高光 + 双层阴影**立起来，不靠画框
+- 强调色是**渐变**，不是单一颜色：按钮、数字、选中项都用 --accent → --accent-2
+- 读数用等宽大数字（27px）+ tabular-nums，单位小一号
+- 状态靠**带光晕的墨点**（实心=在线，空心=离线，琥珀=告警）
+
+保留的东西：衬线标题、等宽数据、账簿式名录的行结构与列对齐。
+账簿仍然是骨架，只是现在它印在好纸上，而不是草稿纸。
 
 ## Token
 
 ### 颜色（浅色 / 深色）
 
-| 角色 | 浅色 | 深色 | 用途 |
-| --- | --- | --- | --- |
-| `--paper` | `#f6f5f1` | `#121211` | 页面底 |
-| `--surface` | `#fffefb` | `#191918` | 内容面板 |
-| `--surface-2` | `#eeede8` | `#101010` | 侧栏、工具栏（第二层中性） |
-| `--ink` | `#1a1a19` | `#e9e7e1` | 正文（15.2:1） |
-| `--ink-2` | `#57564f` | `#a8a59c` | 说明文字（7.4:1） |
-| `--ink-3` | `#6b6961` | `#908d84` | 占位、三级（浅 5.45:1 / 深 5.30:1） |
-| `--rule` | `#dcdad3` | `#2b2b29` | 1px 分隔线 |
-| `--rule-strong` | `#c3c0b6` | `#3d3d3a` | 需要更明确的分界 |
-| `--accent` | `#2c4a6e` | `#8fb2da` | 主操作、当前选中、链接 |
-| `--error` | `#a63a2e` | `#dd7f72` | 异常 |
-| `--ok` | `#2f6b4f` | `#86c2a1` | 正常 |
-| `--warn` | `#8a6a1f` | `#cfae64` | 降级 |
+新一代 token（与 `styles/paper.css` 同步）：
 
-只用一套世界观，双主题是同一套 token 的明暗两版，不是两套设计。
+| 名称 | 浅色 | 深色 | 用途 |
+| --- | --- | --- | --- |
+| `--paper` | #f5f5f9 | #070708 | 页面底 |
+| `--surface` | #ffffff | #0e0e12 | 卡片 / 面板 |
+| `--surface-2` | #eeeef4 | #16161c | 次级容器 |
+| `--ink` / `-2` / `-3` | #14141a / #55555f / #767680 | #f0f0f4 / #b6b6c2 / #7a7a88 | 正文 / 次级 / 三级（三级也对 AA 4.6:1） |
+| `--accent` → `--accent-2` | #6d5ce0 → #3b82f6 | #8b7bff → #4ea8ff | 渐变强调 |
+| `--card-bg` | 白到 #fcfcfe 渐变 | 白 5% 到 1% 渐变 | 卡面 |
+| `--card-line` | rgba(20,20,26,.08) | rgba(255,255,255,.075) | 卡边 |
+| `--card-shadow` | 两层柔和阴影 | 内高光 + 外阴影 | 卡片浮起 |
+| `--glow-1` / `--glow-2` | 紫/蓝淡雾 | 紫/蓝辉光 | 页面背景 |
+
+旧的纸面 token（`--rule`、`--surface` 等）全部保留，语义不变，只换了值。
 
 ### 字体
 
@@ -183,8 +197,10 @@ components:
 ### 间距与形状
 
 - 间距基数 4：4 / 8 / 12 / 16 / 24 / 32 / 48
-- 圆角：2px（按钮、输入框、卡片、chip 全部统一）
-- 阴影：**只有浮层**（弹窗、菜单、通知）允许，带 offset 与柔和模糊；页面内元素一律无阴影
+- 圆角分三档：控件 9px（按钮、输入框、下拉）、卡片 12px、弹窗 14px、chip 6px
+- 阴影：卡片用**双层柔和阴影**（深色下是第一层内高光 + 外阴影）浮起；
+  弹窗用更大的 `--shadow-float`。不再有「页面内禁止阴影」这条——
+  那是上一版把卡片压成色块的原因
 
 ## 标志性动作：账簿式名录
 
@@ -264,29 +280,49 @@ CPU   4 核              |  版本  v1.13.18
 
 ## 组件语言
 
-- **按钮**：默认描边（1px `--rule-strong`，2px 圆角）；主操作用墨底白字（`--ink` 底 + `--paper` 字）；危险操作用 `--error`；一律无阴影、无大写变形、无字距夸张
-- **表单**：1px 描边、无填充色块；聚焦时边框变 `--accent`；标签 11px 大写小字距
-- **表格**：透明底、表头 11px 大写小字距、行 1px 细线、数字等宽右对齐
-- **Chip**：2px 圆角、20px 高、等宽数字；只用于承载数据（流量、状态），不做装饰
-- **浮层**：唯一有阴影的地方；弹窗 320px 宽、标题衬线
+- **按钮**：9px 圆角。主操作 = 紫蓝渐变（`--accent` → `--accent-2`）+ 顶部内高光 +
+  hover 上浮 1px；次级 = 1px 描边 + 半透明底；文本按钮只有 hover 时才有底色
+- **表单**：9px 圆角、半透明底；聚焦时边框转 `--accent` 并加 3px `--accent-soft` 光晕；
+  标签 9.5px 大写、0.15em 字距
+- **卡片**：`--card-bg` 渐变面 + 1px `--card-line` + `--card-shadow`；
+  hover 时上浮 2px、阴影加深。卡片右上角可以放一团 `--glow-*` 模糊光
+- **表格**：整块作为卡片（12px 圆角 + 边框 + 阴影），表头 9.5px 大写字距、
+  不铺底色，行 1px 细线、hover 淡染
+- **Chip**：6px 圆角、20px 高、等宽数字；只承载数据，不做装饰
+- **浮层**：14px 圆角 + `--shadow-float`；弹窗标题衬线 16px、标题下不画分隔线
+  （靠间距分层），底部按钮区有极淡底色收口
+- **列表**：`.ledger` 整体作为卡片容器，行 hover 时左侧浮出 2px 渐变竖条
+
+## 动效
+
+- 卡片 hover：`transform: translateY(-2px)`，200ms，`cubic-bezier(.16,1,.3,1)`
+- 按钮 hover：上浮 1px + 阴影加深，160ms；`:active` 回弹 `scale(.99)`
+- 账簿行进场：220ms 位移淡入（保留上一版的编排，不额外加）
+- 输入框聚焦：边框 + 光晕过渡 160ms
+- 不做：bounce/elastic、无限循环动画、滚动视差
 
 ## 浏览器表面（会被漏掉但决定「是做的还是拼的」）
 
 `::selection` 用 accent 底 + 纸色字；`caret-color` 用 accent；滚动条细、滑块 `--rule-strong`；`:focus-visible` 是 1px accent 描边 + 2px offset。这些都在 `paper.css` 里，改主题时一起改。
 
-## 动效
+## 不做（这些是两版各自的反面参考）
 
-只有一次编排的时刻：账簿行进场的 220ms 位移淡入，指数缓出 `cubic-bezier(0.16, 1, 0.3, 1)`。其余状态变化 140–160ms。不做页面加载编排，不做 bounce/elastic。
+**上一版（纸面极简）做成了毛坯房**，教训是：
 
-## 不做（这些是上一版的反面参考）
+- 把「克制」理解成「什么都不画」——无阴影、无渐变、无颜色，只剩骨架
+- 卡片压成 1px 色块，读起来像表单系统而不是成品界面
+- 2px 直角用在全站，控件没有反馈感
 
-- 渐变皮肤、毛玻璃、彩色光斑
+**现在这版要避免滑向另一头**：
+
+- 霓虹发光、彩虹渐变、彩色光斑堆满屏
+- emoji 当图标（用 lucide / mdi）
+- 装饰性插图、无意义的动效
+- 纯黑纯灰（墨色带一点冷，纸白带一点紫）
 - 卡片套卡片、卡片堆成网格代替列表
 - 标题上方的 kicker/eyebrow
-- 渐变文字、发光边框、单边彩色粗边框
-- emoji 当图标（用 mdi 图标库）
-- 纯黑纯灰（墨色带一点暖，纸白带一点冷）
-- 大圆角（>4px）与零偏移光晕阴影
+
+**始终守住的**：数字是主角、异常一眼可见、账目能一行行扫过去。
 
 ## 节点切换器（顶栏下拉，2026-10-31）
 

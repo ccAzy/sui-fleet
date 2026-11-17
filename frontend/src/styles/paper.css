@@ -52,7 +52,7 @@
   --ink-2: #b6b6c2;        /* 8.4:1 */
   --ink-3: #7a7a88;        /* 4.6:1（原 #6b6b7a 只有 3.9，不够） */
   --rule: rgba(255, 255, 255, 0.075);
-  --rule-strong: rgba(255, 255, 255, 0.14);
+  --rule-strong: rgba(255, 255, 255, 0.2);
   --accent: #8b7bff;
   --accent-2: #4ea8ff;
   --accent-soft: rgba(139, 123, 255, 0.14);
@@ -68,7 +68,7 @@
   --card-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 2px 4px rgba(0, 0, 0, 0.5);
   --card-shadow-hover: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 16px 32px -14px rgba(0, 0, 0, 0.95);
   --shadow-float: 0 24px 60px -20px rgba(0, 0, 0, 0.9), 0 2px 8px rgba(0, 0, 0, 0.55);
-  --scrim: rgba(0, 0, 0, 0.62);
+  --scrim: rgba(0, 0, 0, 0.74);
 }
 
 /* ---------- 字体：标题衬线，正文无衬线，数据等宽 ---------- */
@@ -317,12 +317,100 @@ kbd,
   box-shadow: none !important;
 }
 
-/* 浮层是唯一允许有阴影的地方：带 offset 与柔和模糊 */
+/* 浮层：唯一允许大阴影的地方 */
 .v-overlay__content > .v-card,
 .v-dialog > .v-card,
 .v-menu > .v-overlay__content {
   box-shadow: var(--shadow-float) !important;
+  border-radius: 14px !important;
+}
+
+/* ---------- 弹窗：Obsidian 表单式 ----------
+ * 28 个弹窗都长成 v-card > (v-card-title + v-divider + v-card-text + v-card-actions)，
+ * 所以在这里统一改结构感：标题用衬线、去掉标题下的分隔线（靠间距分层）、
+ * 底部按钮区加一层很淡的底色把它和内容分开。
+ */
+.v-dialog > .v-card {
+  border: 1px solid var(--card-line) !important;
+  background: var(--card-bg) !important;
+  overflow: hidden;
+}
+
+.v-dialog .v-card-title {
+  font-family: var(--serif);
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.01em;
+  line-height: 1.3 !important;
+  color: var(--ink);
+  padding: 18px 20px 10px !important;
+}
+
+/* 标题紧跟的分隔线：用间距代替线 */
+.v-dialog .v-card-title + .v-divider {
+  display: none !important;
+}
+
+.v-dialog .v-card-text {
+  padding: 6px 20px 18px !important;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.v-dialog .v-card-actions {
+  padding: 12px 16px !important;
+  gap: 8px;
+  border-top: 1px solid var(--rule);
+  background: color-mix(in srgb, var(--ink) 2.5%, transparent);
+}
+
+/* 弹窗里那种「XX Options」按钮：Vuetify 默认给 flat 灰底，在深色卡里像补丁，
+   改成透明 + 细边 */
+.v-dialog .v-btn--variant-flat:not([color]) {
+  background: color-mix(in srgb, var(--ink) 7%, transparent) !important;
+  color: var(--ink-2) !important;
+  box-shadow: inset 0 0 0 1px var(--rule) !important;
+}
+
+/* 弹窗里的输入框底色要跟卡片一致，不然会浮出一个色块 */
+.v-dialog .v-field {
+  background: color-mix(in srgb, var(--paper) 55%, transparent) !important;
+}
+
+/* 遮罩：不压暗的话，弹窗会像浮在列表上的一块玻璃，完全没有「进来了」的感觉。
+   Vuetify 用 opacity 控制 scrim，这里直接给终值。 */
+.v-overlay__scrim {
+  background: var(--scrim) !important;
+  opacity: 1 !important;
+  backdrop-filter: none !important;
+}
+
+/* 弹窗内的**分组卡片**（Listen / Derp / TLS / 协议参数这些）
+   本来是嵌套 v-card，全局卡片样式一上来就变成「卡片套卡片」的灰块。
+   改成扁平分组：透明底 + 一圈细线 + 左上角的小标题。 */
+.v-dialog .v-card .v-card {
+  background: transparent !important;
+  border: 1px solid var(--rule) !important;
+  box-shadow: none !important;
   border-radius: 10px !important;
+  overflow: visible !important;
+}
+
+.v-dialog .v-card .v-card > .v-card-subtitle,
+.v-dialog .v-card .v-card > .v-card-title {
+  font-family: var(--sans) !important;
+  font-size: 9.5px !important;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  font-weight: 700 !important;
+  color: var(--ink-3) !important;
+  padding: 10px 14px 0 !important;
+  min-height: 0;
+  line-height: 1.4;
+}
+
+.v-dialog .v-card .v-card > .v-card-text {
+  padding: 8px 14px 12px !important;
 }
 
 .v-divider {
