@@ -71,6 +71,32 @@ fi
 say "构建前端（产物写到 panel/frontend-dist，已随仓库提交）"
 npm run build:web
 
+# ---------------------------------------------------------------- 节点侧 agent
+# /dl/ 是 gitignore 的（33 MB 的二进制不该进 git），所以全新 clone 出来它是空的。
+# 少了它，部署出来的面板能登录、能建配置，但「接入节点」那条一键命令会 404。
+# 这里自动补上：有预编译产物就直接切片，没有就现场编，都不行就明确告警而不是静默跳过。
+DL_PREFIX="frontend-dist/dl/sui-agent-linux-amd64"
+if [ -f "${DL_PREFIX}.parts" ]; then
+  say "节点 agent 已就位（跳过）"
+else
+  REPO_ROOT="$(cd .. && pwd)"
+  if [ -f "$REPO_ROOT/dist/sui-agent-linux-amd64" ]; then
+    say "检测到预编译产物，切片发布到 /dl/"
+    bash "$REPO_ROOT/apps/selfhost/scripts/publish-agent.sh" || warn "agent 切片失败"
+  elif command -v go >/dev/null 2>&1; then
+    say "现场编译节点 agent（需要 Go 1.26 + gcc，约 5-10 分钟）"
+    if bash "$REPO_ROOT/scripts/build-wsl.sh" &&        bash "$REPO_ROOT/apps/selfhost/scripts/publish-agent.sh"; then
+      :
+    else
+      warn "agent 编译失败，节点一键接入将不可用"
+    fi
+  else
+    warn "没有 Go 环境也没有预编译产物 —— 节点的「一键接入」命令会返回 404"
+    warn "  办法一：在别的机器跑 scripts/build-wsl.sh，把 dist/sui-agent-linux-amd64 拷到本机后重跑本脚本"
+    warn "  办法二：装 Go 1.26.5 + gcc 后重跑"
+  fi
+fi
+
 # ---------------------------------------------------------------- 登录
 say "检查 Cloudflare 登录状态"
 if ! npx wrangler --config "$CFG" whoami >/dev/null 2>&1; then
