@@ -40,6 +40,13 @@ const rows = [
 // v-data-table 的 TableHeader 类型用自己的 align 取值（start/end），
 // 跟本项目的 TableHeader（left/center/right）不兼容，对照页里各用一份。
 const vuetifyHeaders = headers.map((h) => ({ title: h.title, key: h.key }))
+
+const svcRows = [
+  { tag: 'vless-reality-46250', type: 'vless', port: 46250, tls: true, listen: '0.0.0.0' },
+  { tag: 'hysteria2-50381', type: 'hysteria2', port: 50381, tls: true, listen: '0.0.0.0' },
+  { tag: 'ss-2022-30814', type: 'shadowsocks', port: 30814, tls: false, listen: '0.0.0.0' },
+  { tag: 'trojan-ws-2087', type: 'trojan', port: 2087, tls: true, listen: '127.0.0.1' },
+]
 </script>
 
 <template>
@@ -175,7 +182,7 @@ const vuetifyHeaders = headers.map((h) => ({ title: h.title, key: h.key }))
       </section>
 
       <!-- 表格 -->
-      <section class="mt-9 mb-16">
+      <section class="mt-9">
         <h2 class="mb-3 text-[15px] font-semibold" style="font-family: var(--serif)">表格</h2>
         <div class="grid grid-cols-2 gap-6">
           <div>
@@ -185,6 +192,80 @@ const vuetifyHeaders = headers.map((h) => ({ title: h.title, key: h.key }))
           <div>
             <div class="mb-1 text-[11px] uppercase tracking-wider text-[var(--ink-3)]">shadcn</div>
             <DataTable :headers="headers" :items="rows" />
+          </div>
+        </div>
+      </section>
+
+      <!-- 整页改造对比 -->
+      <section class="mt-12 mb-24 border-t-2 border-[var(--ink)] pt-8">
+        <h2 class="text-[19px] font-semibold" style="font-family: var(--serif)">整页改造：服务页</h2>
+        <p class="mt-1 max-w-[760px] text-[12px] leading-relaxed text-[var(--ink-3)]">
+          同一份数据、同样的信息量，两种组织方式。改后的结构就是 DESIGN.md 里写的「账簿式名录」——
+          入站、节点、客户端三个页面早就在用，只有服务页还是卡片墙。
+        </p>
+
+        <div class="mt-7 space-y-9">
+          <!-- 改前 -->
+          <div>
+            <div class="mb-3 flex items-baseline gap-2">
+              <span class="text-[13px] font-semibold text-[var(--ink)]">改前</span>
+              <span class="text-[11px] text-[var(--ink-3)]">v-card 网格 · 每个服务一个框</span>
+            </div>
+            <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
+              <div v-for="s in svcRows" :key="s.tag" class="rounded-[2px] border border-[var(--rule)] bg-[var(--surface)]">
+                <div class="border-b border-[var(--rule)] px-2.5 py-1.5 text-[12px] font-semibold" style="font-family: var(--serif)">{{ s.tag }}</div>
+                <dl class="space-y-0.5 px-2.5 py-1.5 text-[11px]">
+                  <div class="flex justify-between gap-2"><dt class="text-[var(--ink-3)]">类型</dt><dd class="truncate">{{ s.type }}</dd></div>
+                  <div class="flex justify-between gap-2"><dt class="text-[var(--ink-3)]">端口</dt><dd class="tabular-nums">{{ s.port }}</dd></div>
+                  <div class="flex justify-between gap-2"><dt class="text-[var(--ink-3)]">TLS</dt><dd>{{ s.tls ? '启用' : '关闭' }}</dd></div>
+                </dl>
+                <div class="flex gap-1 border-t border-[var(--rule)] px-1.5 py-1 text-[11px] text-[var(--ink-3)]">
+                  <span>✎</span><span>🗑</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 改后 -->
+          <div>
+            <div class="mb-3 flex items-baseline gap-2">
+              <span class="text-[13px] font-semibold text-[var(--ink)]">改后</span>
+              <span class="text-[11px] text-[var(--ink-3)]">账簿名录 · 一行一个，靠列对齐扫读</span>
+            </div>
+            <div class="ledger">
+              <div v-for="(s, i) in svcRows" :key="s.tag" class="ledger-row">
+                <span class="ledger-mark" :data-state="s.tls ? 'up' : 'down'" aria-hidden="true"></span>
+                <span class="ledger-name">{{ s.tag }}</span>
+                <span class="ledger-meta">
+                  <span class="mono">:{{ s.port }}</span>
+                  <span class="sep">·</span>{{ s.type }}
+                  <span class="sep">·</span>{{ s.tls ? 'TLS' : 'plain' }}
+                  <span class="sep">·</span><span class="mono">{{ s.listen }}</span>
+                </span>
+                <div class="ledger-actions" :style="i === 0 ? 'opacity:1' : ''">
+                  <span class="grid h-6 w-6 place-items-center text-[var(--ink-3)]">✎</span>
+                  <span class="grid h-6 w-6 place-items-center text-[var(--ink-3)]">🗑</span>
+                </div>
+              </div>
+            </div>
+            <p class="mt-2 text-[11px] text-[var(--ink-3)]">
+              操作按钮默认隐形（第一行是 hover 状态的样子），账目不需要满屏图标。
+            </p>
+          </div>
+        </div>
+
+        <div class="mt-8 grid grid-cols-3 gap-6 border-t border-[var(--rule)] pt-5 text-[12px] leading-relaxed text-[var(--ink-2)]">
+          <div>
+            <div class="mb-1 text-[10px] uppercase tracking-[0.1em] text-[var(--ink-3)]">改前的问题</div>
+            四张卡片要占用四倍高度，横向只有四列；再多的服务就得往下滚。每个框自身的边线又切碎视线。
+          </div>
+          <div>
+            <div class="mb-1 text-[10px] uppercase tracking-[0.1em] text-[var(--ink-3)]">改后</div>
+            行高 36–40px，一屏能放二十多个；名称、端口、协议、TLS 各占一列，竖着扫一眼就对得上。墨点是唯一的状态信号。
+          </div>
+          <div>
+            <div class="mb-1 text-[10px] uppercase tracking-[0.1em] text-[var(--ink-3)]">顺带修掉</div>
+            原来每张卡片各自维护一个 delOverlay[index]，删掉中间一张后索引全偏移，点 A 弹 B。现在只记一个删除目标。
           </div>
         </div>
       </section>

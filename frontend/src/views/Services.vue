@@ -11,62 +11,48 @@
     @close="closeModal"
   />
 
-  <!-- 工具栏 -->
-  <div class="page-toolbar mb-4 flex items-center justify-between gap-3">
-    <Button size="sm" @click="showModal(0)">
-      <Plus class="mr-1.5 h-3.5 w-3.5" />
-      {{ $t('actions.add') }}
-    </Button>
-  </div>
-
-  <!-- 空状态 -->
-  <div
-    v-if="!services.length"
-    class="list-empty rounded-[2px] border border-dashed border-[var(--rule-strong)] py-14 text-center text-[13px] text-[var(--ink-3)]"
-  >
-    {{ $t('emptyList') }}
-  </div>
-
-  <!-- 服务卡片 -->
-  <div v-else class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-    <div
-      v-for="item in services"
-      :key="item.tag"
-      class="flex min-w-0 flex-col rounded-[2px] border border-[var(--rule)] bg-[var(--surface)] transition-colors duration-150 hover:border-[var(--rule-strong)]"
+  <!-- 工具条：右对齐 + 一条细线收口（DESIGN.md「列表页的统一收口」） -->
+  <div class="page-toolbar mb-3 flex items-center justify-end gap-2 border-b border-[var(--rule-strong)] pb-2">
+    <button
+      type="button"
+      class="ui-reset inline-flex items-center gap-1.5 rounded-[2px] px-2 py-1 text-[12px] text-[var(--ink-2)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)]"
+      @click="showModal(0)"
     >
-      <div class="min-w-0 px-3 pt-2.5">
-        <h3 class="truncate text-[13px] font-semibold text-[var(--ink)]" style="font-family: var(--serif)" :title="item.tag">
-          {{ item.tag }}
-        </h3>
-        <p class="mt-0.5 truncate text-[11px] uppercase tracking-[0.06em] text-[var(--ink-3)]">
-          {{ item.type }}
-        </p>
-      </div>
+      <Plus class="h-3.5 w-3.5" />
+      {{ $t('actions.add') }}
+    </button>
+  </div>
 
-      <dl class="mt-2 space-y-0.5 px-3 pb-2.5 text-[12px]">
-        <div class="flex items-baseline gap-2">
-          <dt class="shrink-0 text-[var(--ink-3)]">{{ $t('in.addr') }}</dt>
-          <dd class="min-w-0 truncate text-right text-[var(--ink-2)]" :title="item.listen">{{ item.listen }}</dd>
-        </div>
-        <div class="flex items-baseline gap-2">
-          <dt class="shrink-0 text-[var(--ink-3)]">{{ $t('in.port') }}</dt>
-          <dd class="ml-auto tabular-nums text-[var(--ink-2)]">{{ item.listen_port }}</dd>
-        </div>
-        <div class="flex items-baseline gap-2">
-          <dt class="shrink-0 text-[var(--ink-3)]">{{ $t('objects.tls') }}</dt>
-          <dd class="ml-auto" :class="item.tls_id > 0 ? 'text-[var(--ink)]' : 'text-[var(--ink-3)]'">
-            {{ item.tls_id > 0 ? $t('enable') : $t('disable') }}
-          </dd>
-        </div>
-      </dl>
+  <div v-if="!services.length" class="list-empty">{{ $t('emptyList') }}</div>
 
-      <div class="mt-auto flex items-center gap-1 border-t border-[var(--rule)] px-1.5 py-1">
+  <!--
+    账簿式名录（DESIGN.md 的「标志性动作」）：
+    这是一份同类对象清单，不是卡片墙。四列固定——状态墨点、名称（衬线）、
+    参数（等宽 + · 分隔）、操作（默认隐形，hover/聚焦才出现）。
+    原来这里是 v-card 网格，每个服务一个框，和站点其余列表页不是同一套语言。
+  -->
+  <div v-else class="ledger">
+    <div v-for="item in services" :key="item.tag" class="ledger-row">
+      <span class="ledger-mark" :data-state="item.tls_id > 0 ? 'up' : 'down'" aria-hidden="true"></span>
+
+      <span class="ledger-name" :title="item.tag">{{ item.tag }}</span>
+
+      <span class="ledger-meta">
+        <span class="mono">:{{ item.listen_port }}</span>
+        <span class="sep">·</span>{{ item.type }}
+        <span class="sep">·</span>{{ item.tls_id > 0 ? 'TLS' : 'plain' }}
+        <template v-if="item.listen">
+          <span class="sep">·</span><span class="mono" :title="item.listen">{{ item.listen }}</span>
+        </template>
+      </span>
+
+      <div class="ledger-actions">
         <button
           type="button"
           class="ui-reset grid h-6 w-6 place-items-center rounded-[2px] text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)]"
           :title="$t('actions.edit')"
           :aria-label="$t('actions.edit')"
-          @click="showModal(item.id)"
+          @click.stop="showModal(item.id)"
         >
           <Pencil class="h-3.5 w-3.5" />
         </button>
@@ -75,7 +61,7 @@
           class="ui-reset grid h-6 w-6 place-items-center rounded-[2px] text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--error)]"
           :title="$t('actions.del')"
           :aria-label="$t('actions.del')"
-          @click="askDelete(item)"
+          @click.stop="askDelete(item)"
         >
           <Trash2 class="h-3.5 w-3.5" />
         </button>
