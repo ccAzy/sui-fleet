@@ -34,7 +34,7 @@ const headers: TableHeader[] = [
 const rows = [
   { name: 'HK-01', addr: '192.0.2.10', port: 443 },
   { name: 'JP-02', addr: '198.51.100.20', port: 8443 },
-  { name: 'VN-03', addr: '45.118.132.10', port: 2096 },
+  { name: 'VN-03', addr: '203.0.113.30', port: 2096 },
 ]
 
 // v-data-table 的 TableHeader 类型用自己的 align 取值（start/end），

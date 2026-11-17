@@ -13,7 +13,10 @@ import Data from '@/store/modules/data'
 // 为什么不用 import.meta.env：实测 Vite 8 + Rolldown 在 dev 下没替换它，
 // 连 import.meta.env.PROD 都被算成真值 —— 结果本地 /devui 不注册、还被
 // 轮询的 401 挤到 /login。别在这条路上再试。
-const isLocalDev = __DEV_UI__ && !['sui.example.com', 'hksui.example.com', 'panel.example.org'].includes(location.hostname)
+// 只靠构建期常量控制：`npm run build` 时 __DEV_UI__ 是 false，整段会被摇掉。
+// 这里刻意不写域名黑名单 —— 那是把部署域名硬编进公开源码，没有实际防护价值
+// （生产包根本不含这段），只会泄露信息。
+const isLocalDev = __DEV_UI__
 
 const routes = [
   ...(isLocalDev

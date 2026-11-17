@@ -5,15 +5,15 @@
 set -u
 STATE=/opt/sui-arbiter/state.env
 LOG_TAG=sui-arbiter
-PROBE="https://sui.example.com/health"
+PROBE="${PROBE:-https://panel.example.com/health}"
 ORDER="hk,jp"
-declare -A IPS=([hk]="192.0.2.10" [jp]="85.121.122.96")
+declare -A IPS=([hk]="${IP_HK:?}" [jp]="${IP_JP:?}")
 THRESHOLD=3
 COOLDOWN=600
 DRY_RUN="${DRY_RUN:-1}"
 OPS_TOKEN_FILE=/opt/sui-arbiter/ops_token
 ZONE_ID="69cdbbbcfd895b665caf28113c142dd5"
-RECORD="sui.example.com"
+RECORD="${RECORD:-panel.example.com}"
 CF_TOKEN_FILE=/opt/sui-arbiter/cf_token
 
 [ -f "$STATE" ] || printf "failures=0\nlast_switch=0\nprimary=hk\n" >"$STATE"
@@ -66,7 +66,7 @@ if [ "$failures" -ge "$THRESHOLD" ] && [ $((now - last_switch)) -ge "$COOLDOWN" 
       fi
       if [ "$ok" = "1" ]; then
         curl -fsS --max-time 10 -X POST \
-          "https://sui.example.com/api/arbiter?token=$(cat "$OPS_TOKEN_FILE")" \
+          "${PROBE%/health}/api/arbiter?token=$(cat "$OPS_TOKEN_FILE")" \
           -H "Content-Type: application/json" \
           --data "{\"primary\":\"$next\",\"order\":[\"hk\",\"jp\"],\"reason\":\"probe failed $failures times\"}" >/dev/null 2>&1
         logger -t "$LOG_TAG" "已切到 $next（IP $ip），DNS 已更新"
