@@ -38,7 +38,7 @@
           <span class="sep">·</span><span class="mono">{{ item.address?.length > 0 ? item.address[0] : '-' }}</span>
           <span class="sep">·</span><span class="mono">:{{ item.listen_port > 0 ? item.listen_port : '-' }}</span>
           <template v-if="item.peers?.length">
-            <span class="sep">·</span>{{ $t('types.wg.peers') }}{{ ' ' }}<span class="mono">{{ item.peers.length }}</span>
+            <span class="sep">·</span>{{ $t('types.wg.peers') }}&nbsp;<span class="mono">{{ item.peers.length }}</span>
           </template>
           <template v-if="onlines.includes(item.tag)">
             <span class="sep">·</span>{{ $t('online') }}
