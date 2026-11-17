@@ -446,7 +446,7 @@ export default {
       return this.saveClient(clientName, [id], { shadowsocks: { name: clientName, password: RandomUtil.randomShadowsocksPassword(32) } })
     },
     async buildSelfSigned(port: number, clientName: string, type: string, tagPrefix: string, config: any, alpn?: string[]): Promise<number | null> {
-      const id = await this.inboundSelfSigned(port, type, tagPrefix, this.sniOr('www.bing.com'), alpn)
+      const id = await this.inboundSelfSigned(port, type, tagPrefix, this.sniOr(SELF_SIGNED_SNI), alpn)
       if (!id) return null
       return this.saveClient(clientName, [id], config)
     },
