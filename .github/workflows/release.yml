@@ -1,0 +1,104 @@
+name: Release
+
+# 推一个 v* tag 就产出一个可下载的 agent。
+#
+# 为什么需要它：/dl/ 是 gitignore 的（33 MB 二进制不该进 git），所以任何人 clone
+# 下来都没有节点二进制，install.sh 只能现场编（要 Go 1.26 + gcc + CGO，5-10 分钟）。
+# Release 资产没有 Cloudflare 那种 25 MB 单文件限制，正好放整包 —— install.sh 直接下。
+#
+# 产物命名与 install.sh / publish-agent.sh 对齐：
+#   sui-agent-linux-amd64.gz     整包（gzip）
+#   sui-agent-linux-arm64.gz
+#   *.sha256                     各自校验值
+
+on:
+  push:
+    tags:
+      - 'v*'
+  # 手动也能出一个，方便在真机验证 Release 链路
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: 构建并发布 agent
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          # go.mod 要求 go 1.26.5；用更高的 1.27 会在 go-json-experiment/json 上炸
+          go-version: '1.26.5'
+          cache-dependency-path: node/go.sum
+
+      # arm64 交叉编译需要 aarch64 工具链（CGO 打开，sqlite 要 C 编译器）
+      - name: 安装交叉编译工具链
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gcc-aarch64-linux-gnu
+
+      - name: 编译 amd64
+        working-directory: node
+        env:
+          CGO_ENABLED: '1'
+          GOOS: linux
+          GOARCH: amd64
+        run: |
+          TAGS="with_quic,with_grpc,with_utls,with_acme,with_gvisor,"
+          TAGS="${TAGS}badlinkname,tfogo_checklinkname0,with_tailscale"
+          LD="-w -s -checklinkname=0"
+          go build -tags "$TAGS" -ldflags "$LD" -o /tmp/sui-agent-amd64 .
+          # 能力自检：缺 uTLS 时产物能编出来但 reality 会在运行时拒绝启动
+          for sym in "tailscale.com" "uTLS" "with_utls"; do
+            n=$(strings /tmp/sui-agent-amd64 | grep -c "$sym" || true)
+            [ "$n" -gt 0 ] || { echo "产物里找不到 [$sym]，构建标签没生效"; exit 1; }
+          done
+          ls -lh /tmp/sui-agent-amd64
+
+      - name: 编译 arm64
+        working-directory: node
+        env:
+          CGO_ENABLED: '1'
+          GOOS: linux
+          GOARCH: arm64
+          CC: aarch64-linux-gnu-gcc
+        run: |
+          TAGS="with_quic,with_grpc,with_utls,with_acme,with_gvisor,"
+          TAGS="${TAGS}badlinkname,tfogo_checklinkname0,with_tailscale"
+          LD="-w -s -checklinkname=0"
+          go build -tags "$TAGS" -ldflags "$LD" -o /tmp/sui-agent-arm64 .
+          ls -lh /tmp/sui-agent-arm64
+
+      - name: 打包
+        run: |
+          set -e
+          mkdir -p /tmp/out
+          for arch in amd64 arm64; do
+            src="/tmp/sui-agent-$arch"
+            gz="/tmp/out/sui-agent-linux-$arch.gz"
+            gzip -9 -c "$src" > "$gz"
+            sha256sum "$gz" > "$gz.sha256"
+          done
+          ls -lh /tmp/out
+
+      - name: 发布
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            /tmp/out/sui-agent-linux-amd64.gz
+            /tmp/out/sui-agent-linux-amd64.gz.sha256
+            /tmp/out/sui-agent-linux-arm64.gz
+            /tmp/out/sui-agent-linux-arm64.gz.sha256
+          generate_release_notes: true
+          body: |
+            节点侧 `sui-agent` 二进制（sing-box 已链接在内，独立运行，目标机不需要 Node/Docker）。
+
+            | 架构 | 文件 |
+            | --- | --- |
+            | x86_64 | `sui-agent-linux-amd64.gz` |
+            | aarch64 | `sui-agent-linux-arm64.gz` |
+
+            `install.sh` 会自动按架构挑一个下载，不需要手动取。

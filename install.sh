@@ -13,7 +13,7 @@
 #   --domain panel.example.com   装完自动装 Caddy 反代（自签证书，配 Cloudflare Full 模式）
 #   --port 8788                  面板监听端口（默认 8788）
 #   --src  <tar.gz 或 git URL>   代码来源（默认从 GitHub 拉 main 分支）
-#   --agent <二进制 URL>         节点 agent（默认从 --src 同源目录取）
+#   --agent <二进制 URL>         节点 agent（默认顺序：GitHub Release → 面板 /dl/ → 报错）
 #   --no-agent                   只装面板，不装本机节点
 #   --dir /opt/sui-panel         安装目录
 #   --service sui-panel          systemd 服务名
@@ -347,6 +347,11 @@ if [ "$WITH_AGENT" -eq 1 ]; then
     say "下载节点 agent"
     curl -fsSL --retry 2 --max-time 300 "$AGENT_URL" -o /tmp/sui-agent || warn "agent 下载失败，跳过本机节点"
     [ -s /tmp/sui-agent ] && AGENT_BIN=/tmp/sui-agent
+  elif curl -fsSL --retry 1 --max-time 300         "https://github.com/exampleuser/sui-fleet/releases/latest/download/sui-agent-linux-${ARCH}.gz"         -o /tmp/sui-agent.gz 2>/dev/null && gunzip -c /tmp/sui-agent.gz > /tmp/sui-agent 2>/dev/null; then
+    # Release 资产没有 CF 那种 25 MB 单文件限制，放的是整包 gz，解压即用
+    chmod +x /tmp/sui-agent
+    AGENT_BIN=/tmp/sui-agent
+    dim "来自 Release（$(du -h /tmp/sui-agent | cut -f1)）"
   elif [ -d "$DL" ] && ls "$DL"/sui-agent-linux-*.parts >/dev/null 2>&1; then
     say "从面板自带的分片里取 agent"
     NAM="sui-agent-linux-${ARCH}"
@@ -366,6 +371,13 @@ if [ "$WITH_AGENT" -eq 1 ]; then
   fi
 
   if [ -n "$AGENT_BIN" ]; then
+    # 把它切进面板的 /dl/：这一步决定「以后在面板里加节点」时那条命令能不能用
+    PUB="$INSTALL_DIR/apps/selfhost/scripts/publish-agent.sh"
+    if [ -f "$PUB" ] && [ ! -f "$DL/sui-agent-linux-${ARCH}.parts" ]; then
+      say "把 agent 切片放进面板的 /dl/（供其他节点下载）"
+      cp "$AGENT_BIN" "/tmp/sui-agent-linux-${ARCH}"
+      AGENT_BIN="/tmp/sui-agent-linux-${ARCH}" bash "$PUB" 2>&1 | tail -3         || warn "切片失败（不影响本机节点，但面板里加新节点时会 404）"
+    fi
     say "安装本机节点 agent"
     bash "$INSTALL_DIR/apps/selfhost/scripts/install-agent.sh" \
       --panel "http://127.0.0.1:${PORT}" \

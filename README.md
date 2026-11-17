@@ -21,6 +21,9 @@ curl -fsSL https://ghproxy.net/https://raw.githubusercontent.com/exampleuser/sui
 跑完会打印面板地址和一个随机生成的管理员密码。它做的事：装 Node ≥22.5 → 取代码 → 装依赖 →
 建库建管理员 → 写 systemd → 起服务 → 自检 → 顺便把本机也装成节点。
 
+节点 agent 按这个顺序取：**GitHub Release**（每个 `v*` tag 由 CI 自动构建 amd64/arm64）→
+面板自带 `/dl/` → 本地 `dist/` → 现场用 Go 编译。所以新机器上不需要你有 Go 环境。
+
 <details>
 <summary>可选参数</summary>
 
