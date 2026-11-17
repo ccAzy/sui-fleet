@@ -25,44 +25,28 @@
     </v-col>
   </v-row>
   <v-row>
-    <v-col cols="12" sm="4" md="3" lg="3" v-for="item in <any[]>users" :key="item.id">
-      <v-card rounded="xl" elevation="5" min-width="200" :title="item.username">
-        <v-card-subtitle style="margin-top: -15px;">
+    <div class="adm-ledger">
+      <div v-for="item in <any[]>users" :key="item.id" class="ledger-row">
+        <span class="ledger-mark" data-state="up" aria-hidden="true"></span>
+        <span class="ledger-name" :title="item.username">{{ item.username }}</span>
+        <span class="ledger-meta">
           {{ $t('admin.lastLogin') }}
-        </v-card-subtitle>
-        <v-card-text>
-          <v-row>
-            <v-col>{{ $t('admin.date') }}</v-col>
-            <v-col>
-              {{ item.loginDate }}
-            </v-col>
-          </v-row>
-          <v-row>
-            <v-col>{{ $t('admin.time') }}</v-col>
-            <v-col>
-              {{ item.loginTime }}
-            </v-col>
-          </v-row>
-          <v-row>
-            <v-col>IP</v-col>
-            <v-col>
-              {{ item.ip }}
-            </v-col>
-          </v-row>
-        </v-card-text>
-        <v-divider></v-divider>
-        <v-card-actions style="padding: 0;">
-          <v-btn icon="mdi-account-edit" @click="showEditModal(item)">
-            <v-icon />
-            <v-tooltip activator="parent" location="top" :text="$t('actions.edit')"></v-tooltip>
-          </v-btn>
-          <v-btn icon="mdi-list-box-outline" @click="showChangesModal(item.username)">
-            <v-icon />
-            <v-tooltip activator="parent" location="top" :text="$t('admin.changes')"></v-tooltip>
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-col>
+          <span class="sep">·</span><span class="mono">{{ item.loginDate || '-' }}</span>
+          <span class="sep">·</span><span class="mono">{{ item.loginTime || '-' }}</span>
+          <template v-if="item.ip">
+            <span class="sep">·</span><span class="mono">{{ item.ip }}</span>
+          </template>
+        </span>
+        <div class="ledger-actions">
+          <button type="button" class="ui-reset adm-btn" :title="$t('actions.edit')" @click="showEditModal(item)">
+            <v-icon icon="mdi-account-edit" size="16" />
+          </button>
+          <button type="button" class="ui-reset adm-btn" :title="$t('admin.changes')" @click="showChangesModal(item.username)">
+            <v-icon icon="mdi-list-box-outline" size="16" />
+          </button>
+        </div>
+      </div>
+    </div>
   </v-row>
 </template>
 
@@ -159,3 +143,36 @@ const closeTokenModal = () => {
   tokenModal.value.visible = false
 }
 </script>
+<style scoped>
+/* 管理员页：卡片墙 → 账簿名录 */
+.adm-ledger {
+  border: 1px solid var(--card-line);
+  border-radius: 12px;
+  background: var(--card-bg);
+  box-shadow: var(--card-shadow);
+  padding: 0 16px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.adm-ledger :deep(.ledger-row) {
+  grid-template-columns: 14px minmax(0, 220px) minmax(0, 1fr) auto;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.adm-btn {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  color: var(--ink-3);
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.adm-btn:hover {
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  color: var(--ink);
+}
+</style>

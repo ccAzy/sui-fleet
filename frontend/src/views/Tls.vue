@@ -20,7 +20,7 @@
         <span class="ledger-meta">
           <span class="mono">{{ item.server?.server_name || '-' }}</span>
           <template v-if="tlsInbounds(item.id).length">
-            <span class="sep">·</span>{{ $t('pages.inbounds') }} <span class="mono">{{ tlsInbounds(item.id).length }}</span>
+            <span class="sep">·</span>{{ $t('pages.inbounds') }}{{ ' ' }}<span class="mono">{{ tlsInbounds(item.id).length }}</span>
           </template>
           <template v-if="item.server?.acme != undefined"><span class="sep">·</span>ACME</template>
           <template v-if="item.server?.ech != undefined"><span class="sep">·</span>ECH</template>
