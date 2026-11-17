@@ -176,6 +176,8 @@ fi
 say "复制文件到 $INSTALL_DIR"
 cp -a "$SRCDIR/apps" "$INSTALL_DIR/" 2>/dev/null || true
 cp -a "$SRCDIR/panel" "$INSTALL_DIR/" 2>/dev/null || true
+# 节点安装脚本在仓库根的 scripts/，不在 apps/selfhost/scripts/
+cp -a "$SRCDIR/scripts" "$INSTALL_DIR/" 2>/dev/null || true
 [ -f "$SRCDIR/package.json" ] && cp -a "$SRCDIR/package.json" "$INSTALL_DIR/"
 [ -f "$SRCDIR/package-lock.json" ] && cp -a "$SRCDIR/package-lock.json" "$INSTALL_DIR/"
 
@@ -376,12 +378,17 @@ if [ "$WITH_AGENT" -eq 1 ]; then
     if [ -f "$PUB" ] && [ ! -f "$DL/sui-agent-linux-${ARCH}.parts" ]; then
       say "把 agent 切片放进面板的 /dl/（供其他节点下载）"
       cp "$AGENT_BIN" "/tmp/sui-agent-linux-${ARCH}"
-      AGENT_BIN="/tmp/sui-agent-linux-${ARCH}" bash "$PUB" 2>&1 | tail -3         || warn "切片失败（不影响本机节点，但面板里加新节点时会 404）"
+      AGENT_BIN="/tmp/sui-agent-linux-${ARCH}" bash "$PUB" 2>&1 | tail -3         || warn "切片失败（本机节点不受影响，但面板里加新节点时会 404）"
+    else
+      dim "agent 已在 /dl/，跳过切片"
     fi
-    say "安装本机节点 agent"
-    bash "$INSTALL_DIR/apps/selfhost/scripts/install-agent.sh" \
-      --panel "http://127.0.0.1:${PORT}" \
-      --bin "$AGENT_BIN" 2>&1 | tail -8 || warn "agent 安装失败（面板本身可用，节点可以后再接）"
+
+    # 本机节点这一步不能全自动：面板首次登录是 must_change=1，改密之前
+    # 所有写接口都会被拒（"当前是默认密码，请先到管理改密"），所以拿不到节点令牌。
+    # 与其硬塞一个空 token 让 agent 起来后 401，不如把命令准备好让用户点一下。
+    say "本机节点：登录面板后按提示接入（令牌只能由面板生成）"
+    dim "面板 → 服务器 → Add Server，名称填 $(hostname 2>/dev/null || echo 本机)、地址填 ${IP:-<公网IP>}"
+    dim "保存后会弹出一条命令，直接复制到本机终端执行即可"
   else
     warn "没有可用的 agent 二进制 —— 本机节点没装"
     warn "  面板本身已经能用；接入节点走面板里的「添加服务器」，会给你一条命令"
