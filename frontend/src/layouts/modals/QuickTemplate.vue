@@ -344,28 +344,68 @@ export default {
       inbound.out_json = {}
       return this.saveInbound(inbound)
     },
+    /**
+     * 找一个能复用的自签 TLS 配置。
+     *
+     * 以前每建一个自签入站就无脑 genSelfSigned + saveTls，一键建 5 个会留下
+     * 5 条 TLS 记录 —— 其中 3 个 VMess 的三份证书内容一模一样，只是 id 不同。
+     * 现在按「SNI + ALPN」复用：
+     *   · ALPN 必须完全一致：TUIC 要 h3、VMess 要 h2/http1.1、
+     *     Hysteria2 不设 —— 三者不能共用同一份，否则握手协商不上。
+     *   · 只复用自签（有 certificate 且没有 acme）：ACME 是按域名签发的，
+     *     混进来会让「换证书」这件事变得不可预期。
+     *   · client.insecure 必须是 true：自签证书只有 insecure 才连得上，
+     *     复用一份给别的用途配的 TLS 会直接握手失败。
+     */
+    findReusableTls(sni: string, alpn?: string[]): number | null {
+      const norm = (v: any) => (Array.isArray(v) ? v.slice().sort().join(',') : '')
+      const want = norm(alpn)
+      const hit = (Data().tlsConfigs || []).find((t: any) => {
+        const srv = t.server || {}
+        if (!srv.enabled) return false
+        if (srv.acme) return false
+        if (!srv.certificate && !srv.certificate_path) return false
+        if ((srv.server_name || '') !== sni) return false
+        if (norm(srv.alpn) !== want) return false
+        if (t.client?.insecure !== true) return false
+        return true
+      })
+      return hit ? hit.id : null
+    },
     async inboundSelfSigned(port: number, type: string, tagPrefix: string, sni: string, alpn?: string[], outJson?: any): Promise<number | null> {
       const tag = tagPrefix + '-' + port
       if (this.tagExists(tag)) return null
-      const ss = await this.genSelfSigned(sni)
-      if (!ss) { this.err('cert'); return null }
-      // TUIC/VMess need an ALPN on the TLS server or the handshake fails
-      // ("server did not select an ALPN protocol"). prepareTls copies the
-      // server alpn to the client side, so the share link carries it too.
-      const server: any = { enabled: true, server_name: sni, certificate: ss.cert, key: ss.key }
-      if (alpn && alpn.length) server.alpn = alpn
-      const tlsObj = {
-        id: 0,
-        name: tagPrefix + '-' + port + '-' + RandomUtil.randomLowerAndNum(4),
-        server,
-        client: { enabled: true, insecure: true, server_name: sni },
+
+      // 先看有没有现成的同 SNI / 同 ALPN 自签配置
+      let tlsId = this.findReusableTls(sni, alpn)
+      // 只在**本次新建** TLS 时才允许失败回滚删掉它；
+      // 复用别人的配置还在 rollbackTlsId 里传下去的话，保存失败会把
+      // 别人正在用的证书一起删了。
+      let tlsCreated = false
+      if (!tlsId) {
+        const ss = await this.genSelfSigned(sni)
+        if (!ss) { this.err('cert'); return null }
+        // TUIC/VMess need an ALPN on the TLS server or the handshake fails
+        // ("server did not select an ALPN protocol"). prepareTls copies the
+        // server alpn to the client side, so the share link carries it too.
+        const server: any = { enabled: true, server_name: sni, certificate: ss.cert, key: ss.key }
+        if (alpn && alpn.length) server.alpn = alpn
+        const tlsObj = {
+          id: 0,
+          name: tagPrefix + '-' + port + '-' + RandomUtil.randomLowerAndNum(4),
+          server,
+          client: { enabled: true, insecure: true, server_name: sni },
+        }
+        const newId = await this.saveTls(tlsObj)
+        if (!newId) { this.err('TLS'); return null }
+        tlsId = newId
+        tlsCreated = true
       }
-      const tlsId = await this.saveTls(tlsObj)
-      if (!tlsId) { this.err('TLS'); return null }
+
       const inbound: any = createInbound(type, { id: 0, tag, listen: '::', listen_port: port, tls_id: tlsId })
       inbound.addrs = []
       inbound.out_json = outJson ?? {}
-      return this.saveInbound(inbound, tlsId)
+      return this.saveInbound(inbound, tlsCreated ? tlsId : undefined)
     },
 
     // ---- single-protocol templates --------------------------------------
