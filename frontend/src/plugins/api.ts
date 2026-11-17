@@ -3,7 +3,17 @@ import axios from 'axios'
 axios.defaults.headers.post['Content-Type'] = 'application/x-www-form-urlencoded; charset=UTF-8'
 axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest'
 
-axios.defaults.baseURL = "./"
+// baseURL 必须是绝对根路径 `/`，不能是相对当前页的 `./`。
+//
+// `./` 会让请求跟着页面路径走：在 `/dev/ui` 下，`get('api/load')` 会被浏览器
+// 解析成 `/dev/api/load`，既命中不了后端路由、也不在 vite proxy 的 /api 规则里，
+// 最终落回 index.html；前端把 HTML 当 JSON 读，报 `unknown data: <!DOCTYPE html>`。
+// 现有 16 条路由恰好都是单层路径才没暴露，以后加 `/rules/edit`、`/clients/:id`
+// 这类页面会整页数据全挂。
+//
+// 这个面板固定部署在域名根路径（index.html 里资源引用也都是 `/assets/...`），
+// 所以改成 `/` 是安全的。
+axios.defaults.baseURL = '/'
 const pendingRequests = new Map()
 
 axios.interceptors.request.use(
