@@ -1,5 +1,5 @@
 <template>
-  <ServiceVue 
+  <ServiceVue
     v-model="modal.visible"
     :visible="modal.visible"
     :id="modal.id"
@@ -10,113 +10,136 @@
     :tlsConfigs="tlsConfigs"
     @close="closeModal"
   />
-  <v-row>
-    <v-col cols="12" class="page-toolbar">
-      <v-btn color="primary" @click="showModal(0)">{{ $t('actions.add') }}</v-btn>
-    </v-col>
-  </v-row>
-  <v-row>
-    <v-col v-if="!services.length" cols="12" class="list-empty">
-      {{ $t('emptyList') }}
-    </v-col>
-    <v-col cols="12" sm="4" md="3" lg="2" v-for="(item, index) in <any[]>services" :key="item.tag">
-      <v-card rounded="xl" elevation="5" min-width="200" :title="item.tag">
-        <v-card-subtitle style="margin-top: -15px;">
-          <v-row>
-            <v-col>{{ item.type }}</v-col>
-          </v-row>
-        </v-card-subtitle>
-        <v-card-text>
-          <v-row>
-            <v-col>{{ $t('in.addr') }}</v-col>
-            <v-col>
-              {{ item.listen }}
-            </v-col>
-          </v-row>
-          <v-row>
-            <v-col>{{ $t('in.port') }}</v-col>
-            <v-col>
-              {{ item.listen_port }}
-            </v-col>
-          </v-row>
-          <v-row>
-            <v-col>{{ $t('objects.tls') }}</v-col>
-            <v-col>
-              {{ item.tls_id > 0 ? $t('enable') : $t('disable') }}
-            </v-col>
-          </v-row>
-        </v-card-text>
-        <v-divider></v-divider>
-        <v-card-actions style="padding: 0;">
-          <v-btn icon="mdi-file-edit" @click="showModal(item.id)">
-            <v-icon />
-            <v-tooltip activator="parent" location="top" :text="$t('actions.edit')"></v-tooltip>
-          </v-btn>
-          <v-btn icon="mdi-file-remove" style="margin-inline-start:0;" color="warning" @click="delOverlay[index] = true">
-            <v-icon />
-            <v-tooltip activator="parent" location="top" :text="$t('actions.del')"></v-tooltip>
-          </v-btn>
-          <v-overlay
-            v-model="delOverlay[index]"
-            contained
-            class="align-center justify-center"
-          >
-            <v-card :title="$t('actions.del')" rounded="lg">
-              <v-divider></v-divider>
-              <v-card-text>{{ $t('confirm') }}</v-card-text>
-              <v-card-actions>
-                <v-btn color="error" variant="flat" @click="delSrv(item.id)">{{ $t('yes') }}</v-btn>
-                <v-btn variant="text" class="confirm-cancel" @click="delOverlay[index] = false">{{ $t('no') }}</v-btn>
-              </v-card-actions>
-            </v-card>
-          </v-overlay>
-        </v-card-actions>
-      </v-card>      
-    </v-col>
-  </v-row>
+
+  <!-- 工具栏 -->
+  <div class="page-toolbar mb-4 flex items-center justify-between gap-3">
+    <Button size="sm" @click="showModal(0)">
+      <Plus class="mr-1.5 h-3.5 w-3.5" />
+      {{ $t('actions.add') }}
+    </Button>
+  </div>
+
+  <!-- 空状态 -->
+  <div
+    v-if="!services.length"
+    class="list-empty rounded-[2px] border border-dashed border-[var(--rule-strong)] py-14 text-center text-[13px] text-[var(--ink-3)]"
+  >
+    {{ $t('emptyList') }}
+  </div>
+
+  <!-- 服务卡片 -->
+  <div v-else class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+    <div
+      v-for="item in services"
+      :key="item.tag"
+      class="flex min-w-0 flex-col rounded-[2px] border border-[var(--rule)] bg-[var(--surface)] transition-colors duration-150 hover:border-[var(--rule-strong)]"
+    >
+      <div class="min-w-0 px-3 pt-2.5">
+        <h3 class="truncate text-[13px] font-semibold text-[var(--ink)]" style="font-family: var(--serif)" :title="item.tag">
+          {{ item.tag }}
+        </h3>
+        <p class="mt-0.5 truncate text-[11px] uppercase tracking-[0.06em] text-[var(--ink-3)]">
+          {{ item.type }}
+        </p>
+      </div>
+
+      <dl class="mt-2 space-y-0.5 px-3 pb-2.5 text-[12px]">
+        <div class="flex items-baseline gap-2">
+          <dt class="shrink-0 text-[var(--ink-3)]">{{ $t('in.addr') }}</dt>
+          <dd class="min-w-0 truncate text-right text-[var(--ink-2)]" :title="item.listen">{{ item.listen }}</dd>
+        </div>
+        <div class="flex items-baseline gap-2">
+          <dt class="shrink-0 text-[var(--ink-3)]">{{ $t('in.port') }}</dt>
+          <dd class="ml-auto tabular-nums text-[var(--ink-2)]">{{ item.listen_port }}</dd>
+        </div>
+        <div class="flex items-baseline gap-2">
+          <dt class="shrink-0 text-[var(--ink-3)]">{{ $t('objects.tls') }}</dt>
+          <dd class="ml-auto" :class="item.tls_id > 0 ? 'text-[var(--ink)]' : 'text-[var(--ink-3)]'">
+            {{ item.tls_id > 0 ? $t('enable') : $t('disable') }}
+          </dd>
+        </div>
+      </dl>
+
+      <div class="mt-auto flex items-center gap-1 border-t border-[var(--rule)] px-1.5 py-1">
+        <button
+          type="button"
+          class="ui-reset grid h-6 w-6 place-items-center rounded-[2px] text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)]"
+          :title="$t('actions.edit')"
+          :aria-label="$t('actions.edit')"
+          @click="showModal(item.id)"
+        >
+          <Pencil class="h-3.5 w-3.5" />
+        </button>
+        <button
+          type="button"
+          class="ui-reset grid h-6 w-6 place-items-center rounded-[2px] text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--error)]"
+          :title="$t('actions.del')"
+          :aria-label="$t('actions.del')"
+          @click="askDelete(item)"
+        >
+          <Trash2 class="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <Dialog v-model:open="delOpen" :title="$t('actions.del')" :width="360">
+    <p class="text-[13px] leading-relaxed text-[var(--ink-2)]">
+      {{ $t('confirm') }}
+    </p>
+    <p v-if="delTarget" class="mt-1.5 truncate text-[12px] text-[var(--ink-3)]">{{ delTarget.tag }}</p>
+    <template #footer>
+      <Button variant="ghost" size="sm" class="confirm-cancel" @click="delOpen = false">{{ $t('no') }}</Button>
+      <Button variant="destructive" size="sm" @click="doDelete">{{ $t('yes') }}</Button>
+    </template>
+  </Dialog>
 </template>
 
 <script lang="ts" setup>
-import Data from '@/store/modules/data'
-import { Srv } from '@/types/services'
 import { computed, ref } from 'vue'
+import { Pencil, Plus, Trash2 } from 'lucide-vue-next'
+import Button from '@/components/ui/button/Button.vue'
+import Dialog from '@/components/ui/dialog/Dialog.vue'
+import Data from '@/store/modules/data'
+import type { Srv } from '@/types/services'
 import ServiceVue from '@/layouts/modals/Service.vue'
 
 const services = computed((): Srv[] => {
-  return <Srv[]> Data().services
-})
-
-const srvTags = computed((): any[] => {
-  return services.value?.map((o:Srv) => o.tag)
+  return Data().services as Srv[]
 })
 
 const tsTags = computed((): any[] => {
-  return Data().endpoints?.filter((o:any) => o.type == "tailscale")?.map((o:any) => o.tag)
+  return Data().endpoints?.filter((o: any) => o.type == 'tailscale')?.map((o: any) => o.tag)
 })
 
 const ssTags = computed((): any[] => {
-  return Data().inbounds?.filter((o:any) => o.type == "shadowsocks" && !o.users)?.map((o:any) => o.tag)
+  return Data().inbounds?.filter((o: any) => o.type == 'shadowsocks' && !o.users)?.map((o: any) => o.tag)
 })
 
 const inTags = computed((): any[] => {
-  return [...Data().inbounds?.map((o:any) => o.tag).filter(t => t != null), ...Data().endpoints?.filter((e:any) => e.listen_port > 0).map((e:any) => e.tag)]
+  return [
+    ...(Data().inbounds?.map((o: any) => o.tag).filter((t) => t != null) ?? []),
+    ...(Data().endpoints?.filter((e: any) => e.listen_port > 0).map((e: any) => e.tag) ?? []),
+  ]
 })
 
 const tlsConfigs = computed((): any[] => {
-  return <any[]> Data().tlsConfigs
+  return Data().tlsConfigs as any[]
 })
 
 const modal = ref({
   visible: false,
   id: 0,
-  data: "",
+  data: '',
 })
 
-let delOverlay = ref([] as boolean[])
+/** 删除确认：只记一个目标，不再为每张卡片维护一个 overlay 开关 */
+const delOpen = ref(false)
+const delTarget = ref<Srv | null>(null)
 
 const showModal = (id: number) => {
   modal.value.id = id
-  modal.value.data = id == 0 ? '' : JSON.stringify(services.value.findLast(o => o.id == id))
+  modal.value.data = id == 0 ? '' : JSON.stringify(services.value.findLast((o) => o.id == id))
   modal.value.visible = true
 }
 
@@ -124,11 +147,18 @@ const closeModal = () => {
   modal.value.visible = false
 }
 
-const delSrv = async (id: number) => {
-  const index = services.value.findIndex(i => i.id == id)
-  const tag = services.value[index].tag
+const askDelete = (item: Srv) => {
+  delTarget.value = item
+  delOpen.value = true
+}
 
-  const success = await Data().save("services", "del", tag)
-  if (success) delOverlay.value[index] = false
+const doDelete = async () => {
+  const item = delTarget.value
+  if (!item) return
+  const success = await Data().save('services', 'del', item.tag)
+  if (success) {
+    delOpen.value = false
+    delTarget.value = null
+  }
 }
 </script>
