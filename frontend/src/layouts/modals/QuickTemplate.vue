@@ -74,6 +74,26 @@
 </template>
 
 <script lang="ts">
+/**
+ * 「★ All Protocols」的生成计划 —— 唯一事实来源。
+ *
+ * 一次建 5 个入站，但只有 3 种协议：VMess ×3、Hysteria2 ×1、TUIC ×1。
+ * 三个 VMess 用不同端口（端口由 pickPort 现挑），tag 也会跟着端口区分。
+ * 文案里的 {n} 直接取这个数组长度，不再用「模板下拉项数 - 1」，
+ * 否则一个模板建多个入站时数字会对不上。
+ */
+export const BUILD_ALL_PLAN: { type: string; alpn?: string[]; outJson?: any }[] = [
+  { type: 'vmess', alpn: ['h2', 'http/1.1'] },
+  { type: 'vmess', alpn: ['h2', 'http/1.1'] },
+  { type: 'vmess', alpn: ['h2', 'http/1.1'] },
+  // Hysteria2 默认带端口跳跃：
+  //   面板侧 —— out_json.server_ports 会进订阅链接（mport=...）
+  //   节点侧 —— node/core/port_hop.go 读到它就建 iptables DNAT，
+  //             把整段 UDP 转到真正的监听端口
+  // 20000:30000 是固定段：用户防火墙/安全组只需要放行一次这一段。
+  { type: 'hysteria2', outJson: { server_ports: ['20000:30000'] } },
+  { type: 'tuic', alpn: ['h3'] },
+]
 import Data from '@/store/modules/data'
 import HttpUtils from '@/plugins/httputil'
 import RandomUtil from '@/plugins/randomUtil'
@@ -126,6 +146,7 @@ export default {
         { title: t('vlessReality'), value: 'vless-reality' },
         { title: t('hysteria2'), value: 'hysteria2' },
         { title: t('tuic'), value: 'tuic' },
+        { title: t('vmess'), value: 'vmess' },
       ]
     },
     descKey(): string {
@@ -145,7 +166,7 @@ export default {
       // {n} in allDesc = how many protocols "★ All" actually builds, derived
       // from the template list (minus the "all" entry) so the copy never goes
       // stale when protocols are added/removed. Ignored by descs without {n}.
-      return { desc: i18n.global.t('quickTemplate.' + this.descKey, { n: this.templates.length - 1 }) }
+      return { desc: i18n.global.t('quickTemplate.' + this.descKey, { n: BUILD_ALL_PLAN.length }) }
     },
     needsSni(): boolean {
       // Everything except Shadowsocks needs a domain (Reality handshake target
@@ -191,6 +212,7 @@ export default {
           case 'all': clientId = await this.buildAll(clientName); break
           case 'vless-reality': clientId = await this.buildVlessReality(port, clientName); break
           case 'hysteria2': clientId = await this.buildSelfSigned(port, clientName, 'hysteria2', 'hysteria2', { hysteria2: { name: clientName, password: RandomUtil.randomSeq(10) } }); break
+          case 'vmess': clientId = await this.buildSelfSigned(port, clientName, 'vmess', 'vmess', { vmess: { name: clientName, uuid: RandomUtil.randomUUID() } }, ['h2', 'http/1.1']); break
           case 'tuic': clientId = await this.buildSelfSigned(port, clientName, 'tuic', 'tuic', { tuic: { name: clientName, uuid: RandomUtil.randomUUID(), password: RandomUtil.randomSeq(10) } }, ['h3']); break
           case 'trojan': clientId = await this.buildSelfSigned(port, clientName, 'trojan', 'trojan', { trojan: { name: clientName, password: RandomUtil.randomSeq(10) } }); break
           case 'anytls': clientId = await this.buildSelfSigned(port, clientName, 'anytls', 'anytls', { anytls: { name: clientName, password: RandomUtil.randomSeq(10) } }); break
@@ -322,7 +344,7 @@ export default {
       inbound.out_json = {}
       return this.saveInbound(inbound)
     },
-    async inboundSelfSigned(port: number, type: string, tagPrefix: string, sni: string, alpn?: string[]): Promise<number | null> {
+    async inboundSelfSigned(port: number, type: string, tagPrefix: string, sni: string, alpn?: string[], outJson?: any): Promise<number | null> {
       const tag = tagPrefix + '-' + port
       if (this.tagExists(tag)) return null
       const ss = await this.genSelfSigned(sni)
@@ -342,7 +364,7 @@ export default {
       if (!tlsId) { this.err('TLS'); return null }
       const inbound: any = createInbound(type, { id: 0, tag, listen: '::', listen_port: port, tls_id: tlsId })
       inbound.addrs = []
-      inbound.out_json = {}
+      inbound.out_json = outJson ?? {}
       return this.saveInbound(inbound, tlsId)
     },
 
@@ -377,9 +399,9 @@ export default {
       const ids: number[] = []
       const collect = (id: number | null) => { if (id) ids.push(id) }
 
-      collect(await this.inboundReality(pickPort(), sni))
-      collect(await this.inboundSelfSigned(pickPort(), 'hysteria2', 'hysteria2', sni))
-      collect(await this.inboundSelfSigned(pickPort(), 'tuic', 'tuic', sni, ['h3']))
+      for (const step of BUILD_ALL_PLAN) {
+        collect(await this.inboundSelfSigned(pickPort(), step.type, step.type, sni, step.alpn, step.outJson))
+      }
 
       if (ids.length === 0) { this.err(i18n.global.t('objects.inbound')); return null }
 
