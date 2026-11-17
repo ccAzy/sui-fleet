@@ -126,8 +126,6 @@ export default {
         { title: t('vlessReality'), value: 'vless-reality' },
         { title: t('hysteria2'), value: 'hysteria2' },
         { title: t('tuic'), value: 'tuic' },
-        { title: t('trojan'), value: 'trojan' },
-        { title: t('anytls'), value: 'anytls' },
       ]
     },
     descKey(): string {
@@ -382,8 +380,6 @@ export default {
       collect(await this.inboundReality(pickPort(), sni))
       collect(await this.inboundSelfSigned(pickPort(), 'hysteria2', 'hysteria2', sni))
       collect(await this.inboundSelfSigned(pickPort(), 'tuic', 'tuic', sni, ['h3']))
-      collect(await this.inboundSelfSigned(pickPort(), 'trojan', 'trojan', sni))
-      collect(await this.inboundSelfSigned(pickPort(), 'anytls', 'anytls', sni))
 
       if (ids.length === 0) { this.err(i18n.global.t('objects.inbound')); return null }
 
