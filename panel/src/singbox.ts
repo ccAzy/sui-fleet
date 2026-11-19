@@ -175,11 +175,31 @@ export function linkToOutbound(uri: string): J | null {
 export function buildSingboxConfig(uris: string[], title: string): J {
   const outbounds = buildSingboxOutbounds(uris);
   const tags = outbounds.map((o) => String(o.tag)).filter(Boolean);
+  // 自动优选 / 故障转移，与 clash.ts 里的 AUTO / FALLBACK 对齐。
+  // 原来只有 selector（只能手动选），长连接场景没得选。
+  if (tags.length > 0) {
+    outbounds.push({
+      type: "urltest",
+      tag: "auto",
+      outbounds: tags,
+      url: "https://www.gstatic.com/generate_204",
+      // 10m + 80ms 容差：默认 3m 且无容差，差 1ms 就切，流式响应会断
+      interval: "10m",
+      tolerance: 80,
+    } as J);
+    outbounds.push({
+      type: "fallback",
+      tag: "fallback",
+      outbounds: tags,
+      url: "https://www.gstatic.com/generate_204",
+      interval: "5m",
+    } as J);
+  }
   outbounds.push({
     type: "selector",
     tag: "proxy",
-    outbounds: tags.length ? tags : ["direct"],
-    default: tags[0] ?? "direct",
+    outbounds: tags.length ? ["auto", "fallback", ...tags] : ["direct"],
+    default: tags.length ? "auto" : "direct",
   } as J);
   outbounds.push({ type: "direct", tag: "direct" } as J);
   return {
