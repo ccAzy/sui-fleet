@@ -413,6 +413,18 @@ export function buildClashConfig(uris: string[], title = "s-ui"): string {
         type: "url-test",
         proxies: names,
         url: "https://www.gstatic.com/generate_204",
+        // interval 300 + tolerance 0 是默认组合，也是最坑的组合：
+        // 每 5 分钟重测全量，且相差 1ms 就切换 —— 正在跑的流式响应/下载当场断。
+        // 600s 重测 + 80ms 容差，小幅抖动不再触发切换。
+        interval: 600,
+        tolerance: 80,
+      },
+      {
+        // 长连接场景用它：只按顺序用第一个活着的，不追最快，不会中途切走
+        name: "FALLBACK",
+        type: "fallback",
+        proxies: names,
+        url: "https://www.gstatic.com/generate_204",
         interval: 300,
       },
     ],

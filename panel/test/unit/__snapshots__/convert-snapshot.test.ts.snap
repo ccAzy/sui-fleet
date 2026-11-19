@@ -152,6 +152,23 @@ proxy-groups:
       - anytls
       - socks5
     url: "https://www.gstatic.com/generate_204"
+    interval: 600
+    tolerance: 80
+  - name: FALLBACK
+    type: fallback
+    proxies:
+      - vless-reality
+      - vless-ws
+      - vless-grpc
+      - vmess-ws
+      - trojan
+      - ss
+      - ss2022
+      - hy2
+      - tuic
+      - anytls
+      - socks5
+    url: "https://www.gstatic.com/generate_204"
     interval: 300
 rules:
   - "GEOIP,CN,DIRECT"
